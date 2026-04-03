@@ -1,9 +1,11 @@
 using System.Text.Json;
+using AbacController.Api.Observability;
 using AbacController.Core.Constants;
 using AbacController.Core.Domain.Decisions;
 using AbacController.Core.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace AbacController.Api.Controllers;
 
@@ -14,10 +16,12 @@ namespace AbacController.Api.Controllers;
 public class AuthZenController : ControllerBase
 {
     private readonly IPdpEngine _pdp;
+    private readonly ApiMetrics _metrics;
 
-    public AuthZenController(IPdpEngine pdp)
+    public AuthZenController(IPdpEngine pdp, ApiMetrics metrics)
     {
         _pdp = pdp;
+        _metrics = metrics;
     }
 
     /// <summary>
@@ -26,11 +30,13 @@ public class AuthZenController : ControllerBase
     /// </summary>
     [HttpPost("/access/v1/evaluation")]
     [Authorize(Policy = "Evaluate")]
+    [EnableRateLimiting("pdp")]
     public async Task<IActionResult> Evaluate(
         [FromBody] AuthZenEvaluationRequest request, CancellationToken ct)
     {
         var internalRequest = MapToInternal(request);
         var result = await _pdp.EvaluateAsync(internalRequest, ct);
+        _metrics.RecordEvaluation(result.Decision, result.EvaluationTime);
 
         var response = new AuthZenEvaluationResponse
         {
@@ -62,15 +68,18 @@ public class AuthZenController : ControllerBase
     /// </summary>
     [HttpPost("/access/v1/evaluations")]
     [Authorize(Policy = "Evaluate")]
+    [EnableRateLimiting("pdp")]
     public async Task<IActionResult> EvaluateBatch(
         [FromBody] AuthZenBatchRequest request, CancellationToken ct)
     {
         var results = new List<AuthZenEvaluationResponse>();
+        _metrics.RecordBatchEvaluation(request.Evaluations.Count);
 
         foreach (var eval in request.Evaluations)
         {
             var internalRequest = MapToInternal(eval);
             var result = await _pdp.EvaluateAsync(internalRequest, ct);
+            _metrics.RecordEvaluation(result.Decision, result.EvaluationTime);
 
             results.Add(new AuthZenEvaluationResponse
             {
