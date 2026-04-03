@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using System.Text.Json;
 using AbacController.Core.Constants;
+using AbacController.Core.Domain.Attributes;
 using AbacController.Core.Domain.Decisions;
 using AbacController.Core.Domain.Labels;
+using AbacController.Core.Domain.Policy;
 using AbacController.Core.Interfaces;
 
 namespace AbacController.Pdp;
@@ -16,92 +18,33 @@ public sealed class PdpEngine : IPdpEngine
     private readonly IAcdfEvaluator _acdf;
     private readonly ISpifRegistry _spifRegistry;
     private readonly IDecisionCache _decisionCache;
+    private readonly IPolicyRepository _policyRepository;
+    private readonly IPipResolver _pipResolver;
     private readonly IAuditWriter _auditWriter;
 
     public PdpEngine(
         IAcdfEvaluator acdf,
         ISpifRegistry spifRegistry,
         IDecisionCache decisionCache,
+        IPolicyRepository policyRepository,
+        IPipResolver pipResolver,
         IAuditWriter auditWriter)
     {
         _acdf = acdf;
         _spifRegistry = spifRegistry;
         _decisionCache = decisionCache;
+        _policyRepository = policyRepository;
+        _pipResolver = pipResolver;
         _auditWriter = auditWriter;
     }
 
     /// <inheritdoc />
-    public Task<EvaluationResult> EvaluateAsync(
+    public async Task<EvaluationResult> EvaluateAsync(
         EvaluationRequest request,
         CancellationToken ct = default)
     {
-        var sw = Stopwatch.StartNew();
-        var decisionId = Guid.NewGuid().ToString("N");
-
-        var label = ExtractLabel(request);
-        var clearance = ExtractClearance(request);
-
-        if (label is null || clearance is null)
-        {
-            return Task.FromResult(CreateResult(
-                decisionId,
-                request,
-                Decision.Indeterminate,
-                sw.Elapsed,
-                "Missing security label or clearance in request",
-                cacheStatus: "MISS"));
-        }
-
-        var spifIndex = ResolveSpif(request, label, clearance);
-        if (spifIndex is null)
-        {
-            return Task.FromResult(CreateResult(
-                decisionId,
-                request,
-                Decision.Indeterminate,
-                sw.Elapsed,
-                "No applicable SPIF found",
-                cacheStatus: "MISS"));
-        }
-
-        var policyVersion = request.Options.PolicyVersion
-            ?? spifIndex.Spif.Version
-            ?? spifIndex.SchemaVersion;
-
-        if (!request.Options.BypassCache)
-        {
-            var cacheKey = _decisionCache.ComputeKey(request, policyVersion);
-            if (_decisionCache.TryGet(cacheKey, out var cached) && cached is not null)
-            {
-                return Task.FromResult(cached with
-                {
-                    RequestId = request.RequestId,
-                    CacheStatus = "HIT",
-                    EvaluationTime = sw.Elapsed
-                });
-            }
-        }
-
-        var acdfResult = _acdf.Evaluate(in label, in clearance, spifIndex);
-        sw.Stop();
-
-        var result = CreateResult(
-            decisionId,
-            request,
-            acdfResult.Pass ? Decision.Permit : Decision.Deny,
-            sw.Elapsed,
-            acdfResult.FailureDetail,
-            cacheStatus: request.Options.BypassCache ? "BYPASS" : "MISS",
-            appliedPolicies: [spifIndex.PolicyOid]);
-
-        if (!request.Options.BypassCache && result.Decision != Decision.Indeterminate)
-        {
-            var cacheKey = _decisionCache.ComputeKey(request, policyVersion);
-            _decisionCache.Set(cacheKey, result, TimeSpan.FromMinutes(5));
-        }
-
-        WriteAuditEvent(result, request);
-        return Task.FromResult(result);
+        var evaluation = await EvaluateInternalAsync(request, explain: false, ct);
+        return evaluation.Result;
     }
 
     /// <inheritdoc />
@@ -137,79 +80,169 @@ public sealed class PdpEngine : IPdpEngine
     }
 
     /// <inheritdoc />
-    public Task<ExplainedEvaluationResult> EvaluateExplainAsync(
+    public async Task<ExplainedEvaluationResult> EvaluateExplainAsync(
         EvaluationRequest request,
         CancellationToken ct = default)
     {
+        var evaluation = await EvaluateInternalAsync(request, explain: true, ct);
+        return new ExplainedEvaluationResult
+        {
+            Result = evaluation.Result,
+            Trace = evaluation.Trace ?? new EvaluationTrace()
+        };
+    }
+
+    private async Task<InternalEvaluation> EvaluateInternalAsync(
+        EvaluationRequest request,
+        bool explain,
+        CancellationToken ct)
+    {
         var sw = Stopwatch.StartNew();
         var decisionId = Guid.NewGuid().ToString("N");
-        var trace = new AcdfTraceCollector();
+        var traceCollector = explain ? new AcdfTraceCollector() : null;
+        var cacheStatus = explain || request.Options.BypassCache ? "BYPASS" : "MISS";
 
         var label = ExtractLabel(request);
-        var clearance = ExtractClearance(request);
-
-        if (label is null || clearance is null)
+        if (label is null)
         {
-            trace.AddStep("input-validation", "FAIL", false, "Missing label or clearance");
-            return Task.FromResult(new ExplainedEvaluationResult
-            {
-                Result = CreateResult(
-                    decisionId,
-                    request,
-                    Decision.Indeterminate,
-                    sw.Elapsed,
-                    "Missing security label or clearance",
-                    cacheStatus: "BYPASS"),
-                Trace = new EvaluationTrace { Steps = trace.GetSteps().ToList() }
-            });
+            traceCollector?.AddStep("input-validation", "FAIL", false, "Missing security label in request");
+            var missingLabelResult = CreateResult(
+                decisionId,
+                request,
+                Decision.Indeterminate,
+                sw.Elapsed,
+                "Missing security label in request",
+                cacheStatus);
+            WriteAuditEvent(missingLabelResult, request);
+            return BuildInternalEvaluation(missingLabelResult, traceCollector, request.Options.PolicySetId, null, null);
         }
 
-        var spifIndex = ResolveSpif(request, label, clearance);
+        var spifIndex = ResolveSpif(request, label, clearance: null);
         if (spifIndex is null)
         {
-            trace.AddStep("spif-resolution", "FAIL", false, "No applicable SPIF found");
-            return Task.FromResult(new ExplainedEvaluationResult
-            {
-                Result = CreateResult(
-                    decisionId,
-                    request,
-                    Decision.Indeterminate,
-                    sw.Elapsed,
-                    "No applicable SPIF found",
-                    cacheStatus: "BYPASS"),
-                Trace = new EvaluationTrace { Steps = trace.GetSteps().ToList() }
-            });
+            traceCollector?.AddStep("spif-resolution", "FAIL", false, "No applicable SPIF found");
+            var missingSpifResult = CreateResult(
+                decisionId,
+                request,
+                Decision.Indeterminate,
+                sw.Elapsed,
+                "No applicable SPIF found",
+                cacheStatus);
+            WriteAuditEvent(missingSpifResult, request);
+            return BuildInternalEvaluation(missingSpifResult, traceCollector, request.Options.PolicySetId, null, null);
         }
 
-        trace.AddStep("spif-resolution", "PASS", true,
+        traceCollector?.AddStep("spif-resolution", "PASS", true,
             $"SPIF resolved: {spifIndex.PolicyName} ({spifIndex.PolicyOid})");
-        trace.AddStep("input-validation", "PASS", true, "Label and clearance extracted");
 
-        var acdfResult = _acdf.EvaluateWithTrace(in label, in clearance, spifIndex, trace);
-        sw.Stop();
+        var policySets = await LoadPolicySetsAsync(request, ct);
+        var policyVersion = NativePolicyEvaluator.ComputeVersionFingerprint(policySets, request.Options.PolicyVersion);
+
+        if (!explain && !request.Options.BypassCache)
+        {
+            var cacheKey = _decisionCache.ComputeKey(request, policyVersion);
+            if (_decisionCache.TryGet(cacheKey, out var cached) && cached is not null)
+            {
+                var cacheHit = cached with
+                {
+                    RequestId = request.RequestId,
+                    CacheStatus = "HIT",
+                    EvaluationTime = sw.Elapsed
+                };
+                WriteAuditEvent(cacheHit, request);
+                return new InternalEvaluation(cacheHit, null);
+            }
+        }
+
+        var enrichment = await EnrichRequestAsync(request, policySets, ct);
+        var evaluationRequest = enrichment.Request;
+        var provenance = BuildProvenance(enrichment.ResolvedAttributes);
+
+        traceCollector?.AddStep(
+            "pip-resolution",
+            enrichment.MissingAttributes.Count == 0 ? "PASS" : "PARTIAL",
+            enrichment.MissingAttributes.Count == 0,
+            enrichment.ResolvedAttributes.Count == 0
+                ? "No PIP attributes resolved"
+                : $"Resolved attributes: {string.Join(", ", enrichment.ResolvedAttributes.Select(static a => a.Name))}");
+
+        var clearance = ExtractClearance(evaluationRequest);
+        if (clearance is null)
+        {
+            var missingMessage = enrichment.MissingAttributes.Count > 0
+                ? $"Missing required attributes: {string.Join(", ", enrichment.MissingAttributes)}"
+                : "Missing security clearance in request";
+
+            traceCollector?.AddStep("input-validation", "FAIL", false, missingMessage);
+
+            var indeterminate = CreateResult(
+                decisionId,
+                evaluationRequest,
+                Decision.Indeterminate,
+                sw.Elapsed,
+                missingMessage,
+                cacheStatus,
+                attributeProvenance: provenance);
+            WriteAuditEvent(indeterminate, evaluationRequest);
+            return BuildInternalEvaluation(indeterminate, traceCollector, request.Options.PolicySetId, policyVersion, spifIndex.PolicyName);
+        }
+
+        traceCollector?.AddStep("input-validation", "PASS", true, "Security label and clearance available");
+
+        var acdfResult = explain
+            ? _acdf.EvaluateWithTrace(in label, in clearance, spifIndex, traceCollector!)
+            : _acdf.Evaluate(in label, in clearance, spifIndex);
+
+        if (!acdfResult.Pass)
+        {
+            var denied = CreateResult(
+                decisionId,
+                evaluationRequest,
+                Decision.Deny,
+                sw.Elapsed,
+                acdfResult.FailureDetail,
+                cacheStatus,
+                attributeProvenance: provenance);
+            WriteAuditEvent(denied, evaluationRequest);
+            return BuildInternalEvaluation(denied, traceCollector, request.Options.PolicySetId, policyVersion, spifIndex.PolicyName);
+        }
+
+        var policyOutcome = NativePolicyEvaluator.Evaluate(evaluationRequest, policySets, request.Options.PolicyVersion);
+        foreach (var step in policyOutcome.TraceSteps)
+        {
+            traceCollector?.AddStep(step.RuleId, step.Effect, step.Result, step.Reason);
+        }
+
+        var finalDecision = policyOutcome.Decision switch
+        {
+            Decision.NotApplicable => Decision.Deny,
+            _ => policyOutcome.Decision
+        };
+
+        var message = policyOutcome.Decision == Decision.NotApplicable
+            ? "No applicable policy matched; default deny"
+            : policyOutcome.Message;
 
         var result = CreateResult(
             decisionId,
-            request,
-            acdfResult.Pass ? Decision.Permit : Decision.Deny,
+            evaluationRequest,
+            finalDecision,
             sw.Elapsed,
-            acdfResult.FailureDetail,
-            cacheStatus: "BYPASS",
-            appliedPolicies: [spifIndex.PolicyOid]);
+            message,
+            cacheStatus,
+            appliedPolicies: policyOutcome.AppliedPolicies,
+            obligations: request.Options.ReturnObligations ? policyOutcome.Obligations : null,
+            advice: request.Options.ReturnAdvice ? policyOutcome.Advice : null,
+            attributeProvenance: provenance);
 
-        WriteAuditEvent(result, request);
-
-        return Task.FromResult(new ExplainedEvaluationResult
+        if (!explain && !request.Options.BypassCache && result.Decision != Decision.Indeterminate)
         {
-            Result = result,
-            Trace = new EvaluationTrace
-            {
-                PolicySetId = spifIndex.PolicyOid,
-                PolicyVersion = request.Options.PolicyVersion ?? spifIndex.Spif.Version ?? spifIndex.SchemaVersion,
-                MatchedPolicy = spifIndex.PolicyName,
-                Steps = trace.GetSteps().ToList()
-            }
-        });
+            var cacheKey = _decisionCache.ComputeKey(request, policyVersion);
+            _decisionCache.Set(cacheKey, result, ComputeDecisionTtl(enrichment.ResolvedAttributes));
+        }
+
+        WriteAuditEvent(result, evaluationRequest);
+        return BuildInternalEvaluation(result, traceCollector, request.Options.PolicySetId, policyVersion, spifIndex.PolicyName);
     }
 
     /// <summary>
@@ -262,6 +295,94 @@ public sealed class PdpEngine : IPdpEngine
         return _spifRegistry.GetDefault();
     }
 
+    private async Task<List<PolicySet>> LoadPolicySetsAsync(EvaluationRequest request, CancellationToken ct)
+    {
+        if (!string.IsNullOrWhiteSpace(request.Options.PolicySetId))
+        {
+            var policySet = await _policyRepository.GetPolicySetAsync(request.Options.PolicySetId!, ct);
+            return policySet is null || !policySet.IsActive ? [] : [policySet];
+        }
+
+        return (await _policyRepository.GetPolicySetsAsync(ct))
+            .Where(static ps => ps.IsActive)
+            .ToList();
+    }
+
+    private async Task<RequestEnrichment> EnrichRequestAsync(
+        EvaluationRequest request,
+        IReadOnlyList<PolicySet> policySets,
+        CancellationToken ct)
+    {
+        var requiredAttributes = new HashSet<string>(StringComparer.Ordinal);
+
+        if (!request.Subject.Properties.ContainsKey("securityClearance"))
+        {
+            requiredAttributes.Add("securityClearance");
+        }
+
+        foreach (var attribute in NativePolicyEvaluator.CollectRequiredSubjectAttributes(policySets, request.Options.PolicyVersion))
+        {
+            if (!request.Subject.Properties.ContainsKey(attribute))
+            {
+                requiredAttributes.Add(attribute);
+            }
+        }
+
+        if (requiredAttributes.Count == 0)
+        {
+            return new RequestEnrichment(request, [], []);
+        }
+
+        var resolution = await _pipResolver.ResolveAsync(new AttributeResolutionRequest
+        {
+            SubjectId = request.Subject.Id,
+            SubjectType = request.Subject.Type,
+            RequestedAttributes = requiredAttributes.ToList(),
+            Context = new Dictionary<string, object?>
+            {
+                ["actionName"] = request.Action.Name,
+                ["resourceType"] = request.Resource.Type,
+                ["resourceId"] = request.Resource.Id
+            }
+        }, ct);
+
+        var subjectProperties = new Dictionary<string, object?>(request.Subject.Properties, StringComparer.Ordinal);
+        var resourceProperties = new Dictionary<string, object?>(request.Resource.Properties, StringComparer.Ordinal);
+        var actionProperties = new Dictionary<string, object?>(request.Action.Properties, StringComparer.Ordinal);
+        var environment = new Dictionary<string, object?>(request.Context?.Environment ?? [], StringComparer.Ordinal);
+
+        foreach (var value in resolution.Values)
+        {
+            switch (value.Category)
+            {
+                case AttributeCategory.Subject:
+                    subjectProperties[value.Name] = value.Value;
+                    break;
+                case AttributeCategory.Resource:
+                    resourceProperties[value.Name] = value.Value;
+                    break;
+                case AttributeCategory.Action:
+                    actionProperties[value.Name] = value.Value;
+                    break;
+                case AttributeCategory.Environment:
+                    environment[value.Name] = value.Value;
+                    break;
+            }
+        }
+
+        var enrichedRequest = request with
+        {
+            Subject = request.Subject with { Properties = subjectProperties },
+            Resource = request.Resource with { Properties = resourceProperties },
+            Action = request.Action with { Properties = actionProperties },
+            Context = request.Context is null
+                ? new ContextInfo { Environment = environment }
+                : request.Context with { Environment = environment }
+        };
+
+        return new RequestEnrichment(enrichedRequest, resolution.Values, resolution.Missing);
+    }
+
     private static SecurityLabel? ExtractLabel(EvaluationRequest request)
         => request.Resource.Properties.TryGetValue("securityLabel", out var labelObj) && labelObj is SecurityLabel label
             ? label
@@ -280,7 +401,10 @@ public sealed class PdpEngine : IPdpEngine
         TimeSpan elapsed,
         string? message,
         string cacheStatus,
-        List<string>? appliedPolicies = null)
+        List<string>? appliedPolicies = null,
+        List<Obligation>? obligations = null,
+        List<Advice>? advice = null,
+        List<AttributeProvenance>? attributeProvenance = null)
     {
         var code = decision == Decision.Indeterminate ? "error" : "ok";
 
@@ -290,11 +414,53 @@ public sealed class PdpEngine : IPdpEngine
             DecisionId = decisionId,
             Decision = decision,
             Status = message is null ? null : new StatusInfo { Code = code, Message = message },
+            Obligations = obligations ?? [],
+            Advice = advice ?? [],
             AppliedPolicies = appliedPolicies ?? [],
             EvaluationTime = elapsed,
-            CacheStatus = cacheStatus
+            CacheStatus = cacheStatus,
+            AttributeProvenance = attributeProvenance ?? []
         };
     }
+
+    private static TimeSpan ComputeDecisionTtl(IReadOnlyList<AttributeValue> resolvedAttributes)
+    {
+        var configuredTtl = TimeSpan.FromMinutes(5);
+        var minAttributeTtl = resolvedAttributes
+            .Where(static a => a.CacheTtl.HasValue)
+            .Select(static a => a.CacheTtl!.Value)
+            .DefaultIfEmpty(configuredTtl)
+            .Min();
+
+        return minAttributeTtl < configuredTtl ? minAttributeTtl : configuredTtl;
+    }
+
+    private static List<AttributeProvenance> BuildProvenance(IReadOnlyList<AttributeValue> resolvedAttributes)
+        => resolvedAttributes.Select(static value => new AttributeProvenance
+        {
+            AttributeName = value.Name,
+            Source = value.SourceId,
+            FetchedAt = value.FetchedAt,
+            SourceTtl = value.CacheTtl
+        }).ToList();
+
+    private static InternalEvaluation BuildInternalEvaluation(
+        EvaluationResult result,
+        AcdfTraceCollector? traceCollector,
+        string? policySetId,
+        string? policyVersion,
+        string? matchedPolicy)
+        => new(
+            result,
+            traceCollector is null
+                ? null
+                : new EvaluationTrace
+                {
+                    PolicySetId = policySetId,
+                    PolicyVersion = policyVersion,
+                    MatchedPolicy = matchedPolicy,
+                    Steps = traceCollector.GetSteps().ToList()
+                });
 
     private void WriteAuditEvent(EvaluationResult result, EvaluationRequest request)
     {
@@ -315,4 +481,11 @@ public sealed class PdpEngine : IPdpEngine
             EvaluationTimeMs = result.EvaluationTime.TotalMilliseconds
         });
     }
+
+    private sealed record RequestEnrichment(
+        EvaluationRequest Request,
+        List<AttributeValue> ResolvedAttributes,
+        List<string> MissingAttributes);
+
+    private sealed record InternalEvaluation(EvaluationResult Result, EvaluationTrace? Trace);
 }

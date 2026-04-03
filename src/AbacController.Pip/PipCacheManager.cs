@@ -1,6 +1,7 @@
-using Microsoft.Extensions.Caching.Memory;
+using System.Collections.Concurrent;
 using AbacController.Core.Domain.Attributes;
 using AbacController.Core.Interfaces;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace AbacController.Pip;
 
@@ -14,6 +15,8 @@ public sealed class PipCacheManager : IPipCacheManager
     {
         SizeLimit = 50_000
     });
+
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _subjectKeys = new(StringComparer.Ordinal);
 
     /// <inheritdoc />
     public bool TryGet(string sourceId, string subjectId, string attributeName, out AttributeValue? value)
@@ -31,23 +34,57 @@ public sealed class PipCacheManager : IPipCacheManager
             AbsoluteExpirationRelativeToNow = ttl,
             Size = 1
         };
+
+        var subjectIndex = _subjectKeys.GetOrAdd(subjectId, _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal));
+        subjectIndex[key] = 0;
+
+        options.RegisterPostEvictionCallback(static (evictedKey, _, _, state) =>
+        {
+            if (evictedKey is not string cacheKey || state is not SubjectEntryState entryState)
+            {
+                return;
+            }
+
+            if (entryState.SubjectKeys.TryGetValue(entryState.SubjectId, out var indexedKeys))
+            {
+                indexedKeys.TryRemove(cacheKey, out _);
+                if (indexedKeys.IsEmpty)
+                {
+                    entryState.SubjectKeys.TryRemove(entryState.SubjectId, out _);
+                }
+            }
+        }, new SubjectEntryState(subjectId, _subjectKeys));
+
         _cache.Set(key, value, options);
     }
 
     /// <inheritdoc />
     public void Invalidate(string subjectId)
     {
-        // MemoryCache doesn't support prefix-based invalidation.
-        // For v1, compact the entire cache.
-        _cache.Compact(1.0);
+        if (!_subjectKeys.TryRemove(subjectId, out var keys))
+        {
+            return;
+        }
+
+        foreach (var key in keys.Keys)
+        {
+            _cache.Remove(key);
+        }
     }
 
     /// <inheritdoc />
     public void InvalidateAll()
     {
-        _cache.Compact(1.0);
+        foreach (var subjectId in _subjectKeys.Keys.ToList())
+        {
+            Invalidate(subjectId);
+        }
     }
 
     private static string MakeKey(string sourceId, string subjectId, string attributeName)
         => $"{sourceId}:{subjectId}:{attributeName}";
+
+    private sealed record SubjectEntryState(
+        string SubjectId,
+        ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> SubjectKeys);
 }
