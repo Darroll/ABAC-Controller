@@ -1,0 +1,775 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "abac-controller-lightweight-sbom",
+  "documentNamespace": "https://archtis.example/spdx/abac-controller/2026-04-03/lightweight-sbom",
+  "creationInfo": {
+    "created": "2026-04-03T20:15:00Z",
+    "creators": [
+      "Tool: OpenClaw subagent manual SPDX-lite generator"
+    ],
+    "licenseListVersion": "3.26"
+  },
+  "documentDescribes": [
+    "SPDXRef-Project-Api",
+    "SPDXRef-Project-Audit",
+    "SPDXRef-Project-Blazor",
+    "SPDXRef-Project-Core",
+    "SPDXRef-Project-Data",
+    "SPDXRef-Project-Pap",
+    "SPDXRef-Project-Pdp",
+    "SPDXRef-Project-Pep",
+    "SPDXRef-Project-Pip",
+    "SPDXRef-Project-Tests-Unit",
+    "SPDXRef-Project-Tests-Integration"
+  ],
+  "comment": "Lightweight SPDX-style SBOM derived from repository .csproj files. Scope is direct NuGet references plus internal project components and dependency relationships. Transitive dependencies, container packages, file hashes, and build output provenance are intentionally out of scope for this manual gate artifact.",
+  "packages": [
+    {
+      "name": "AbacController.Api",
+      "SPDXID": "SPDXRef-Project-Api",
+      "versionInfo": "net10.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "SOURCE",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:generic/AbacController.Api"
+        }
+      ],
+      "description": "Internal source component declared at src/AbacController.Api/AbacController.Api.csproj."
+    },
+    {
+      "name": "AbacController.Audit",
+      "SPDXID": "SPDXRef-Project-Audit",
+      "versionInfo": "net10.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "SOURCE",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:generic/AbacController.Audit"
+        }
+      ],
+      "description": "Internal source component declared at src/AbacController.Audit/AbacController.Audit.csproj."
+    },
+    {
+      "name": "AbacController.Blazor",
+      "SPDXID": "SPDXRef-Project-Blazor",
+      "versionInfo": "net10.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "SOURCE",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:generic/AbacController.Blazor"
+        }
+      ],
+      "description": "Internal source component declared at src/AbacController.Blazor/AbacController.Blazor.csproj."
+    },
+    {
+      "name": "AbacController.Core",
+      "SPDXID": "SPDXRef-Project-Core",
+      "versionInfo": "net10.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "SOURCE",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:generic/AbacController.Core"
+        }
+      ],
+      "description": "Internal source component declared at src/AbacController.Core/AbacController.Core.csproj."
+    },
+    {
+      "name": "AbacController.Data",
+      "SPDXID": "SPDXRef-Project-Data",
+      "versionInfo": "net10.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "SOURCE",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:generic/AbacController.Data"
+        }
+      ],
+      "description": "Internal source component declared at src/AbacController.Data/AbacController.Data.csproj."
+    },
+    {
+      "name": "AbacController.Pap",
+      "SPDXID": "SPDXRef-Project-Pap",
+      "versionInfo": "net10.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "SOURCE",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:generic/AbacController.Pap"
+        }
+      ],
+      "description": "Internal source component declared at src/AbacController.Pap/AbacController.Pap.csproj."
+    },
+    {
+      "name": "AbacController.Pdp",
+      "SPDXID": "SPDXRef-Project-Pdp",
+      "versionInfo": "net10.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "SOURCE",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:generic/AbacController.Pdp"
+        }
+      ],
+      "description": "Internal source component declared at src/AbacController.Pdp/AbacController.Pdp.csproj."
+    },
+    {
+      "name": "AbacController.Pep",
+      "SPDXID": "SPDXRef-Project-Pep",
+      "versionInfo": "net10.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "SOURCE",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:generic/AbacController.Pep"
+        }
+      ],
+      "description": "Internal source component declared at src/AbacController.Pep/AbacController.Pep.csproj."
+    },
+    {
+      "name": "AbacController.Pip",
+      "SPDXID": "SPDXRef-Project-Pip",
+      "versionInfo": "net10.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "SOURCE",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:generic/AbacController.Pip"
+        }
+      ],
+      "description": "Internal source component declared at src/AbacController.Pip/AbacController.Pip.csproj."
+    },
+    {
+      "name": "AbacController.Tests.Unit",
+      "SPDXID": "SPDXRef-Project-Tests-Unit",
+      "versionInfo": "net10.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "SOURCE",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:generic/AbacController.Tests.Unit"
+        }
+      ],
+      "description": "Internal source component declared at tests/AbacController.Tests.Unit/AbacController.Tests.Unit.csproj."
+    },
+    {
+      "name": "AbacController.Tests.Integration",
+      "SPDXID": "SPDXRef-Project-Tests-Integration",
+      "versionInfo": "net10.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "SOURCE",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:generic/AbacController.Tests.Integration"
+        }
+      ],
+      "description": "Internal source component declared at tests/AbacController.Tests.Integration/AbacController.Tests.Integration.csproj."
+    },
+    {
+      "name": "Google.Api.CommonProtos",
+      "SPDXID": "SPDXRef-Package-Google-Api-CommonProtos",
+      "versionInfo": "2.16.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "LIBRARY",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/Google.Api.CommonProtos@2.16.0"
+        }
+      ],
+      "description": "runtime direct package from AbacController.Api.csproj"
+    },
+    {
+      "name": "Google.Protobuf",
+      "SPDXID": "SPDXRef-Package-Google-Protobuf",
+      "versionInfo": "3.32.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "LIBRARY",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/Google.Protobuf@3.32.0"
+        }
+      ],
+      "description": "runtime direct package from AbacController.Api.csproj"
+    },
+    {
+      "name": "Grpc.AspNetCore",
+      "SPDXID": "SPDXRef-Package-Grpc-AspNetCore",
+      "versionInfo": "2.76.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "LIBRARY",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/Grpc.AspNetCore@2.76.0"
+        }
+      ],
+      "description": "runtime direct package from AbacController.Api.csproj"
+    },
+    {
+      "name": "Grpc.Tools",
+      "SPDXID": "SPDXRef-Package-Grpc-Tools",
+      "versionInfo": "2.76.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "LIBRARY",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/Grpc.Tools@2.76.0"
+        }
+      ],
+      "description": "build-time private asset package from AbacController.Api.csproj"
+    },
+    {
+      "name": "Microsoft.AspNetCore.Authentication.JwtBearer",
+      "SPDXID": "SPDXRef-Package-Microsoft-AspNetCore-Authentication-JwtBearer",
+      "versionInfo": "10.0.5",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "LIBRARY",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/Microsoft.AspNetCore.Authentication.JwtBearer@10.0.5"
+        }
+      ],
+      "description": "runtime direct package from AbacController.Api.csproj"
+    },
+    {
+      "name": "Microsoft.AspNetCore.Grpc.JsonTranscoding",
+      "SPDXID": "SPDXRef-Package-Microsoft-AspNetCore-Grpc-JsonTranscoding",
+      "versionInfo": "10.0.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "LIBRARY",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/Microsoft.AspNetCore.Grpc.JsonTranscoding@10.0.0"
+        }
+      ],
+      "description": "runtime direct package from AbacController.Api.csproj"
+    },
+    {
+      "name": "Microsoft.EntityFrameworkCore.Design",
+      "SPDXID": "SPDXRef-Package-Microsoft-EntityFrameworkCore-Design",
+      "versionInfo": "10.0.5",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "LIBRARY",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/Microsoft.EntityFrameworkCore.Design@10.0.5"
+        }
+      ],
+      "description": "design-time package from AbacController.Data.csproj"
+    },
+    {
+      "name": "Microsoft.EntityFrameworkCore.Sqlite",
+      "SPDXID": "SPDXRef-Package-Microsoft-EntityFrameworkCore-Sqlite",
+      "versionInfo": "10.0.5",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "LIBRARY",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/Microsoft.EntityFrameworkCore.Sqlite@10.0.5"
+        }
+      ],
+      "description": "runtime direct package from AbacController.Data.csproj"
+    },
+    {
+      "name": "Microsoft.Extensions.Caching.Memory",
+      "SPDXID": "SPDXRef-Package-Microsoft-Extensions-Caching-Memory",
+      "versionInfo": "10.0.5",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "LIBRARY",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/Microsoft.Extensions.Caching.Memory@10.0.5"
+        }
+      ],
+      "description": "direct package used by multiple runtime projects"
+    },
+    {
+      "name": "Microsoft.Extensions.Hosting.Abstractions",
+      "SPDXID": "SPDXRef-Package-Microsoft-Extensions-Hosting-Abstractions",
+      "versionInfo": "10.0.5",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "LIBRARY",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/Microsoft.Extensions.Hosting.Abstractions@10.0.5"
+        }
+      ],
+      "description": "runtime direct package from AbacController.Audit.csproj"
+    },
+    {
+      "name": "Microsoft.Extensions.Http",
+      "SPDXID": "SPDXRef-Package-Microsoft-Extensions-Http",
+      "versionInfo": "10.0.5",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "LIBRARY",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/Microsoft.Extensions.Http@10.0.5"
+        }
+      ],
+      "description": "runtime direct package from AbacController.Pip.csproj"
+    },
+    {
+      "name": "System.DirectoryServices.Protocols",
+      "SPDXID": "SPDXRef-Package-System-DirectoryServices-Protocols",
+      "versionInfo": "10.0.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "LIBRARY",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/System.DirectoryServices.Protocols@10.0.0"
+        }
+      ],
+      "description": "runtime direct package from AbacController.Pip.csproj"
+    },
+    {
+      "name": "coverlet.collector",
+      "SPDXID": "SPDXRef-Package-coverlet-collector",
+      "versionInfo": "6.0.4",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "LIBRARY",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/coverlet.collector@6.0.4"
+        }
+      ],
+      "description": "test-only direct package"
+    },
+    {
+      "name": "Microsoft.NET.Test.Sdk",
+      "SPDXID": "SPDXRef-Package-Microsoft-NET-Test-Sdk",
+      "versionInfo": "17.14.1",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "LIBRARY",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/Microsoft.NET.Test.Sdk@17.14.1"
+        }
+      ],
+      "description": "test-only direct package"
+    },
+    {
+      "name": "xunit",
+      "SPDXID": "SPDXRef-Package-xunit",
+      "versionInfo": "2.9.3",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "LIBRARY",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/xunit@2.9.3"
+        }
+      ],
+      "description": "test-only direct package"
+    },
+    {
+      "name": "xunit.runner.visualstudio",
+      "SPDXID": "SPDXRef-Package-xunit-runner-visualstudio",
+      "versionInfo": "3.1.4",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "primaryPackagePurpose": "LIBRARY",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/xunit.runner.visualstudio@3.1.4"
+        }
+      ],
+      "description": "test-only direct package"
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-Project-Api",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Core"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Api",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Pdp"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Api",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Pap"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Api",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Pip"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Api",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Pep"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Api",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Data"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Api",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Audit"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Api",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Blazor"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Audit",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Core"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Audit",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Data"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Data",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Core"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Pap",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Core"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Pdp",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Core"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Pep",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Core"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Pip",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Core"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Tests-Unit",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Audit"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Tests-Unit",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Core"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Tests-Unit",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Pdp"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Tests-Unit",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Pap"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Tests-Unit",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Pep"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Tests-Integration",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Core"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Tests-Integration",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Pdp"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Tests-Integration",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Pap"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Tests-Integration",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Project-Pep"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Core",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Microsoft-Extensions-Caching-Memory"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Api",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Google-Api-CommonProtos"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Api",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Google-Protobuf"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Api",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Grpc-AspNetCore"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Api",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Grpc-Tools"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Api",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Microsoft-AspNetCore-Authentication-JwtBearer"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Api",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Microsoft-AspNetCore-Grpc-JsonTranscoding"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Data",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Microsoft-EntityFrameworkCore-Design"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Data",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Microsoft-EntityFrameworkCore-Sqlite"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Pip",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Microsoft-Extensions-Caching-Memory"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Pip",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Microsoft-Extensions-Http"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Pip",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-System-DirectoryServices-Protocols"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Pdp",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Microsoft-Extensions-Caching-Memory"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Audit",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Microsoft-Extensions-Hosting-Abstractions"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Tests-Unit",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-coverlet-collector"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Tests-Unit",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Microsoft-NET-Test-Sdk"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Tests-Unit",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-xunit"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Tests-Unit",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-xunit-runner-visualstudio"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Tests-Integration",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-coverlet-collector"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Tests-Integration",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Microsoft-NET-Test-Sdk"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Tests-Integration",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-xunit"
+    },
+    {
+      "spdxElementId": "SPDXRef-Project-Tests-Integration",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-xunit-runner-visualstudio"
+    }
+  ]
+}
