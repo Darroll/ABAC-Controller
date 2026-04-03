@@ -9,8 +9,9 @@ namespace AbacController.Core.Interfaces;
 public interface IAuditWriter
 {
     /// <summary>
-    /// Queue an audit event for writing. Non-blocking; events are buffered
-    /// and flushed periodically or when buffer is full.
+    /// Queue an audit event for writing.
+    /// Implementations must not silently discard events when the buffer is full;
+    /// they should either apply explicit backpressure or fail the write.
     /// </summary>
     void Write(AuditEvent auditEvent);
 
