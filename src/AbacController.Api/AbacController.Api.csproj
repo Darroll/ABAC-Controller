@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\AbacController.Core\AbacController.Core.csproj" />
+    <ProjectReference Include="..\AbacController.Pdp\AbacController.Pdp.csproj" />
+    <ProjectReference Include="..\AbacController.Pap\AbacController.Pap.csproj" />
+    <ProjectReference Include="..\AbacController.Pip\AbacController.Pip.csproj" />
+    <ProjectReference Include="..\AbacController.Pep\AbacController.Pep.csproj" />
+    <ProjectReference Include="..\AbacController.Data\AbacController.Data.csproj" />
+    <ProjectReference Include="..\AbacController.Audit\AbacController.Audit.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.5" />
+  </ItemGroup>
+
+</Project>

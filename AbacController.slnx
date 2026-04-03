@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AbacController.Api/AbacController.Api.csproj" />
+    <Project Path="src/AbacController.Audit/AbacController.Audit.csproj" />
+    <Project Path="src/AbacController.Blazor/AbacController.Blazor.csproj" />
+    <Project Path="src/AbacController.Core/AbacController.Core.csproj" />
+    <Project Path="src/AbacController.Data/AbacController.Data.csproj" />
+    <Project Path="src/AbacController.Pap/AbacController.Pap.csproj" />
+    <Project Path="src/AbacController.Pdp/AbacController.Pdp.csproj" />
+    <Project Path="src/AbacController.Pep/AbacController.Pep.csproj" />
+    <Project Path="src/AbacController.Pip/AbacController.Pip.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AbacController.Tests.Integration/AbacController.Tests.Integration.csproj" />
+    <Project Path="tests/AbacController.Tests.Unit/AbacController.Tests.Unit.csproj" />
+  </Folder>
+</Solution>

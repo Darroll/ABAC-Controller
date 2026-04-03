@@ -1,0 +1,40 @@
+@page "/"
+
+<h1>Dashboard</h1>
+
+<div class="row" style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+    <div class="card" style="flex: 1; padding: 1rem; border: 1px solid #dee2e6; border-radius: 8px;">
+        <h3>📜 SPIFs Loaded</h3>
+        <p style="font-size: 2rem; font-weight: bold;">@SpifCount</p>
+    </div>
+    <div class="card" style="flex: 1; padding: 1rem; border: 1px solid #dee2e6; border-radius: 8px;">
+        <h3>📝 Active Policies</h3>
+        <p style="font-size: 2rem; font-weight: bold;">@PolicyCount</p>
+    </div>
+    <div class="card" style="flex: 1; padding: 1rem; border: 1px solid #dee2e6; border-radius: 8px;">
+        <h3>🔌 PIP Sources</h3>
+        <p style="font-size: 2rem; font-weight: bold;">@PipSourceCount</p>
+    </div>
+</div>
+
+<h2>System Status</h2>
+<table style="width: 100%; border-collapse: collapse;">
+    <tr>
+        <td style="padding: 0.5rem; border-bottom: 1px solid #dee2e6;"><strong>Version</strong></td>
+        <td style="padding: 0.5rem; border-bottom: 1px solid #dee2e6;">1.0.0-dev</td>
+    </tr>
+    <tr>
+        <td style="padding: 0.5rem; border-bottom: 1px solid #dee2e6;"><strong>Database</strong></td>
+        <td style="padding: 0.5rem; border-bottom: 1px solid #dee2e6;">SQLite (WAL mode)</td>
+    </tr>
+    <tr>
+        <td style="padding: 0.5rem; border-bottom: 1px solid #dee2e6;"><strong>Label Codecs</strong></td>
+        <td style="padding: 0.5rem; border-bottom: 1px solid #dee2e6;">STANAG 4774 XML</td>
+    </tr>
+</table>
+
+@code {
+    private int SpifCount = 0;
+    private int PolicyCount = 0;
+    private int PipSourceCount = 0;
+}
