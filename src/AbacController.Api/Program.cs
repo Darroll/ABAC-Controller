@@ -29,6 +29,7 @@ builder.Services.AddDbContext<AbacDbContext>(options =>
 });
 
 // ── Core Services (Singleton) ──
+builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<ISpifParser, SpifParser>();
 builder.Services.AddSingleton<IAcdfEvaluator, AcdfEvaluator>();
 builder.Services.AddSingleton<IDecisionCache, DecisionCache>();
