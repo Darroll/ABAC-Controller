@@ -1,7 +1,9 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
+using System.Xml.Schema;
 using AbacController.Core.Constants;
 using AbacController.Core.Domain.Labels;
 using AbacController.Core.Domain.Spif;
@@ -22,6 +24,8 @@ public sealed class SpifParser : ISpifParser
         "3.0",
         "2.1"
     ];
+
+    private static readonly Regex OidPattern = new("^[0-2](\\.[0-9]+)+$", RegexOptions.Compiled);
 
     /// <inheritdoc />
     public SpifParseResult Parse(string xmlContent)
@@ -74,9 +78,30 @@ public sealed class SpifParser : ISpifParser
             var normalized = NormalizeNamespaceTypos(xmlContent);
             var document = XDocument.Parse(normalized, LoadOptions.SetLineInfo);
             var validationErrors = ValidateDocumentShape(document);
-            return validationErrors.Count == 0
+            if (validationErrors.Count > 0)
+            {
+                return ValidationResult.Invalid(validationErrors);
+            }
+
+            var schemaErrors = new List<SpifParseError>();
+            document.Validate(SpifSchemas.CreateValidationSet(), (sender, args) =>
+            {
+                var lineInfo = sender as IXmlLineInfo;
+                schemaErrors.Add(new SpifParseError(
+                    $"Schema validation error: {args.Message}",
+                    lineInfo is not null && lineInfo.HasLineInfo() ? lineInfo.LineNumber : null));
+            }, true);
+
+            return schemaErrors.Count == 0
                 ? ValidationResult.Valid()
-                : ValidationResult.Invalid(validationErrors);
+                : ValidationResult.Invalid(schemaErrors);
+        }
+        catch (XmlSchemaValidationException ex)
+        {
+            return ValidationResult.Invalid(
+            [
+                new SpifParseError($"Schema validation error: {ex.Message}", ex.LineNumber)
+            ]);
         }
         catch (XmlException ex)
         {
@@ -106,6 +131,13 @@ public sealed class SpifParser : ISpifParser
 
         var warnings = new List<SpifParseWarning>();
         var errors = new List<SpifParseError>();
+
+        var schemaValidation = ValidateSchema(document.ToString(SaveOptions.DisableFormatting));
+        if (!schemaValidation.IsValid)
+        {
+            errors.AddRange(schemaValidation.Errors);
+            return SpifParseResult.Failed(errors, warnings);
+        }
 
         var schemaVersion = root.Attribute("schemaVersion")?.Value?.Trim();
         if (string.IsNullOrWhiteSpace(schemaVersion))
@@ -191,9 +223,16 @@ public sealed class SpifParser : ISpifParser
             oid = string.Empty;
         }
 
+        var name = EmptyToNull(policyIdElement.Attribute("name")?.Value);
+        if (name is null)
+        {
+            errors.Add(new SpifParseError("securityPolicyId missing required 'name' attribute", GetLineNumber(policyIdElement)));
+            name = "Unknown";
+        }
+
         return new PolicyInfo
         {
-            Name = EmptyToNull(policyIdElement.Attribute("name")?.Value) ?? "Unknown",
+            Name = name,
             Oid = oid,
             MarkingData = ParseMarkingDataList(policyIdElement, [], errors)
         };
@@ -208,7 +247,15 @@ public sealed class SpifParser : ISpifParser
 
         foreach (var classificationElement in FindChildren(classificationsElement, "securityClassification"))
         {
-            var name = EmptyToNull(classificationElement.Attribute("name")?.Value) ?? "Unknown";
+            var name = EmptyToNull(classificationElement.Attribute("name")?.Value);
+            if (name is null)
+            {
+                errors.Add(new SpifParseError(
+                    "securityClassification missing required 'name' attribute",
+                    GetLineNumber(classificationElement)));
+                continue;
+            }
+
             if (!TryParseLacv(classificationElement.Attribute("lacv")?.Value, out var lacv))
             {
                 errors.Add(new SpifParseError(
@@ -312,7 +359,15 @@ public sealed class SpifParser : ISpifParser
 
         foreach (var categoryElement in FindChildren(tagElement, "tagCategory"))
         {
-            var name = EmptyToNull(categoryElement.Attribute("name")?.Value) ?? "Unknown";
+            var name = EmptyToNull(categoryElement.Attribute("name")?.Value);
+            if (name is null)
+            {
+                errors.Add(new SpifParseError(
+                    "tagCategory missing required 'name' attribute",
+                    GetLineNumber(categoryElement)));
+                continue;
+            }
+
             if (!TryParseLacv(categoryElement.Attribute("lacv")?.Value, out var lacv))
             {
                 errors.Add(new SpifParseError(
@@ -687,10 +742,42 @@ public sealed class SpifParser : ISpifParser
         {
             errors.Add(new SpifParseError("securityPolicyId must contain a policy OID"));
         }
+        else if (!IsValidOid(spif.PolicyId.Oid))
+        {
+            errors.Add(new SpifParseError($"securityPolicyId '{spif.PolicyId.Oid}' is not a valid OID"));
+        }
+
+        ValidateOptionalOid(spif.PrivilegeId, "privilegeId", errors);
+        ValidateOptionalOid(spif.RbacId, "rbacId", errors);
+
+        if (spif.KeyIdentifier is not null)
+        {
+            warnings.Add(new SpifParseWarning("SPIF declares keyIdentifier but XML-DSig verification is not implemented"));
+        }
 
         if (spif.Classifications.Count == 0)
         {
             errors.Add(new SpifParseError("SPIF must define at least one securityClassification"));
+        }
+
+        if (spif.PrivacyMarks is not null)
+        {
+            if (spif.PrivacyMarks.MinSelection is not null && spif.PrivacyMarks.MinSelection < 0)
+            {
+                errors.Add(new SpifParseError("privacyMarks minSelection cannot be negative"));
+            }
+
+            if (spif.PrivacyMarks.MaxSelection is not null && spif.PrivacyMarks.MaxSelection < 0)
+            {
+                errors.Add(new SpifParseError("privacyMarks maxSelection cannot be negative"));
+            }
+
+            if (spif.PrivacyMarks.MinSelection is not null &&
+                spif.PrivacyMarks.MaxSelection is not null &&
+                spif.PrivacyMarks.MinSelection > spif.PrivacyMarks.MaxSelection)
+            {
+                errors.Add(new SpifParseError("privacyMarks minSelection cannot be greater than maxSelection"));
+            }
         }
 
         var classificationLacvs = new Dictionary<LacvValue, string>();
@@ -714,11 +801,21 @@ public sealed class SpifParser : ISpifParser
                 warnings.Add(new SpifParseWarning(
                     $"Multiple classifications share hierarchy '{classification.Hierarchy}' ('{classificationHierarchies[classification.Hierarchy]}' and '{classification.Name}')"));
             }
+
+            foreach (var requiredCategory in classification.RequiredCategories)
+            {
+                ValidateRequiredCategoryShape(requiredCategory, $"classification '{classification.Name}'", warnings, errors);
+            }
         }
 
         var tagSetOids = new HashSet<string>(OidComparer);
         foreach (var tagSet in spif.CategoryTagSets)
         {
+            if (!IsValidOid(tagSet.TagSetOid))
+            {
+                errors.Add(new SpifParseError($"securityCategoryTagSet id '{tagSet.TagSetOid}' is not a valid OID"));
+            }
+
             if (!tagSetOids.Add(tagSet.TagSetOid))
             {
                 errors.Add(new SpifParseError($"Duplicate securityCategoryTagSet id '{tagSet.TagSetOid}'"));
@@ -730,6 +827,16 @@ public sealed class SpifParser : ISpifParser
                 if (!tagNames.Add(tag.Name))
                 {
                     errors.Add(new SpifParseError($"Duplicate tag name '{tag.Name}' in tag set '{tagSet.Name}'"));
+                }
+
+                if (tag.TagType == TagType.Enumerated && tag.EnumType is null)
+                {
+                    errors.Add(new SpifParseError($"Enumerated tag '{tag.Name}' in tag set '{tagSet.Name}' must declare enumType"));
+                }
+
+                if (tag.TagType != TagType.Enumerated && tag.EnumType is not null)
+                {
+                    warnings.Add(new SpifParseWarning($"Tag '{tag.Name}' in tag set '{tagSet.Name}' declares enumType but is not enumerated"));
                 }
 
                 var categoryLacvs = new Dictionary<LacvValue, string>();
@@ -758,6 +865,19 @@ public sealed class SpifParser : ISpifParser
                         warnings.Add(new SpifParseWarning(
                             $"Category '{category.Name}' references unknown requiredClass '{category.RequiredClass}'"));
                     }
+
+                    foreach (var requiredCategory in category.RequiredCategories)
+                    {
+                        ValidateRequiredCategoryShape(requiredCategory, $"category '{category.Name}'", warnings, errors);
+                    }
+
+                    foreach (var equivalentCategory in category.EquivalentCategories)
+                    {
+                        if (!IsValidOid(equivalentCategory.TagSetId))
+                        {
+                            errors.Add(new SpifParseError($"Equivalent category mapping in '{category.Name}' uses invalid tagSetId '{equivalentCategory.TagSetId}'"));
+                        }
+                    }
                 }
             }
         }
@@ -779,8 +899,19 @@ public sealed class SpifParser : ISpifParser
         }
 
         var policyNames = new HashSet<string>(NameComparer) { spif.PolicyId.Name };
+        var equivalentPolicyOids = new HashSet<string>(OidComparer);
         foreach (var equivalentPolicy in spif.EquivalentPolicies)
         {
+            if (!IsValidOid(equivalentPolicy.PolicyOid))
+            {
+                errors.Add(new SpifParseError($"Equivalent policy id '{equivalentPolicy.PolicyOid}' is not a valid OID"));
+            }
+
+            if (!equivalentPolicyOids.Add(equivalentPolicy.PolicyOid))
+            {
+                errors.Add(new SpifParseError($"Equivalent policy id '{equivalentPolicy.PolicyOid}' is duplicated"));
+            }
+
             if (!policyNames.Add(equivalentPolicy.Name))
             {
                 warnings.Add(new SpifParseWarning($"Equivalent policy name '{equivalentPolicy.Name}' is duplicated"));
@@ -1064,6 +1195,34 @@ public sealed class SpifParser : ISpifParser
         => string.Equals(operation, "all", StringComparison.OrdinalIgnoreCase)
            || string.Equals(operation, "oneOrMore", StringComparison.OrdinalIgnoreCase)
            || string.Equals(operation, "onlyOne", StringComparison.OrdinalIgnoreCase);
+
+    private static void ValidateRequiredCategoryShape(
+        RequiredCategoryConstraint constraint,
+        string owner,
+        List<SpifParseWarning> warnings,
+        List<SpifParseError> errors)
+    {
+        if (constraint.CategoryGroups.Count == 0)
+        {
+            errors.Add(new SpifParseError($"{owner} has a requiredCategory with no categoryGroup entries"));
+        }
+
+        if (!IsSupportedRequiredOperation(constraint.Operation))
+        {
+            warnings.Add(new SpifParseWarning($"{owner} uses unsupported requiredCategory operation '{constraint.Operation}'"));
+        }
+    }
+
+    private static bool IsValidOid(string value)
+        => OidPattern.IsMatch(value);
+
+    private static void ValidateOptionalOid(string? value, string fieldName, List<SpifParseError> errors)
+    {
+        if (!string.IsNullOrWhiteSpace(value) && !IsValidOid(value))
+        {
+            errors.Add(new SpifParseError($"{fieldName} '{value}' is not a valid OID"));
+        }
+    }
 
     private static string? EmptyToNull(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
