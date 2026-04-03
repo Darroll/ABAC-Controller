@@ -1,0 +1,245 @@
+@*
+    Component: SpifManagement
+    Purpose: SPIF policy management. Upload new SPIF XML files, view imported policies,
+             inspect or edit, delete, and manage activation.
+    Route: /spif
+    Dependencies: HttpClient, NavigationManager.
+*@
+@page "/spif"
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<h2>SPIF Policy Management</h2>
+
+<div class="policy-actions mb-3">
+    <button class="btn btn-outline-primary" @onclick="ShowUploadDialog">
+        <span class="oi oi-cloud-upload"></span> Upload SPIF XML
+    </button>
+    <a href="/spif/create" class="btn btn-success">
+        <span class="oi oi-plus"></span> Create New SPIF
+    </a>
+</div>
+
+@if (_showUpload)
+{
+    <div class="card mt-3 mb-3">
+        <div class="card-body">
+            <h5>Upload SPIF Policy XML</h5>
+            <div class="mb-3">
+                <label class="form-label">SPIF XML File</label>
+                <InputFile OnChange="OnFileSelected" accept=".xml" />
+            </div>
+            <div class="mb-3">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="setDefault" @bind="_setAsDefault" />
+                    <label class="form-check-label" for="setDefault">Set as default policy</label>
+                </div>
+            </div>
+            @if (!string.IsNullOrEmpty(_uploadError))
+            {
+                <div class="alert alert-danger py-2">@_uploadError</div>
+            }
+            @if (!string.IsNullOrEmpty(_uploadSuccess))
+            {
+                <div class="alert alert-success py-2">@_uploadSuccess</div>
+            }
+            <button class="btn btn-primary me-2" @onclick="UploadSpif" disabled="@(_uploading || _selectedFile is null)">
+                @(_uploading ? "Uploading..." : "Upload")
+            </button>
+            <button class="btn btn-secondary" @onclick="() => _showUpload = false">Cancel</button>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(_pageError))
+{
+    <div class="alert alert-danger">@_pageError</div>
+}
+
+@if (_spifs is null)
+{
+    <p><em>Loading policies...</em></p>
+}
+else if (_spifs.Count == 0)
+{
+    <div class="alert alert-info">No SPIF policies found. Upload or create one to get started.</div>
+}
+else
+{
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Policy OID</th>
+                <th>Schema</th>
+                <th>Classifications</th>
+                <th>Status</th>
+                <th>Imported</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var spif in _spifs)
+            {
+                <tr>
+                    <td><strong>@spif.Name</strong></td>
+                    <td><code style="font-size:0.8rem;">@spif.PolicyOid</code></td>
+                    <td><span class="badge bg-secondary">@spif.SchemaVersion</span></td>
+                    <td>@spif.ClassificationCount cls / @spif.CategoryCount cat</td>
+                    <td>
+                        @if (spif.IsActive)
+                        {
+                            <span class="badge bg-success">Active</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Inactive</span>
+                        }
+                    </td>
+                    <td>@spif.ImportedAt.ToString("g")</td>
+                    <td>
+                        <a href="/spif/edit/@spif.Id" class="btn btn-sm btn-outline-secondary">
+                            <span class="oi oi-pencil"></span> Edit
+                        </a>
+                        <button class="btn btn-sm btn-outline-danger ms-1" @onclick="() => DeleteSpif(spif.Id)" disabled="@_deleting">
+                            <span class="oi oi-trash"></span>
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<style>
+    .policy-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .admin-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+
+    .admin-table thead th {
+        text-align: left;
+        padding: 0.6rem 0.75rem;
+        background: #f5f6fa;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 600;
+        color: #495057;
+        font-size: 0.85rem;
+    }
+
+    .admin-table tbody td {
+        padding: 0.6rem 0.75rem;
+        border-bottom: 1px solid #f0f0f0;
+        vertical-align: middle;
+    }
+
+    .admin-table tbody tr:hover { background: #f8f9ff; }
+</style>
+
+@code {
+    private List<SpifRow>? _spifs;
+    private bool _showUpload;
+    private IBrowserFile? _selectedFile;
+    private bool _uploading;
+    private bool _deleting;
+    private bool _setAsDefault;
+    private string? _uploadError;
+    private string? _uploadSuccess;
+    private string? _pageError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSpifs();
+    }
+
+    private async Task LoadSpifs()
+    {
+        try
+        {
+            _spifs = await Http.GetFromJsonAsync<List<SpifRow>>("api/v1/pap/spifs");
+        }
+        catch (Exception ex)
+        {
+            _pageError = $"Failed to load SPIFs: {ex.Message}";
+            _spifs = [];
+        }
+    }
+
+    private void ShowUploadDialog()
+    {
+        _showUpload = true;
+        _uploadError = null;
+        _uploadSuccess = null;
+        _selectedFile = null;
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        _selectedFile = e.File;
+    }
+
+    private async Task UploadSpif()
+    {
+        if (_selectedFile is null) return;
+        _uploading = true;
+        _uploadError = null;
+        _uploadSuccess = null;
+        try
+        {
+            using var stream = _selectedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var reader = new System.IO.StreamReader(stream);
+            var xml = await reader.ReadToEndAsync();
+
+            var request = new { Xml = xml, Activate = true, SetAsDefault = _setAsDefault };
+            var response = await Http.PostAsJsonAsync("api/v1/pap/spifs/import", request);
+            if (response.IsSuccessStatusCode)
+            {
+                _uploadSuccess = "SPIF imported successfully.";
+                _selectedFile = null;
+                await LoadSpifs();
+            }
+            else
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                _uploadError = $"Import failed: {body}";
+            }
+        }
+        catch (Exception ex)
+        {
+            _uploadError = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _uploading = false;
+        }
+    }
+
+    private async Task DeleteSpif(Guid id)
+    {
+        _deleting = true;
+        try
+        {
+            await Http.DeleteAsync($"api/v1/pap/spifs/{id}");
+            await LoadSpifs();
+        }
+        catch (Exception ex)
+        {
+            _pageError = $"Delete failed: {ex.Message}";
+        }
+        finally
+        {
+            _deleting = false;
+        }
+    }
+
+    private sealed record SpifRow(
+        Guid Id, string PolicyOid, string Name, string SchemaVersion,
+        bool IsActive, DateTimeOffset ImportedAt, int ClassificationCount, int CategoryCount);
+}

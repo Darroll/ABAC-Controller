@@ -1,0 +1,194 @@
+@*
+    Component: SystemStatus
+    Purpose: System overview — runtime status, registered codecs and policy OIDs,
+             enforcement points, and configuration summary.
+    Route: /system
+    Dependencies: HttpClient.
+*@
+@page "/system"
+@inject HttpClient Http
+
+<h2>System Status</h2>
+
+@if (_status is null && _loading)
+{
+    <p><em>Loading system status...</em></p>
+}
+else if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger">@_error</div>
+}
+else if (_status is not null)
+{
+    <div class="dashboard-metrics mb-4">
+        <div class="metric-card">
+            <h4>Runtime</h4>
+            <p class="metric-value" style="font-size:1.2rem;">@_status.Runtime</p>
+        </div>
+        <div class="metric-card">
+            <h4>Status</h4>
+            <p class="metric-value">
+                @if (_status.Ready)
+                {
+                    <span class="badge bg-success" style="font-size:1rem;">Ready</span>
+                }
+                else
+                {
+                    <span class="badge bg-warning text-dark" style="font-size:1rem;">Starting</span>
+                }
+            </p>
+        </div>
+        <div class="metric-card">
+            <h4>Label Codecs</h4>
+            <p class="metric-value">@(_status.RegisteredLabelCodecs?.Count ?? 0)</p>
+        </div>
+        <div class="metric-card">
+            <h4>Registered Policies</h4>
+            <p class="metric-value">@(_status.RegisteredPolicyOids?.Count ?? 0)</p>
+        </div>
+    </div>
+
+    @if (_status.RegisteredLabelCodecs is { Count: > 0 })
+    {
+        <div class="card mb-3">
+            <div class="card-header"><strong>Label Codecs</strong></div>
+            <div class="card-body">
+                @foreach (var codec in _status.RegisteredLabelCodecs)
+                {
+                    <span class="badge bg-secondary me-1 mb-1">@codec</span>
+                }
+            </div>
+        </div>
+    }
+
+    @if (_status.RegisteredPolicyOids is { Count: > 0 })
+    {
+        <div class="card mb-3">
+            <div class="card-header"><strong>Registered Policy OIDs</strong></div>
+            <div class="card-body">
+                @foreach (var oid in _status.RegisteredPolicyOids)
+                {
+                    <div><code>@oid</code></div>
+                }
+            </div>
+        </div>
+    }
+}
+
+@if (_enforcementPoints is { Count: > 0 })
+{
+    <div class="card mb-3">
+        <div class="card-header"><strong>Enforcement Points</strong></div>
+        <div class="card-body p-0">
+            <table class="admin-table mb-0">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Registered</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var ep in _enforcementPoints)
+                    {
+                        <tr>
+                            <td><code style="font-size:0.8rem;">@ep.Id</code></td>
+                            <td>@ep.Name</td>
+                            <td><span class="badge bg-secondary" style="font-size:0.75rem;">@ep.Type</span></td>
+                            <td>@ep.RegisteredAt.ToString("g")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+<style>
+    .dashboard-metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 1rem;
+    }
+
+    .metric-card {
+        background: #f5f6fa;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        text-align: center;
+    }
+
+    .metric-card h4 {
+        margin: 0 0 0.5rem;
+        font-size: 0.8rem;
+        color: #6c757d;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .metric-card .metric-value {
+        margin: 0;
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #1a1a2e;
+    }
+
+    .admin-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+
+    .admin-table thead th {
+        text-align: left;
+        padding: 0.6rem 0.75rem;
+        background: #f5f6fa;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 600;
+        color: #495057;
+        font-size: 0.82rem;
+    }
+
+    .admin-table tbody td {
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid #f0f0f0;
+        vertical-align: middle;
+    }
+</style>
+
+@code {
+    private SystemStatusRow? _status;
+    private List<EnforcementPointRow>? _enforcementPoints;
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var statusTask = Http.GetFromJsonAsync<SystemStatusRow>("api/v1/system/status");
+            var epTask = Http.GetFromJsonAsync<List<EnforcementPointRow>>("api/v1/system/enforcement-points");
+            await Task.WhenAll(statusTask, epTask);
+            _status = statusTask.Result;
+            _enforcementPoints = epTask.Result;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load system status: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private sealed record SystemStatusRow(
+        bool StartupCompleted, bool Ready, string Runtime,
+        List<string>? RegisteredLabelCodecs, List<string>? RegisteredPolicyOids);
+
+    private sealed record EnforcementPointRow(
+        string Id, string Name, string Type, DateTimeOffset RegisteredAt);
+}

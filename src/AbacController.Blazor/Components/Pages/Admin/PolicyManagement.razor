@@ -1,0 +1,145 @@
+@*
+    Component: PolicyManagement
+    Purpose: Policy set management. Lists policy sets with their combining algorithms
+             and contained policies. Allows viewing and basic management.
+    Route: /policies
+    Dependencies: HttpClient, NavigationManager.
+*@
+@page "/policies"
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<h2>Policy Management</h2>
+<p class="text-muted" style="margin-top:-0.5rem; margin-bottom:1.5rem; font-size:0.95rem;">
+    XACML-style policy sets controlling access decisions.
+</p>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+@if (_policySets is null)
+{
+    <p><em>Loading policy sets...</em></p>
+}
+else if (_policySets.Count == 0)
+{
+    <div class="alert alert-info">No policy sets defined. Policy sets are created and managed via the API.</div>
+}
+else
+{
+    @foreach (var ps in _policySets)
+    {
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>@ps.Name</strong>
+                    @if (ps.IsActive)
+                    {
+                        <span class="badge bg-success ms-2">Active</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary ms-2">Inactive</span>
+                    }
+                    <span class="badge bg-light text-dark border ms-1" style="font-size:0.75rem;">@ps.CombiningAlgorithm</span>
+                </div>
+                <small class="text-muted"><code>@ps.Id</code></small>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(ps.Description))
+            {
+                <div class="card-body py-2 px-3">
+                    <p class="text-muted small mb-0">@ps.Description</p>
+                </div>
+            }
+            @if (ps.Policies is { Count: > 0 })
+            {
+                <div class="card-body py-2 px-3">
+                    <h6 class="small fw-bold text-muted mb-2">POLICIES (@ps.Policies.Count)</h6>
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Format</th>
+                                <th>Versions</th>
+                                <th>Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var policy in ps.Policies)
+                            {
+                                <tr>
+                                    <td>@policy.Name</td>
+                                    <td><span class="badge bg-secondary" style="font-size:0.75rem;">@policy.Format</span></td>
+                                    <td>@(policy.Versions?.Count ?? 0) version(s)</td>
+                                    <td>@policy.UpdatedAt.ToString("g")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="card-body py-2 px-3">
+                    <p class="text-muted small mb-0"><em>No policies in this set.</em></p>
+                </div>
+            }
+        </div>
+    }
+}
+
+<style>
+    .admin-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+    }
+
+    .admin-table thead th {
+        text-align: left;
+        padding: 0.4rem 0.6rem;
+        background: #f5f6fa;
+        border-bottom: 1px solid #dee2e6;
+        font-weight: 600;
+        color: #6c757d;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .admin-table tbody td {
+        padding: 0.5rem 0.6rem;
+        border-bottom: 1px solid #f0f0f0;
+        vertical-align: middle;
+    }
+
+    .admin-table tbody tr:hover { background: #f8f9ff; }
+</style>
+
+@code {
+    private List<PolicySetRow>? _policySets;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _policySets = await Http.GetFromJsonAsync<List<PolicySetRow>>("api/v1/pap/policy-sets");
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load policy sets: {ex.Message}";
+            _policySets = [];
+        }
+    }
+
+    private sealed record PolicySetRow(
+        string Id, string Name, string? Description, string CombiningAlgorithm,
+        bool IsActive, DateTimeOffset UpdatedAt, List<PolicyRow>? Policies);
+
+    private sealed record PolicyRow(
+        string Id, string Name, string Format, DateTimeOffset UpdatedAt,
+        List<object>? Versions);
+}

@@ -1,0 +1,215 @@
+@*
+    Component: SpifTagSetsSection
+    Purpose: Tag sets section container. Groups tag sets by semantic category
+             (restrictive, dissemination, releasability, informative, generic) and
+             provides templates for quickly adding common tag set types.
+    Dependencies: SpifFormState (cascading parameter), SpifTagSetEditor,
+                  SpifReleasabilityEditor, TagSetCategoryHelper, EventCallback.
+*@
+@using AbacController.Blazor.Components.SpifBuilder
+
+<div class="spif-section @(_isActive ? "active" : "")"
+     data-form-section="tagsets"
+     @onclick="@(() => OnSectionActivated.InvokeAsync("tagsets"))"
+     @onfocusin="@(() => OnSectionActivated.InvokeAsync("tagsets"))">
+    <div class="spif-section-label">Tag Sets</div>
+    <p class="text-muted small mb-2">Security category tag sets, grouped by type. Tags define access controls, dissemination rules, releasability, and information markers.</p>
+
+    @* ── Grouped rendering ── *@
+    @{
+        var grouped = GetGroupedTagSets();
+        var groupOrder = new[] { "restrictive", "dissemination", "releasability", "informative", "generic" };
+    }
+
+    @foreach (var groupKey in groupOrder)
+    {
+        if (!grouped.ContainsKey(groupKey)) continue;
+        var items = grouped[groupKey];
+        var color = TagSetCategoryHelper.CategoryBorderColor(groupKey);
+        var displayName = TagSetCategoryHelper.CategoryDisplayName(groupKey);
+
+        <div class="spif-tagset-group mb-2">
+            <div class="spif-tagset-group-header" style="border-left: 3px solid @color; padding-left: 0.5rem;">
+                <span class="small fw-bold" style="color: @color;">@displayName</span>
+                <span class="badge bg-light text-dark border ms-1" style="font-size:0.6rem;">@items.Count</span>
+            </div>
+
+            @foreach (var (tagSet, originalIndex) in items)
+            {
+                @if (groupKey == "releasability")
+                {
+                    <SpifReleasabilityEditor
+                        TagSetIndex="originalIndex"
+                        TagSet="tagSet"
+                        Classifications="State.Classifications"
+                        AllTagSets="State.TagSets"
+                        OnChanged="OnChanged"
+                        OnRemove="@(() => RemoveTagSet(originalIndex))" />
+                }
+                else
+                {
+                    <SpifTagSetEditor
+                        TagSetIndex="originalIndex"
+                        TagSet="tagSet"
+                        Classifications="State.Classifications"
+                        AllTagSets="State.TagSets"
+                        BorderColor="@color"
+                        OnChanged="OnChanged"
+                        OnRemove="@(() => RemoveTagSet(originalIndex))" />
+                }
+            }
+        </div>
+    }
+
+    @* ── Add Tag Set dropdown ── *@
+    <div style="position:relative;">
+        <button class="btn btn-sm btn-outline-primary" type="button"
+                @onclick="ToggleDropdown" @onclick:stopPropagation="true">
+            + Add Tag Set
+        </button>
+        @if (_showDropdown)
+        {
+            <ul class="dropdown-menu show" style="font-size:0.85rem;">
+                <li><button class="dropdown-item" type="button" @onclick="() => AddFromTemplate(AddBlankTagSet)">Blank Tag Set</button></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><button class="dropdown-item" type="button" @onclick="() => AddFromTemplate(AddAccessControlsTemplate)">
+                    <span class="oi oi-lock-locked me-1 text-danger" style="font-size:0.7rem;"></span> Access Controls
+                </button></li>
+                <li><button class="dropdown-item" type="button" @onclick="() => AddFromTemplate(AddDisseminationTemplate)">
+                    <span class="oi oi-shield me-1 text-warning" style="font-size:0.7rem;"></span> Dissemination Controls
+                </button></li>
+                <li><button class="dropdown-item" type="button" @onclick="() => AddFromTemplate(AddReleasabilityTemplate)">
+                    <span class="oi oi-globe me-1 text-success" style="font-size:0.7rem;"></span> Releasability
+                </button></li>
+                <li><button class="dropdown-item" type="button" @onclick="() => AddFromTemplate(AddInfoMarkersTemplate)">
+                    <span class="oi oi-info me-1 text-primary" style="font-size:0.7rem;"></span> Information Markers
+                </button></li>
+            </ul>
+        }
+    </div>
+</div>
+
+<style>
+    .spif-tagset-group { margin-bottom: 0.5rem; }
+
+    .spif-tagset-group-header {
+        padding: 0.25rem 0.5rem;
+        margin-bottom: 0.25rem;
+    }
+</style>
+
+@code {
+    [CascadingParameter] public required SpifFormState State { get; set; }
+    [Parameter] public EventCallback<string> OnSectionActivated { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public string? ActiveSection { get; set; }
+
+    private bool _isActive => ActiveSection == "tagsets";
+    private bool _showDropdown;
+
+    private void ToggleDropdown()
+    {
+        _showDropdown = !_showDropdown;
+    }
+
+    private Dictionary<string, List<(TagSetEntry TagSet, int Index)>> GetGroupedTagSets()
+    {
+        var result = new Dictionary<string, List<(TagSetEntry, int)>>();
+        for (var i = 0; i < State.TagSets.Count; i++)
+        {
+            var ts = State.TagSets[i];
+            var category = TagSetCategoryHelper.GetCategory(ts);
+            if (!result.ContainsKey(category))
+                result[category] = [];
+            result[category].Add((ts, i));
+        }
+        return result;
+    }
+
+    private void RemoveTagSet(int idx)
+    {
+        State.TagSets.RemoveAt(idx);
+        OnChanged.InvokeAsync();
+    }
+
+    private void AddFromTemplate(Action templateAction)
+    {
+        _showDropdown = false;
+        templateAction();
+        OnChanged.InvokeAsync();
+    }
+
+    private void AddBlankTagSet()
+    {
+        State.TagSets.Add(new TagSetEntry { Name = $"TagSet{State.TagSets.Count + 1}", DisplayOrder = State.TagSets.Count + 1, Expanded = true });
+    }
+
+    private void AddAccessControlsTemplate()
+    {
+        State.TagSets.Add(new TagSetEntry
+        {
+            Name = "AccessControls",
+            DisplayName = "Access Controls",
+            DisplayOrder = State.TagSets.Count + 1,
+            Expanded = true,
+            SemanticCategory = "restrictive",
+            Tags =
+            [
+                new TagEntry { TagName = "SI", LacvValue = 1, TagType = "restrictive" },
+                new TagEntry { TagName = "TK", LacvValue = 2, TagType = "restrictive" },
+            ]
+        });
+    }
+
+    private void AddDisseminationTemplate()
+    {
+        State.TagSets.Add(new TagSetEntry
+        {
+            Name = "Dissemination",
+            DisplayName = "Dissemination Controls",
+            DisplayOrder = State.TagSets.Count + 1,
+            Expanded = true,
+            SemanticCategory = "dissemination",
+            Tags =
+            [
+                new TagEntry { TagName = "NOFORN", LacvValue = 1, TagType = "restrictive" },
+                new TagEntry { TagName = "REL", LacvValue = 2, TagType = "permissive" },
+            ]
+        });
+    }
+
+    private void AddReleasabilityTemplate()
+    {
+        State.TagSets.Add(new TagSetEntry
+        {
+            Name = "Releasability",
+            DisplayName = "Releasability",
+            DisplayOrder = State.TagSets.Count + 1,
+            Expanded = true,
+            SemanticCategory = "releasability",
+            Tags =
+            [
+                new TagEntry { TagName = "USA", LacvValue = 1, TagType = "permissive" },
+                new TagEntry { TagName = "GBR", LacvValue = 2, TagType = "permissive" },
+                new TagEntry { TagName = "AUS", LacvValue = 3, TagType = "permissive" },
+            ]
+        });
+    }
+
+    private void AddInfoMarkersTemplate()
+    {
+        State.TagSets.Add(new TagSetEntry
+        {
+            Name = "InfoMarkers",
+            DisplayName = "Information Markers",
+            DisplayOrder = State.TagSets.Count + 1,
+            Expanded = true,
+            SemanticCategory = "informative",
+            Tags =
+            [
+                new TagEntry { TagName = "PROPIN", LacvValue = 1, TagType = "informative" },
+                new TagEntry { TagName = "ORCON", LacvValue = 2, TagType = "informative" },
+            ]
+        });
+    }
+}

@@ -1,0 +1,42 @@
+@*
+    Component: SpifMetadataSection
+    Purpose: SPIF metadata editing section. Provides form fields for Policy OID,
+             Policy Name, and Default Security Policy ID.
+    Dependencies: SpifFormState (cascading parameter), EventCallback.
+*@
+@using AbacController.Blazor.Components.SpifBuilder
+
+<div class="spif-section @(_isActive ? "active" : "")"
+     data-form-section="metadata"
+     @onclick="@(() => OnSectionActivated.InvokeAsync("metadata"))"
+     @onfocusin="@(() => OnSectionActivated.InvokeAsync("metadata"))">
+    <div class="spif-section-label">Metadata</div>
+    <div class="row mb-2">
+        <div class="col-md-4" data-spif-field="policyOid">
+            <label class="form-label small">Policy OID <span class="text-danger">*</span></label>
+            <input type="text" class="form-control form-control-sm" @bind="State.PolicyOid" placeholder="e.g., 2.16.840.1.101.2.1" @bind:after="NotifyChanged" />
+        </div>
+        <div class="col-md-8" data-spif-field="policyName">
+            <label class="form-label small">Policy Name <span class="text-danger">*</span></label>
+            <input type="text" class="form-control form-control-sm" @bind="State.PolicyName" placeholder="e.g., US Department of Defense" @bind:after="NotifyChanged" />
+            <small class="text-muted">Maps to the SPIF &lt;originator&gt; element. Human-readable policy identifier.</small>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-4" data-spif-field="defaultSecurityPolicyId">
+            <label class="form-label small">Default Security Policy ID</label>
+            <input type="text" class="form-control form-control-sm" @bind="State.DefaultSecurityPolicyId" placeholder="Optional default OID" @bind:after="NotifyChanged" />
+        </div>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter] public required SpifFormState State { get; set; }
+    [Parameter] public EventCallback<string> OnSectionActivated { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public string? ActiveSection { get; set; }
+
+    private bool _isActive => ActiveSection == "metadata";
+
+    private async Task NotifyChanged() => await OnChanged.InvokeAsync();
+}
