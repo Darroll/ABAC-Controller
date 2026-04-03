@@ -85,11 +85,13 @@ public sealed class LabelValidator
         SecurityLabel label)
     {
         var matches = constraint.CategoryGroups.Count(group => HasCategory(label, group.TagSetRef, group.Lacv));
+        var operation = constraint.Operation.Trim().ToLowerInvariant();
 
-        return constraint.Operation.ToLowerInvariant() switch
+        return operation switch
         {
-            "oneormore" => matches > 0,
+            "oneormore" => matches > 0 || constraint.CategoryGroups.Count == 0,
             "onlyone" => matches == 1,
+            "all" => matches == constraint.CategoryGroups.Count,
             _ => matches == constraint.CategoryGroups.Count
         };
     }

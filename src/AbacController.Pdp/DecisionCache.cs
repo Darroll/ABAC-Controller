@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using AbacController.Core.Domain.Decisions;
-using AbacController.Core.Domain.Labels;
 using AbacController.Core.Interfaces;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -33,7 +32,8 @@ public sealed class DecisionCache : IDecisionCache
         entry.Value = result;
         entry.AbsoluteExpirationRelativeToNow = ttl;
 
-        foreach (var policySetId in result.AppliedPolicies.Where(static p => !string.IsNullOrWhiteSpace(p)))
+        foreach (var policySetId in result.AppliedPolicies
+                     .Where(static p => p.StartsWith("policy-set:", StringComparison.Ordinal)))
         {
             var policyIndex = _policyKeys.GetOrAdd(policySetId, _ => new ConcurrentDictionary<string, byte>());
             policyIndex[cacheKey] = 0;
@@ -60,25 +60,13 @@ public sealed class DecisionCache : IDecisionCache
     /// <inheritdoc />
     public string ComputeKey(EvaluationRequest request, string policyVersion)
     {
-        var label = request.Resource.Properties.TryGetValue("securityLabel", out var labelObj) && labelObj is SecurityLabel securityLabel
-            ? SerializeLabel(securityLabel)
-            : "-";
-
-        var clearance = request.Subject.Properties.TryGetValue("securityClearance", out var clearanceObj) && clearanceObj is SecurityClearance securityClearance
-            ? SerializeClearance(securityClearance)
-            : "-";
-
         var input = string.Join("|",
-            request.Subject.Type,
             request.Subject.Id,
             request.Action.Name,
             request.Resource.Type,
             request.Resource.Id,
             request.Options.PolicySetId ?? "-",
-            request.Options.PolicyIdOverride ?? "-",
-            policyVersion,
-            label,
-            clearance);
+            policyVersion);
 
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(input));
         return Convert.ToHexString(hash);
@@ -87,7 +75,11 @@ public sealed class DecisionCache : IDecisionCache
     /// <inheritdoc />
     public void InvalidateByPolicySet(string policySetId)
     {
-        if (!_policyKeys.TryRemove(policySetId, out var keys))
+        var normalizedKey = policySetId.StartsWith("policy-set:", StringComparison.Ordinal)
+            ? policySetId
+            : $"policy-set:{policySetId}";
+
+        if (!_policyKeys.TryRemove(normalizedKey, out var keys))
         {
             return;
         }
@@ -105,77 +97,6 @@ public sealed class DecisionCache : IDecisionCache
         {
             InvalidateByPolicySet(policySetId);
         }
-    }
-
-    private static string SerializeLabel(SecurityLabel label)
-    {
-        var sb = new StringBuilder();
-        sb.Append(label.PolicyOid ?? "-")
-            .Append(':').Append(label.ClassificationLacv.Value);
-
-        foreach (var tagSet in label.CategoryTagSets.OrderBy(static t => t.TagSetOid, StringComparer.Ordinal))
-        {
-            sb.Append('|').Append(tagSet.TagSetOid);
-            foreach (var tag in tagSet.Tags.OrderBy(static t => t.TagOid ?? t.Name ?? string.Empty, StringComparer.Ordinal))
-            {
-                sb.Append('[')
-                    .Append(tag.TagOid ?? tag.Name ?? tag.TagType.ToString())
-                    .Append(':').Append(tag.TagType);
-
-                if (tag.EnumType is not null)
-                {
-                    sb.Append(':').Append(tag.EnumType.Value);
-                }
-
-                var values = tag.TagType == Core.Domain.Spif.TagType.Enumerated
-                    ? tag.EnumeratedValues.OrderBy(static v => v.Value)
-                    : tag.Bits.OrderBy(static v => v.Value);
-
-                foreach (var value in values)
-                {
-                    sb.Append(',').Append(value.Value);
-                }
-
-                sb.Append(']');
-            }
-        }
-
-        return sb.ToString();
-    }
-
-    private static string SerializeClearance(SecurityClearance clearance)
-    {
-        var sb = new StringBuilder();
-        sb.Append(clearance.PolicyOid);
-
-        foreach (var classification in clearance.ClassificationLacvs.OrderBy(static c => c.Value))
-        {
-            sb.Append(':').Append(classification.Value);
-        }
-
-        foreach (var tagSet in clearance.CategoryTagSets.OrderBy(static t => t.TagSetOid, StringComparer.Ordinal))
-        {
-            sb.Append('|').Append(tagSet.TagSetOid);
-            foreach (var tag in tagSet.Tags.OrderBy(static t => t.TagOid ?? string.Empty, StringComparer.Ordinal))
-            {
-                sb.Append('[')
-                    .Append(tag.TagOid ?? tag.TagType.ToString())
-                    .Append(':').Append(tag.TagType);
-
-                var values = tag.TagType == Core.Domain.Spif.TagType.Enumerated
-                    ? tag.EnumeratedValues.OrderBy(static v => v.Value)
-                    : tag.Bits.OrderBy(static v => v.Value);
-
-                foreach (var value in values)
-                {
-                    sb.Append(',').Append(value.Value);
-                }
-
-                sb.Append(']');
-            }
-        }
-
-        return sb.ToString();
     }
 
     private sealed record PolicyEntryState(

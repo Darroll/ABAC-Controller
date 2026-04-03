@@ -315,10 +315,12 @@ public sealed class AcdfEvaluator : IAcdfEvaluator
         foreach (var constraint in constraints)
         {
             var matches = constraint.CategoryGroups.Count(group => HasCategoryReference(label, group, spifIndex));
-            var satisfied = constraint.Operation.ToLowerInvariant() switch
+            var operation = constraint.Operation.Trim().ToLowerInvariant();
+            var satisfied = operation switch
             {
-                "oneormore" => matches > 0,
+                "oneormore" => matches > 0 || constraint.CategoryGroups.Count == 0,
                 "onlyone" => matches == 1,
+                "all" => matches == constraint.CategoryGroups.Count,
                 _ => matches == constraint.CategoryGroups.Count
             };
 
