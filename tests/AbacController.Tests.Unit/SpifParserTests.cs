@@ -60,4 +60,45 @@ public sealed class SpifParserTests
         Assert.Equal(2, result.Spif.Classifications.Count);
         Assert.Single(result.Spif.CategoryTagSets);
     }
+
+    [Fact]
+    public void Parse_Fails_When_SignedSpif_IsPresented_Without_Verifier()
+    {
+        const string xml = """
+<spif:SPIF xmlns:spif="http://www.xmlspif.org/spif"
+           schemaVersion="2.1"
+           keyIdentifier="kid-1">
+  <spif:securityPolicyId name="TEST" id="1.2.3.4" />
+  <spif:securityClassifications>
+    <spif:securityClassification name="SECRET" lacv="3" hierarchy="3" />
+  </spif:securityClassifications>
+</spif:SPIF>
+""";
+
+        var result = _parser.Parse(xml);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Errors, e => e.Message.Contains("XML-DSig verification is not configured", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Parse_Succeeds_For_SignedSpif_When_NoOpVerifier_IsInjected()
+    {
+        const string xml = """
+<spif:SPIF xmlns:spif="http://www.xmlspif.org/spif"
+           schemaVersion="2.1"
+           keyIdentifier="kid-1">
+  <spif:securityPolicyId name="TEST" id="1.2.3.4" />
+  <spif:securityClassifications>
+    <spif:securityClassification name="SECRET" lacv="3" hierarchy="3" />
+  </spif:securityClassifications>
+</spif:SPIF>
+""";
+
+        var parser = new SpifParser(new NoOpXmlSignatureVerifier());
+        var result = parser.Parse(xml);
+
+        Assert.True(result.Success, string.Join(" | ", result.Errors.Select(e => e.Message)));
+        Assert.Contains(result.Warnings, w => w.Message.Contains("bypassed", StringComparison.OrdinalIgnoreCase));
+    }
 }

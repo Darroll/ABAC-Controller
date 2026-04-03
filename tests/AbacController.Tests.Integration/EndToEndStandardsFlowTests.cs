@@ -21,6 +21,7 @@ public sealed class EndToEndStandardsFlowTests
         var codec = new XmlStanag4774Codec();
         var validator = new LabelValidator();
         var evaluator = new AcdfEvaluator();
+        var binder = new Stanag4778MetadataBinder([codec]);
 
         var label = new SecurityLabel
         {
@@ -53,7 +54,18 @@ public sealed class EndToEndStandardsFlowTests
         var encoded = codec.Encode(label, spifIndex);
         Assert.True(encoded.IsSuccess, encoded.Error);
 
-        var decoded = codec.Decode(encoded.EncodedString!);
+        var envelopeXml = binder.Bind(new MetadataBindingEnvelope
+        {
+            BindingId = "integration-001",
+            LabelXml = encoded.EncodedString!,
+            Payload = System.Text.Encoding.UTF8.GetBytes("payload"),
+            MediaType = "text/plain"
+        });
+
+        var unbound = binder.Unbind(envelopeXml);
+        Assert.NotNull(unbound.Label);
+
+        var decoded = codec.Decode(unbound.Envelope.LabelXml);
         Assert.True(decoded.IsSuccess, decoded.Error);
 
         var validation = validator.Validate(decoded.Label!, spifIndex);

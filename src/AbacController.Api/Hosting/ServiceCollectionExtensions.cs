@@ -41,6 +41,7 @@ public static class ServiceCollectionExtensions
             dbOptions.UseSqlite(connStr);
         });
 
+        services.AddSingleton<IXmlSignatureVerifier, RejectingXmlSignatureVerifier>();
         services.AddSingleton<ISpifParser, SpifParser>();
         services.AddSingleton<IAcdfEvaluator, AcdfEvaluator>();
         services.AddSingleton<IDecisionCache, DecisionCache>();
@@ -50,6 +51,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPipResolver, PipResolver>();
         services.AddSingleton<IPipCacheManager, PipCacheManager>();
         services.AddSingleton<LabelValidator>();
+        services.AddSingleton<IStanag4778MetadataBinder, Stanag4778MetadataBinder>();
         services.AddSingleton<IAuditWriter, AuditWriter>();
         services.AddHostedService<AuditBatchWriterService>();
         services.AddSingleton<ILabelCodec, XmlStanag4774Codec>();
