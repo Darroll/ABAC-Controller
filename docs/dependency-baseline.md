@@ -1,35 +1,69 @@
-# Dependency baseline / SBOM placeholder
+# Dependency baseline
 
-This repository does not yet ship a formal SPDX or CycloneDX SBOM artifact. Until automated SBOM generation is added to CI, this file serves as a lightweight dependency baseline for gate review and manual change tracking.
+This file is the human-readable companion to the formal lightweight SBOM artifact at `docs/sbom.spdx.json`.
 
-## Direct NuGet dependencies in current repo state
+## What changed
 
-### Runtime projects
+The earlier placeholder-only dependency note has been replaced by:
 
+- a structured SPDX-style JSON SBOM: `docs/sbom.spdx.json`
+- this summary document for reviewer convenience
+
+## Scope
+
+The SBOM currently captures:
+
+- direct NuGet package references declared in repo `.csproj` files
+- internal project components present in the repo
+- project-to-project dependency relationships
+- target framework baseline (`net10.0`)
+
+It does **not** yet attempt to fully enumerate transitive NuGet closure, OS/container packages, or cryptographic hashes for build outputs. That follow-up belongs in CI/release automation.
+
+## Direct dependency summary
+
+### Runtime-oriented direct NuGet packages
+
+- `Google.Api.CommonProtos` `2.16.0`
+- `Google.Protobuf` `3.32.0`
+- `Grpc.AspNetCore` `2.76.0`
+- `Grpc.Tools` `2.76.0` *(build-time / private asset)*
 - `Microsoft.AspNetCore.Authentication.JwtBearer` `10.0.5`
-- `Microsoft.EntityFrameworkCore.Design` `10.0.5` *(design-time/private asset)*
+- `Microsoft.AspNetCore.Grpc.JsonTranscoding` `10.0.0`
+- `Microsoft.EntityFrameworkCore.Design` `10.0.5` *(design-time)*
 - `Microsoft.EntityFrameworkCore.Sqlite` `10.0.5`
 - `Microsoft.Extensions.Caching.Memory` `10.0.5`
 - `Microsoft.Extensions.Hosting.Abstractions` `10.0.5`
 - `Microsoft.Extensions.Http` `10.0.5`
 - `System.DirectoryServices.Protocols` `10.0.0`
 
-### Test projects
+### Test-only direct NuGet packages
 
 - `coverlet.collector` `6.0.4`
 - `Microsoft.NET.Test.Sdk` `17.14.1`
 - `xunit` `2.9.3`
 - `xunit.runner.visualstudio` `3.1.4`
 
-## Project-to-project dependency baseline
+## Internal component baseline
 
-- `AbacController.Api` references Core, Pdp, Pap, Pip, Pep, Data, Audit, and Blazor
-- `AbacController.Audit` references Core and Data
-- `AbacController.Data` references Core
-- `AbacController.Pap`, `AbacController.Pdp`, `AbacController.Pep`, and `AbacController.Pip` reference Core
-- Unit tests currently reference Audit, Core, Pdp, Pap, and Pep
-- Integration tests reference Core, Pdp, Pap, and Pep
+Repo projects represented in the SBOM:
 
-## Follow-up
+- `AbacController.Api`
+- `AbacController.Audit`
+- `AbacController.Blazor`
+- `AbacController.Core`
+- `AbacController.Data`
+- `AbacController.Pap`
+- `AbacController.Pdp`
+- `AbacController.Pep`
+- `AbacController.Pip`
+- `AbacController.Tests.Unit`
+- `AbacController.Tests.Integration`
 
-Recommended next step: add CI generation of a real SBOM artifact (for example SPDX or CycloneDX) and attach it to release/build outputs.
+## Review note
+
+This artifact is intentionally truthful and lightweight:
+
+- formal enough for gate traceability
+- not presented as a complete supply-chain inventory
+- suitable until CI-based SBOM generation is added
