@@ -84,32 +84,26 @@ public sealed class LabelValidator
         Core.Domain.Spif.RequiredCategoryConstraint constraint,
         SecurityLabel label)
     {
-        if (constraint.Operation == "oneOrMore")
+        var matches = constraint.CategoryGroups.Count(group => HasCategory(label, group.TagSetRef, group.Lacv));
+
+        return constraint.Operation.ToLowerInvariant() switch
         {
-            // At least one category group must be present
-            foreach (var group in constraint.CategoryGroups)
-            {
-                if (HasCategory(label, group.TagSetRef, group.Lacv))
-                    return true;
-            }
-            return constraint.CategoryGroups.Count == 0; // vacuously true if no groups
-        }
-        else // "all"
-        {
-            // All category groups must be present
-            foreach (var group in constraint.CategoryGroups)
-            {
-                if (!HasCategory(label, group.TagSetRef, group.Lacv))
-                    return false;
-            }
-            return true;
-        }
+            "oneormore" => matches > 0,
+            "onlyone" => matches == 1,
+            _ => matches == constraint.CategoryGroups.Count
+        };
     }
 
     private static bool HasCategory(SecurityLabel label, string tagSetRef, Core.Domain.Spif.LacvValue lacv)
     {
         foreach (var tagSet in label.CategoryTagSets)
         {
+            if (!string.Equals(tagSet.TagSetOid, tagSetRef, StringComparison.Ordinal) &&
+                !string.Equals(tagSet.TagSetOid, tagSetRef, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             foreach (var tag in tagSet.Tags)
             {
                 if (tag.Bits.Contains(lacv) || tag.EnumeratedValues.Contains(lacv))

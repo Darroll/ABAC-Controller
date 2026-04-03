@@ -10,6 +10,10 @@ namespace AbacController.Pep.Codecs.Xml;
 /// <summary>
 /// XML STANAG 4774 label codec. Encodes/decodes security labels
 /// to/from the STANAG 4774 XML format.
+///
+/// Note: STANAG 4778 metadata binding is not implemented here; this codec handles
+/// label syntax only. To preserve controller-relevant semantics across round trips,
+/// the codec emits and consumes extension attributes for canonical identifiers.
 /// </summary>
 public sealed class XmlStanag4774Codec : ILabelCodec
 {
@@ -26,26 +30,42 @@ public sealed class XmlStanag4774Codec : ILabelCodec
     {
         try
         {
-            var confInfoElement = new XElement(SlabNs + "ConfidentialityInformation",
-                new XElement(SlabNs + "PolicyIdentifier", spifIndex.PolicyName),
-                new XElement(SlabNs + "Classification",
-                    spifIndex.GetClassificationName(label.ClassificationLacv)
-                    ?? label.ClassificationName
-                    ?? label.ClassificationLacv.ToString())
-            );
+            var policyIdentifier = new XElement(
+                SlabNs + "PolicyIdentifier",
+                new XAttribute("oid", label.PolicyOid ?? spifIndex.PolicyOid),
+                label.PolicyName ?? spifIndex.PolicyName);
 
-            // Add categories
+            var classificationName = spifIndex.GetClassificationName(label.ClassificationLacv)
+                ?? label.ClassificationName
+                ?? label.ClassificationLacv.ToString();
+
+            var classification = new XElement(
+                SlabNs + "Classification",
+                new XAttribute("lacv", label.ClassificationLacv.Value),
+                classificationName);
+
+            var confInfoElement = new XElement(SlabNs + "ConfidentialityInformation", policyIdentifier, classification);
+
             foreach (var tagSet in label.CategoryTagSets)
             {
+                var spifTagSet = spifIndex.GetTagSet(tagSet.TagSetOid);
                 foreach (var tag in tagSet.Tags)
                 {
-                    foreach (var cat in tag.Categories)
+                    var selectedCategories = ResolveSelectedCategories(tag, spifTagSet);
+                    foreach (var cat in selectedCategories)
                     {
-                        confInfoElement.Add(new XElement(SlabNs + "Category",
-                            new XAttribute("TagName", tag.Name ?? ""),
-                            new XAttribute("Type", tag.TagType.ToString().ToLowerInvariant()),
-                            new XElement(SlabNs + "CategoryValue", cat.Name)
-                        ));
+                        confInfoElement.Add(new XElement(
+                            SlabNs + "Category",
+                            new XAttribute("TagSetOid", tagSet.TagSetOid),
+                            new XAttribute("TagName", tag.Name ?? tag.TagOid ?? string.Empty),
+                            new XAttribute("Type", ToWireTagType(tag.TagType)),
+                            tag.EnumType is not null
+                                ? new XAttribute("EnumType", tag.EnumType == EnumType.Restrictive ? "restrictive" : "permissive")
+                                : null,
+                            new XElement(
+                                SlabNs + "CategoryValue",
+                                new XAttribute("lacv", cat.Lacv.Value),
+                                cat.Name)));
                     }
                 }
             }
@@ -54,9 +74,7 @@ public sealed class XmlStanag4774Codec : ILabelCodec
                 new XElement(SlabNs + "originatorConfidentialityLabel",
                     confInfoElement,
                     new XElement(SlabNs + "CreationDateTime",
-                        DateTimeOffset.UtcNow.ToString("o"))
-                )
-            );
+                        (label.CreatedAt ?? DateTimeOffset.UtcNow).ToString("o"))));
 
             return EncodeResult.Success(doc.ToString());
         }
@@ -88,82 +106,77 @@ public sealed class XmlStanag4774Codec : ILabelCodec
             var doc = XDocument.Parse(encodedLabel);
             var root = doc.Root;
             if (root is null)
+            {
                 return DecodeResult.Failure("Empty document");
+            }
 
-            // Find ConfidentialityInformation element (any namespace)
-            var confInfo = root.Descendants()
-                .FirstOrDefault(e => e.Name.LocalName == "ConfidentialityInformation");
+            var confInfo = root.Name.LocalName == "ConfidentialityInformation"
+                ? root
+                : root.Descendants().FirstOrDefault(e => e.Name.LocalName == "ConfidentialityInformation");
             if (confInfo is null)
+            {
                 return DecodeResult.Failure("Missing ConfidentialityInformation element");
+            }
 
-            var policyName = confInfo.Elements()
-                .FirstOrDefault(e => e.Name.LocalName == "PolicyIdentifier")?.Value;
-            var classificationName = confInfo.Elements()
-                .FirstOrDefault(e => e.Name.LocalName == "Classification")?.Value;
+            var policyElement = confInfo.Elements().FirstOrDefault(e => e.Name.LocalName == "PolicyIdentifier");
+            var classificationElement = confInfo.Elements().FirstOrDefault(e => e.Name.LocalName == "Classification");
+            var createdAtElement = root.Descendants().FirstOrDefault(e => e.Name.LocalName == "CreationDateTime");
 
-            // Parse categories
-            var tagSets = new Dictionary<string, List<LabelCategoryTag>>();
-            var categories = confInfo.Elements()
-                .Where(e => e.Name.LocalName == "Category");
+            var policyName = policyElement?.Value?.Trim();
+            var policyOid = policyElement?.Attribute("oid")?.Value?.Trim();
+            var classificationName = classificationElement?.Value?.Trim();
+            var classificationLacv = ParseLacv(classificationElement?.Attribute("lacv")?.Value, classificationName);
+
+            var tagMap = new Dictionary<(string TagSetOid, string TagKey), MutableTag>();
+            var categories = confInfo.Elements().Where(e => e.Name.LocalName == "Category");
 
             foreach (var catElem in categories)
             {
-                var tagName = catElem.Attribute("TagName")?.Value ?? "default";
-                var typeStr = catElem.Attribute("Type")?.Value ?? "restrictive";
-                var catValue = catElem.Elements()
-                    .FirstOrDefault(e => e.Name.LocalName == "CategoryValue")?.Value ?? "";
+                var tagSetOid = catElem.Attribute("TagSetOid")?.Value?.Trim() ?? "decoded";
+                var tagName = catElem.Attribute("TagName")?.Value?.Trim() ?? "default";
+                var type = ParseTagType(catElem.Attribute("Type")?.Value ?? "restrictive");
+                var enumType = ParseEnumType(catElem.Attribute("EnumType")?.Value);
+                var categoryValueElement = catElem.Elements().FirstOrDefault(e => e.Name.LocalName == "CategoryValue");
+                var categoryName = categoryValueElement?.Value?.Trim() ?? string.Empty;
+                var categoryLacv = ParseLacv(categoryValueElement?.Attribute("lacv")?.Value, categoryName);
 
-                if (!tagSets.ContainsKey(tagName))
-                    tagSets[tagName] = [];
-
-                // Find existing tag or create new one
-                var existingTag = tagSets[tagName]
-                    .FirstOrDefault(t => t.Name == tagName);
-
-                if (existingTag is null)
+                var key = (tagSetOid, tagName);
+                if (!tagMap.TryGetValue(key, out var mutableTag))
                 {
-                    tagSets[tagName].Add(new LabelCategoryTag
-                    {
-                        Name = tagName,
-                        TagType = ParseTagType(typeStr),
-                        Categories = ImmutableList.Create(new LabelCategory
-                        {
-                            Name = catValue,
-                            Lacv = 0 // Will need to be resolved against SPIF
-                        })
-                    });
+                    mutableTag = new MutableTag(tagName, type, enumType);
+                    tagMap[key] = mutableTag;
                 }
-                else
+
+                mutableTag.AddCategory(new LabelCategory
                 {
-                    // Add category to existing tag
-                    var idx = tagSets[tagName].IndexOf(existingTag);
-                    tagSets[tagName][idx] = existingTag with
-                    {
-                        Categories = existingTag.Categories.Add(new LabelCategory
-                        {
-                            Name = catValue,
-                            Lacv = 0
-                        })
-                    };
-                }
+                    Name = categoryName,
+                    Lacv = categoryLacv
+                });
             }
 
-            // Build label tag sets
-            var labelTagSets = ImmutableList.CreateBuilder<LabelCategoryTagSet>();
-            if (tagSets.Count > 0)
-            {
-                labelTagSets.Add(new LabelCategoryTagSet
+            var labelTagSets = tagMap
+                .GroupBy(kvp => kvp.Key.TagSetOid)
+                .Select(group => new LabelCategoryTagSet
                 {
-                    TagSetOid = "decoded", // Will be resolved against SPIF
-                    Tags = tagSets.Values.SelectMany(t => t).ToImmutableList()
-                });
+                    TagSetOid = group.Key,
+                    Tags = group.Select(kvp => kvp.Value.Build()).ToImmutableList()
+                })
+                .ToImmutableList();
+
+            DateTimeOffset? createdAt = null;
+            if (DateTimeOffset.TryParse(createdAtElement?.Value, out var parsedCreatedAt))
+            {
+                createdAt = parsedCreatedAt;
             }
 
             var label = new SecurityLabel
             {
+                PolicyOid = policyOid,
                 PolicyName = policyName,
+                ClassificationLacv = classificationLacv,
                 ClassificationName = classificationName,
-                CategoryTagSets = labelTagSets.ToImmutable()
+                CategoryTagSets = labelTagSets,
+                CreatedAt = createdAt
             };
 
             return DecodeResult.Success(label);
@@ -174,6 +187,54 @@ public sealed class XmlStanag4774Codec : ILabelCodec
         }
     }
 
+    private static ImmutableList<LabelCategory> ResolveSelectedCategories(LabelCategoryTag tag, ITagSetIndex? spifTagSet)
+    {
+        if (tag.Categories.Count > 0)
+        {
+            return tag.Categories;
+        }
+
+        var lacvs = tag.TagType == TagType.Enumerated ? tag.EnumeratedValues : tag.Bits;
+        if (lacvs.Count == 0)
+        {
+            return ImmutableList<LabelCategory>.Empty;
+        }
+
+        return lacvs.Select(lacv => new LabelCategory
+        {
+            Name = ResolveCategoryName(spifTagSet, tag, lacv),
+            Lacv = lacv
+        }).ToImmutableList();
+    }
+
+    private static string ResolveCategoryName(ITagSetIndex? spifTagSet, LabelCategoryTag tag, LacvValue lacv)
+        => spifTagSet?.GetCategory(tag.Name ?? string.Empty, lacv)?.Name
+           ?? lacv.ToString();
+
+    private static LacvValue ParseLacv(string? attributeValue, string? fallbackText)
+    {
+        if (int.TryParse(attributeValue, out var parsedAttribute))
+        {
+            return parsedAttribute;
+        }
+
+        if (int.TryParse(fallbackText, out var parsedText))
+        {
+            return parsedText;
+        }
+
+        return 0;
+    }
+
+    private static string ToWireTagType(TagType tagType) => tagType switch
+    {
+        TagType.Restrictive => "restrictive",
+        TagType.Permissive => "permissive",
+        TagType.Enumerated => "enumerated",
+        TagType.TagType7 => "tagType7",
+        _ => "notApplicable"
+    };
+
     private static TagType ParseTagType(string value) => value.ToLowerInvariant() switch
     {
         "restrictive" => TagType.Restrictive,
@@ -182,4 +243,41 @@ public sealed class XmlStanag4774Codec : ILabelCodec
         "tagtype7" => TagType.TagType7,
         _ => TagType.NotApplicable
     };
+
+    private static EnumType? ParseEnumType(string? value) => value?.ToLowerInvariant() switch
+    {
+        "restrictive" => EnumType.Restrictive,
+        "permissive" => EnumType.Permissive,
+        _ => null
+    };
+
+    private sealed class MutableTag(string name, TagType tagType, EnumType? enumType)
+    {
+        private readonly List<LabelCategory> _categories = [];
+        private readonly HashSet<LacvValue> _bits = [];
+        private readonly HashSet<LacvValue> _enumeratedValues = [];
+
+        public void AddCategory(LabelCategory category)
+        {
+            _categories.Add(category);
+            if (tagType == TagType.Enumerated)
+            {
+                _enumeratedValues.Add(category.Lacv);
+            }
+            else
+            {
+                _bits.Add(category.Lacv);
+            }
+        }
+
+        public LabelCategoryTag Build() => new()
+        {
+            Name = name,
+            TagType = tagType,
+            EnumType = enumType,
+            Bits = _bits.ToImmutableHashSet(),
+            EnumeratedValues = _enumeratedValues.ToImmutableHashSet(),
+            Categories = _categories.ToImmutableList()
+        };
+    }
 }

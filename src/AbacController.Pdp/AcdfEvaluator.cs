@@ -315,13 +315,16 @@ public sealed class AcdfEvaluator : IAcdfEvaluator
         foreach (var constraint in constraints)
         {
             var matches = constraint.CategoryGroups.Count(group => HasCategoryReference(label, group, spifIndex));
-            var satisfied = string.Equals(constraint.Operation, "all", StringComparison.OrdinalIgnoreCase)
-                ? matches == constraint.CategoryGroups.Count
-                : matches > 0;
+            var satisfied = constraint.Operation.ToLowerInvariant() switch
+            {
+                "oneormore" => matches > 0,
+                "onlyone" => matches == 1,
+                _ => matches == constraint.CategoryGroups.Count
+            };
 
             if (!satisfied)
             {
-                var reason = $"Required categories for {scope} not satisfied ({constraint.Operation})";
+                var reason = $"Required categories for {scope} not satisfied ({constraint.Operation}; matches={matches})";
                 trace?.AddStep("label-validation", "FAIL", false, reason);
                 return AcdfResult.Fail(AcdfFailureReason.LabelValidationFailed, reason);
             }
