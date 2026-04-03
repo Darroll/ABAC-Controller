@@ -8,6 +8,7 @@
     <ProjectReference Include="..\AbacController.Pep\AbacController.Pep.csproj" />
     <ProjectReference Include="..\AbacController.Data\AbacController.Data.csproj" />
     <ProjectReference Include="..\AbacController.Audit\AbacController.Audit.csproj" />
+    <ProjectReference Include="..\AbacController.Blazor\AbacController.Blazor.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

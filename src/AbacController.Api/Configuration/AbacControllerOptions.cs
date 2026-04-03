@@ -23,6 +23,7 @@ public sealed class AuthOptions
     public string Audience { get; set; } = "abac-controller";
     public bool RequireHttpsMetadata { get; set; } = true;
     public string? JwksFile { get; set; }
+    public bool EnableDevelopmentAuth { get; set; }
 }
 
 public sealed class PdpOptions
