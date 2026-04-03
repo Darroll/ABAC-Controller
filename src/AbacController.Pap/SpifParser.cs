@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Xml;
 using System.Xml.Linq;
 using AbacController.Core.Constants;
@@ -9,589 +10,1071 @@ using AbacController.Core.Interfaces;
 namespace AbacController.Pap;
 
 /// <summary>
-/// XML SPIF parser supporting v2.1 and v3.0 schemas.
-/// Performs namespace normalization, parsing, and semantic validation.
+/// XML SPIF parser supporting v3.0 as the primary schema and v2.1 as the compatibility fallback.
+/// Performs namespace normalization, structural validation, and semantic validation.
 /// </summary>
 public sealed class SpifParser : ISpifParser
 {
-    private static readonly XNamespace SpifNs = SpifNamespaces.Spif;
+    private static readonly StringComparer OidComparer = StringComparer.Ordinal;
+    private static readonly StringComparer NameComparer = StringComparer.OrdinalIgnoreCase;
+    private static readonly HashSet<string> SupportedSchemaVersions =
+    [
+        "3.0",
+        "2.1"
+    ];
 
     /// <inheritdoc />
     public SpifParseResult Parse(string xmlContent)
     {
+        ArgumentNullException.ThrowIfNull(xmlContent);
+
+        if (string.IsNullOrWhiteSpace(xmlContent))
+        {
+            return SpifParseResult.Failed([new SpifParseError("SPIF XML content is empty")]);
+        }
+
         try
         {
-            // Normalize namespace typo (xmslpif → xmlspif)
-            xmlContent = xmlContent.Replace(
-                SpifNamespaces.SpifTypo,
-                SpifNamespaces.Spif);
-
-            var doc = XDocument.Parse(xmlContent);
-            return ParseDocument(doc);
+            var normalized = NormalizeNamespaceTypos(xmlContent);
+            var document = XDocument.Parse(normalized, LoadOptions.SetLineInfo | LoadOptions.PreserveWhitespace);
+            return ParseDocument(document);
         }
         catch (XmlException ex)
         {
             return SpifParseResult.Failed(
-                [new SpifParseError($"XML parsing error: {ex.Message}", ex.LineNumber)]);
+            [
+                new SpifParseError($"XML parsing error: {ex.Message}", ex.LineNumber)
+            ]);
         }
         catch (Exception ex)
         {
             return SpifParseResult.Failed(
-                [new SpifParseError($"Unexpected error: {ex.Message}")]);
+            [
+                new SpifParseError($"Unexpected error: {ex.Message}")
+            ]);
         }
     }
 
     /// <inheritdoc />
     public SpifParseResult Parse(Stream xmlStream)
     {
-        using var reader = new StreamReader(xmlStream);
+        ArgumentNullException.ThrowIfNull(xmlStream);
+
+        using var reader = new StreamReader(xmlStream, leaveOpen: true);
         return Parse(reader.ReadToEnd());
     }
 
     /// <inheritdoc />
     public ValidationResult ValidateSchema(string xmlContent)
     {
+        ArgumentNullException.ThrowIfNull(xmlContent);
+
         try
         {
-            xmlContent = xmlContent.Replace(
-                SpifNamespaces.SpifTypo,
-                SpifNamespaces.Spif);
-
-            XDocument.Parse(xmlContent);
-            return ValidationResult.Valid();
+            var normalized = NormalizeNamespaceTypos(xmlContent);
+            var document = XDocument.Parse(normalized, LoadOptions.SetLineInfo);
+            var validationErrors = ValidateDocumentShape(document);
+            return validationErrors.Count == 0
+                ? ValidationResult.Valid()
+                : ValidationResult.Invalid(validationErrors);
         }
         catch (XmlException ex)
         {
             return ValidationResult.Invalid(
-                [new SpifParseError($"XML validation error: {ex.Message}", ex.LineNumber)]);
+            [
+                new SpifParseError($"XML validation error: {ex.Message}", ex.LineNumber)
+            ]);
         }
     }
 
-    private SpifParseResult ParseDocument(XDocument doc)
-    {
-        var root = doc.Root;
-        if (root is null)
-            return SpifParseResult.Failed([new SpifParseError("Empty document")]);
+    private static string NormalizeNamespaceTypos(string xmlContent)
+        => xmlContent.Replace(SpifNamespaces.SpifTypo, SpifNamespaces.Spif, StringComparison.Ordinal);
 
-        // Handle both namespaced and un-namespaced elements
-        var spifElement = root.Name.LocalName == "SPIF" ? root : null;
-        if (spifElement is null)
-            return SpifParseResult.Failed([new SpifParseError("Root element must be SPIF")]);
+    private SpifParseResult ParseDocument(XDocument document)
+    {
+        var root = document.Root;
+        if (root is null)
+        {
+            return SpifParseResult.Failed([new SpifParseError("Empty SPIF document")]);
+        }
+
+        var validationErrors = ValidateDocumentShape(document);
+        if (validationErrors.Count > 0)
+        {
+            return SpifParseResult.Failed(validationErrors);
+        }
 
         var warnings = new List<SpifParseWarning>();
         var errors = new List<SpifParseError>();
 
-        // Parse root attributes
-        var schemaVersion = spifElement.Attribute("schemaVersion")?.Value ?? "2.1";
-        var version = spifElement.Attribute("version")?.Value;
-        var creationDateStr = spifElement.Attribute("creationDate")?.Value;
-        var originatorDn = spifElement.Attribute("originatorDN")?.Value;
-        var keyIdentifier = spifElement.Attribute("keyIdentifier")?.Value;
-        var privilegeId = spifElement.Attribute("privilegeId")?.Value;
-        var rbacId = spifElement.Attribute("rbacId")?.Value;
-
-        DateTimeOffset? creationDate = null;
-        if (creationDateStr is not null)
+        var schemaVersion = root.Attribute("schemaVersion")?.Value?.Trim();
+        if (string.IsNullOrWhiteSpace(schemaVersion))
         {
-            creationDate = ParseGenTime(creationDateStr);
-            if (creationDate is null)
-                warnings.Add(new SpifParseWarning(
-                    $"Could not parse creationDate: {creationDateStr}"));
+            schemaVersion = "2.1";
+            warnings.Add(new SpifParseWarning("schemaVersion missing; assuming v2.1", GetLineNumber(root)));
+        }
+        else if (!SupportedSchemaVersions.Contains(schemaVersion))
+        {
+            warnings.Add(new SpifParseWarning(
+                $"Schema version '{schemaVersion}' is not explicitly targeted; parsing using v2.1/v3.0 compatibility rules",
+                GetLineNumber(root)));
         }
 
-        // Parse securityPolicyId
-        var policyIdElement = FindChild(spifElement, "securityPolicyId");
-        if (policyIdElement is null)
-            return SpifParseResult.Failed([new SpifParseError("Missing securityPolicyId element")]);
+        var creationDate = ParseOptionalDateTime(root.Attribute("creationDate")?.Value, root, warnings, "creationDate");
 
-        var policyInfo = new PolicyInfo
-        {
-            Name = policyIdElement.Attribute("name")?.Value ?? "Unknown",
-            Oid = policyIdElement.Attribute("id")?.Value ?? "",
-            MarkingData = ParseMarkingDataList(policyIdElement)
-        };
-
-        if (string.IsNullOrEmpty(policyInfo.Oid))
-            errors.Add(new SpifParseError("securityPolicyId missing 'id' (OID) attribute"));
-
-        // Parse classifications
-        var classificationsElement = FindChild(spifElement, "securityClassifications");
-        var classifications = ImmutableList<SecurityClassification>.Empty;
-        if (classificationsElement is not null)
-        {
-            classifications = ParseClassifications(classificationsElement, warnings);
-        }
-        else
-        {
-            errors.Add(new SpifParseError("Missing securityClassifications element"));
-        }
-
-        // Parse category tag sets
-        var tagSetsElement = FindChild(spifElement, "securityCategoryTagSets");
-        var tagSets = ImmutableList<SecurityCategoryTagSet>.Empty;
-        if (tagSetsElement is not null)
-        {
-            tagSets = ParseTagSets(tagSetsElement, warnings);
-        }
-
-        // Parse equivalent policies
-        var equivElement = FindChild(spifElement, "equivalentPolicies");
-        var equivPolicies = ImmutableList<EquivalentPolicy>.Empty;
-        if (equivElement is not null)
-        {
-            equivPolicies = ParseEquivalentPolicies(equivElement);
-        }
-
-        // Parse privacy marks
-        PrivacyMarks? privacyMarks = null;
-        var privacyElement = FindChild(spifElement, "privacyMarks");
-        if (privacyElement is not null)
-        {
-            privacyMarks = ParsePrivacyMarks(privacyElement);
-        }
-
-        // Parse global marking data
-        var globalMarkingData = ParseMarkingDataList(spifElement);
-        var globalQualifiers = ParseMarkingQualifiers(spifElement);
+        var policyIdElement = FindRequiredChild(root, "securityPolicyId", errors);
+        var classificationsElement = FindRequiredChild(root, "securityClassifications", errors);
 
         if (errors.Count > 0)
+        {
             return SpifParseResult.Failed(errors, warnings);
-
-        // Semantic validation
-        ValidateSemantics(classifications, tagSets, warnings, errors);
-
-        if (errors.Count > 0)
-            return SpifParseResult.Failed(errors, warnings);
+        }
 
         var spif = new Spif
         {
-            SchemaVersion = schemaVersion,
-            Version = version,
+            SchemaVersion = schemaVersion!,
+            Version = EmptyToNull(root.Attribute("version")?.Value),
             CreationDate = creationDate,
-            OriginatorDn = originatorDn,
-            KeyIdentifier = keyIdentifier,
-            PrivilegeId = privilegeId,
-            RbacId = rbacId,
-            PolicyId = policyInfo,
-            Classifications = classifications,
-            CategoryTagSets = tagSets,
-            EquivalentPolicies = equivPolicies,
-            PrivacyMarks = privacyMarks,
-            GlobalMarkingData = globalMarkingData,
-            GlobalMarkingQualifiers = globalQualifiers
+            OriginatorDn = EmptyToNull(root.Attribute("originatorDN")?.Value),
+            KeyIdentifier = EmptyToNull(root.Attribute("keyIdentifier")?.Value),
+            PrivilegeId = EmptyToNull(root.Attribute("privilegeId")?.Value),
+            RbacId = EmptyToNull(root.Attribute("rbacId")?.Value),
+            PolicyId = ParsePolicyInfo(policyIdElement!, errors),
+            Classifications = ParseClassifications(classificationsElement!, warnings, errors),
+            CategoryTagSets = ParseTagSets(FindChild(root, "securityCategoryTagSets"), warnings, errors),
+            EquivalentPolicies = ParseEquivalentPolicies(FindChild(root, "equivalentPolicies"), warnings, errors),
+            PrivacyMarks = ParsePrivacyMarks(FindChild(root, "privacyMarks"), warnings),
+            GlobalMarkingData = ParseMarkingDataList(root, warnings, errors),
+            GlobalMarkingQualifiers = ParseMarkingQualifiers(root, warnings)
         };
 
-        return SpifParseResult.Succeeded(spif, warnings);
+        ValidateSemantics(spif, warnings, errors);
+
+        return errors.Count > 0
+            ? SpifParseResult.Failed(errors, warnings)
+            : SpifParseResult.Succeeded(spif, warnings);
     }
 
-    private ImmutableList<SecurityClassification> ParseClassifications(
-        XElement parent, List<SpifParseWarning> warnings)
+    private static List<SpifParseError> ValidateDocumentShape(XDocument document)
+    {
+        var errors = new List<SpifParseError>();
+        var root = document.Root;
+        if (root is null)
+        {
+            errors.Add(new SpifParseError("Empty SPIF document"));
+            return errors;
+        }
+
+        if (!string.Equals(root.Name.LocalName, "SPIF", StringComparison.Ordinal))
+        {
+            errors.Add(new SpifParseError("Root element must be SPIF", GetLineNumber(root)));
+        }
+
+        var namespaceName = root.Name.NamespaceName;
+        if (!string.IsNullOrEmpty(namespaceName) &&
+            !string.Equals(namespaceName, SpifNamespaces.Spif, StringComparison.Ordinal))
+        {
+            errors.Add(new SpifParseError(
+                $"Unsupported SPIF namespace '{namespaceName}'",
+                GetLineNumber(root)));
+        }
+
+        return errors;
+    }
+
+    private static PolicyInfo ParsePolicyInfo(XElement policyIdElement, List<SpifParseError> errors)
+    {
+        var oid = EmptyToNull(policyIdElement.Attribute("id")?.Value);
+        if (oid is null)
+        {
+            errors.Add(new SpifParseError("securityPolicyId missing required 'id' attribute", GetLineNumber(policyIdElement)));
+            oid = string.Empty;
+        }
+
+        return new PolicyInfo
+        {
+            Name = EmptyToNull(policyIdElement.Attribute("name")?.Value) ?? "Unknown",
+            Oid = oid,
+            MarkingData = ParseMarkingDataList(policyIdElement, [], errors)
+        };
+    }
+
+    private static ImmutableList<SecurityClassification> ParseClassifications(
+        XElement classificationsElement,
+        List<SpifParseWarning> warnings,
+        List<SpifParseError> errors)
     {
         var builder = ImmutableList.CreateBuilder<SecurityClassification>();
 
-        foreach (var elem in FindChildren(parent, "securityClassification"))
+        foreach (var classificationElement in FindChildren(classificationsElement, "securityClassification"))
         {
-            var name = elem.Attribute("name")?.Value ?? "Unknown";
-            if (!int.TryParse(elem.Attribute("lacv")?.Value, out var lacv))
+            var name = EmptyToNull(classificationElement.Attribute("name")?.Value) ?? "Unknown";
+            if (!TryParseLacv(classificationElement.Attribute("lacv")?.Value, out var lacv))
             {
-                warnings.Add(new SpifParseWarning($"Classification '{name}' has invalid lacv"));
-                continue;
-            }
-            if (!int.TryParse(elem.Attribute("hierarchy")?.Value, out var hierarchy))
-            {
-                warnings.Add(new SpifParseWarning($"Classification '{name}' has invalid hierarchy"));
+                errors.Add(new SpifParseError(
+                    $"securityClassification '{name}' has missing or invalid lacv",
+                    GetLineNumber(classificationElement)));
                 continue;
             }
 
-            var cls = new SecurityClassification
+            if (!int.TryParse(classificationElement.Attribute("hierarchy")?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var hierarchy))
+            {
+                errors.Add(new SpifParseError(
+                    $"securityClassification '{name}' has missing or invalid hierarchy",
+                    GetLineNumber(classificationElement)));
+                continue;
+            }
+
+            builder.Add(new SecurityClassification
             {
                 Name = name,
                 Lacv = lacv,
                 Hierarchy = hierarchy,
-                Obsolete = ParseBool(elem.Attribute("obsolete")?.Value),
-                Color = elem.Attribute("color")?.Value,
-                FgColor = elem.Attribute("fgcolor")?.Value,
-                BgColor = elem.Attribute("bgcolor")?.Value,
-                MarkingData = ParseMarkingDataList(elem),
-                EquivalentClassifications = ParseEquivalentClassifications(elem),
-                RequiredCategories = ParseRequiredCategories(elem),
-                ExcludedCategories = ParseExcludedCategoryRefs(elem)
-            };
-
-            builder.Add(cls);
+                Obsolete = ParseBool(classificationElement.Attribute("obsolete")?.Value),
+                Color = EmptyToNull(classificationElement.Attribute("color")?.Value),
+                FgColor = EmptyToNull(classificationElement.Attribute("fgcolor")?.Value),
+                BgColor = EmptyToNull(classificationElement.Attribute("bgcolor")?.Value),
+                MarkingData = ParseMarkingDataList(classificationElement, warnings, errors),
+                EquivalentClassifications = ParseEquivalentClassifications(classificationElement, warnings, errors),
+                RequiredCategories = ParseRequiredCategories(classificationElement, warnings, errors),
+                ExcludedCategories = ParseExcludedCategoryRefs(classificationElement, warnings, errors)
+            });
         }
 
         return builder.ToImmutable();
     }
 
-    private ImmutableList<SecurityCategoryTagSet> ParseTagSets(
-        XElement parent, List<SpifParseWarning> warnings)
+    private static ImmutableList<SecurityCategoryTagSet> ParseTagSets(
+        XElement? tagSetsElement,
+        List<SpifParseWarning> warnings,
+        List<SpifParseError> errors)
     {
+        if (tagSetsElement is null)
+        {
+            return ImmutableList<SecurityCategoryTagSet>.Empty;
+        }
+
         var builder = ImmutableList.CreateBuilder<SecurityCategoryTagSet>();
 
-        foreach (var tsElem in FindChildren(parent, "securityCategoryTagSet"))
+        foreach (var tagSetElement in FindChildren(tagSetsElement, "securityCategoryTagSet"))
         {
-            var tagSet = new SecurityCategoryTagSet
+            var oid = EmptyToNull(tagSetElement.Attribute("id")?.Value);
+            if (oid is null)
             {
-                TagSetOid = tsElem.Attribute("id")?.Value ?? "",
-                Name = tsElem.Attribute("name")?.Value ?? "Unknown",
-                Tags = ParseCategoryTags(tsElem, warnings)
-            };
-            builder.Add(tagSet);
-        }
-
-        return builder.ToImmutable();
-    }
-
-    private ImmutableList<SecurityCategoryTag> ParseCategoryTags(
-        XElement parent, List<SpifParseWarning> warnings)
-    {
-        var builder = ImmutableList.CreateBuilder<SecurityCategoryTag>();
-
-        foreach (var tagElem in FindChildren(parent, "securityCategoryTag"))
-        {
-            var tagTypeStr = tagElem.Attribute("tagType")?.Value ?? "notApplicable";
-            var enumTypeStr = tagElem.Attribute("enumType")?.Value;
-
-            var tag = new SecurityCategoryTag
-            {
-                Name = tagElem.Attribute("name")?.Value ?? "Unknown",
-                TagType = ParseTagType(tagTypeStr),
-                EnumType = enumTypeStr is not null ? ParseEnumType(enumTypeStr) : null,
-                Categories = ParseTagCategories(tagElem, warnings),
-                MarkingData = ParseMarkingDataList(tagElem)
-            };
-            builder.Add(tag);
-        }
-
-        return builder.ToImmutable();
-    }
-
-    private ImmutableList<TagCategory> ParseTagCategories(
-        XElement parent, List<SpifParseWarning> warnings)
-    {
-        var builder = ImmutableList.CreateBuilder<TagCategory>();
-
-        foreach (var catElem in FindChildren(parent, "tagCategory"))
-        {
-            var name = catElem.Attribute("name")?.Value ?? "Unknown";
-            if (!int.TryParse(catElem.Attribute("lacv")?.Value, out var lacv))
-            {
-                warnings.Add(new SpifParseWarning($"Category '{name}' has invalid lacv"));
+                errors.Add(new SpifParseError(
+                    "securityCategoryTagSet missing required 'id' attribute",
+                    GetLineNumber(tagSetElement)));
                 continue;
             }
 
-            var notBeforeStr = catElem.Attribute("notBefore")?.Value;
-            var notAfterStr = catElem.Attribute("notAfter")?.Value;
+            builder.Add(new SecurityCategoryTagSet
+            {
+                TagSetOid = oid,
+                Name = EmptyToNull(tagSetElement.Attribute("name")?.Value) ?? oid,
+                Tags = ParseCategoryTags(tagSetElement, warnings, errors)
+            });
+        }
 
-            var cat = new TagCategory
+        return builder.ToImmutable();
+    }
+
+    private static ImmutableList<SecurityCategoryTag> ParseCategoryTags(
+        XElement tagSetElement,
+        List<SpifParseWarning> warnings,
+        List<SpifParseError> errors)
+    {
+        var builder = ImmutableList.CreateBuilder<SecurityCategoryTag>();
+
+        foreach (var tagElement in FindChildren(tagSetElement, "securityCategoryTag"))
+        {
+            var tagType = ParseTagType(tagElement.Attribute("tagType")?.Value, tagElement, warnings);
+            var enumType = ParseEnumType(tagElement.Attribute("enumType")?.Value, tagElement, warnings);
+
+            builder.Add(new SecurityCategoryTag
+            {
+                Name = EmptyToNull(tagElement.Attribute("name")?.Value) ?? "Unknown",
+                TagType = tagType,
+                EnumType = enumType,
+                Categories = ParseTagCategories(tagElement, warnings, errors),
+                MarkingData = ParseMarkingDataList(tagElement, warnings, errors)
+            });
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private static ImmutableList<TagCategory> ParseTagCategories(
+        XElement tagElement,
+        List<SpifParseWarning> warnings,
+        List<SpifParseError> errors)
+    {
+        var builder = ImmutableList.CreateBuilder<TagCategory>();
+
+        foreach (var categoryElement in FindChildren(tagElement, "tagCategory"))
+        {
+            var name = EmptyToNull(categoryElement.Attribute("name")?.Value) ?? "Unknown";
+            if (!TryParseLacv(categoryElement.Attribute("lacv")?.Value, out var lacv))
+            {
+                errors.Add(new SpifParseError(
+                    $"tagCategory '{name}' has missing or invalid lacv",
+                    GetLineNumber(categoryElement)));
+                continue;
+            }
+
+            builder.Add(new TagCategory
             {
                 Name = name,
                 Lacv = lacv,
-                Obsolete = ParseBool(catElem.Attribute("obsolete")?.Value),
-                RequiredClass = catElem.Attribute("requiredClass")?.Value,
-                UserInput = catElem.Attribute("userInput")?.Value,
-                DateFormat = catElem.Attribute("dateFormat")?.Value,
-                NotBefore = notBeforeStr is not null ? ParseIso8601(notBeforeStr) : null,
-                NotAfter = notAfterStr is not null ? ParseIso8601(notAfterStr) : null,
-                MarkingData = ParseMarkingDataList(catElem),
-                EquivalentCategories = ParseEquivalentCategoryTags(catElem),
-                ExcludedClasses = ParseExcludedClasses(catElem),
-                RequiredCategories = ParseRequiredCategories(catElem),
-                ExcludedCategories = ParseExcludedCategoryRefs(catElem)
-            };
-            builder.Add(cat);
+                Obsolete = ParseBool(categoryElement.Attribute("obsolete")?.Value),
+                RequiredClass = EmptyToNull(categoryElement.Attribute("requiredClass")?.Value),
+                UserInput = EmptyToNull(categoryElement.Attribute("userInput")?.Value),
+                DateFormat = EmptyToNull(categoryElement.Attribute("dateFormat")?.Value),
+                NotBefore = ParseOptionalDateTime(categoryElement.Attribute("notBefore")?.Value, categoryElement, warnings, "notBefore"),
+                NotAfter = ParseOptionalDateTime(categoryElement.Attribute("notAfter")?.Value, categoryElement, warnings, "notAfter"),
+                MarkingData = ParseMarkingDataList(categoryElement, warnings, errors),
+                EquivalentCategories = ParseEquivalentCategoryTags(categoryElement, warnings, errors),
+                ExcludedClasses = ParseExcludedClasses(categoryElement),
+                RequiredCategories = ParseRequiredCategories(categoryElement, warnings, errors),
+                ExcludedCategories = ParseExcludedCategoryRefs(categoryElement, warnings, errors)
+            });
         }
 
         return builder.ToImmutable();
     }
 
-    private ImmutableList<EquivalentClassification> ParseEquivalentClassifications(XElement parent)
+    private static ImmutableList<EquivalentClassification> ParseEquivalentClassifications(
+        XElement parent,
+        List<SpifParseWarning> warnings,
+        List<SpifParseError> errors)
     {
         var builder = ImmutableList.CreateBuilder<EquivalentClassification>();
-        foreach (var elem in FindChildren(parent, "equivalentClassification"))
+
+        foreach (var element in FindChildren(parent, "equivalentClassification"))
         {
-            if (!int.TryParse(elem.Attribute("lacv")?.Value, out var lacv)) continue;
+            var policyRef = EmptyToNull(element.Attribute("policyRef")?.Value);
+            if (policyRef is null)
+            {
+                errors.Add(new SpifParseError("equivalentClassification missing required 'policyRef' attribute", GetLineNumber(element)));
+                continue;
+            }
+
+            if (!TryParseLacv(element.Attribute("lacv")?.Value, out var lacv))
+            {
+                errors.Add(new SpifParseError(
+                    $"equivalentClassification for policy '{policyRef}' has missing or invalid lacv",
+                    GetLineNumber(element)));
+                continue;
+            }
+
             builder.Add(new EquivalentClassification
             {
-                PolicyRef = elem.Attribute("policyRef")?.Value ?? "",
+                PolicyRef = policyRef,
                 Lacv = lacv,
-                Applied = ParseEquivDirection(elem.Attribute("applied")?.Value),
-                RequiredCategories = ParseRequiredCategories(elem)
+                Applied = ParseEquivalencyDirection(element.Attribute("applied")?.Value, element, warnings),
+                RequiredCategories = ParseRequiredCategories(element, warnings, errors)
             });
         }
+
         return builder.ToImmutable();
     }
 
-    private ImmutableList<EquivalentCategoryTag> ParseEquivalentCategoryTags(XElement parent)
+    private static ImmutableList<EquivalentCategoryTag> ParseEquivalentCategoryTags(
+        XElement parent,
+        List<SpifParseWarning> warnings,
+        List<SpifParseError> errors)
     {
         var builder = ImmutableList.CreateBuilder<EquivalentCategoryTag>();
-        foreach (var elem in FindChildren(parent, "equivalentSecCategoryTag"))
+
+        foreach (var element in FindChildren(parent, "equivalentSecCategoryTag"))
         {
-            if (!int.TryParse(elem.Attribute("lacv")?.Value, out var lacv)) continue;
+            var policyRef = EmptyToNull(element.Attribute("policyRef")?.Value);
+            var tagSetId = EmptyToNull(element.Attribute("tagSetId")?.Value);
+            if (policyRef is null || tagSetId is null)
+            {
+                errors.Add(new SpifParseError(
+                    "equivalentSecCategoryTag missing required 'policyRef' or 'tagSetId' attribute",
+                    GetLineNumber(element)));
+                continue;
+            }
+
+            if (!TryParseLacv(element.Attribute("lacv")?.Value, out var lacv))
+            {
+                errors.Add(new SpifParseError(
+                    $"equivalentSecCategoryTag for policy '{policyRef}' has missing or invalid lacv",
+                    GetLineNumber(element)));
+                continue;
+            }
+
             builder.Add(new EquivalentCategoryTag
             {
-                PolicyRef = elem.Attribute("policyRef")?.Value ?? "",
-                TagSetId = elem.Attribute("tagSetId")?.Value ?? "",
-                TagType = ParseTagType(elem.Attribute("tagType")?.Value ?? "notApplicable"),
+                PolicyRef = policyRef,
+                TagSetId = tagSetId,
+                TagType = ParseTagType(element.Attribute("tagType")?.Value, element, warnings),
                 Lacv = lacv,
-                Applied = ParseEquivDirection(elem.Attribute("applied")?.Value),
-                Action = elem.Attribute("action")?.Value
+                Applied = ParseEquivalencyDirection(element.Attribute("applied")?.Value, element, warnings),
+                Action = EmptyToNull(element.Attribute("action")?.Value)
             });
         }
+
         return builder.ToImmutable();
     }
 
-    private ImmutableList<RequiredCategoryConstraint> ParseRequiredCategories(XElement parent)
+    private static ImmutableList<RequiredCategoryConstraint> ParseRequiredCategories(
+        XElement parent,
+        List<SpifParseWarning> warnings,
+        List<SpifParseError> errors)
     {
         var builder = ImmutableList.CreateBuilder<RequiredCategoryConstraint>();
-        foreach (var elem in FindChildren(parent, "requiredCategory"))
+
+        foreach (var element in FindChildren(parent, "requiredCategory"))
         {
+            var operation = EmptyToNull(element.Attribute("operation")?.Value) ?? "all";
+            if (!IsSupportedRequiredOperation(operation))
+            {
+                warnings.Add(new SpifParseWarning(
+                    $"requiredCategory uses non-standard operation '{operation}'",
+                    GetLineNumber(element)));
+            }
+
             builder.Add(new RequiredCategoryConstraint
             {
-                Operation = elem.Attribute("operation")?.Value ?? "all",
-                CategoryGroups = ParseCategoryGroupRefs(elem)
+                Operation = operation,
+                CategoryGroups = ParseCategoryGroupRefs(element, warnings, errors)
             });
         }
+
         return builder.ToImmutable();
     }
 
-    private ImmutableList<CategoryGroupRef> ParseCategoryGroupRefs(XElement parent)
+    private static ImmutableList<CategoryGroupRef> ParseCategoryGroupRefs(
+        XElement parent,
+        List<SpifParseWarning> warnings,
+        List<SpifParseError> errors)
     {
         var builder = ImmutableList.CreateBuilder<CategoryGroupRef>();
-        foreach (var elem in FindChildren(parent, "categoryGroup"))
+
+        foreach (var element in FindChildren(parent, "categoryGroup"))
         {
-            if (!int.TryParse(elem.Attribute("lacv")?.Value, out var lacv)) continue;
-            var enumTypeStr = elem.Attribute("enumType")?.Value;
+            var tagSetRef = EmptyToNull(element.Attribute("tagSetRef")?.Value)
+                ?? EmptyToNull(element.Attribute("tagSetId")?.Value);
+            if (tagSetRef is null)
+            {
+                errors.Add(new SpifParseError("categoryGroup missing required 'tagSetRef' or 'tagSetId' attribute", GetLineNumber(element)));
+                continue;
+            }
+
+            if (!TryParseLacv(element.Attribute("lacv")?.Value, out var lacv))
+            {
+                errors.Add(new SpifParseError("categoryGroup missing required or valid 'lacv' attribute", GetLineNumber(element)));
+                continue;
+            }
+
             builder.Add(new CategoryGroupRef
             {
-                TagSetRef = elem.Attribute("tagSetRef")?.Value ?? "",
-                TagType = ParseTagType(elem.Attribute("tagType")?.Value ?? "notApplicable"),
+                TagSetRef = tagSetRef,
+                TagType = ParseTagType(element.Attribute("tagType")?.Value, element, warnings),
                 Lacv = lacv,
-                EnumType = enumTypeStr is not null ? ParseEnumType(enumTypeStr) : null
+                EnumType = ParseEnumType(element.Attribute("enumType")?.Value, element, warnings)
             });
         }
+
         return builder.ToImmutable();
     }
 
-    private ImmutableList<ExcludedCategoryRef> ParseExcludedCategoryRefs(XElement parent)
+    private static ImmutableList<ExcludedCategoryRef> ParseExcludedCategoryRefs(
+        XElement parent,
+        List<SpifParseWarning> warnings,
+        List<SpifParseError> errors)
     {
         var builder = ImmutableList.CreateBuilder<ExcludedCategoryRef>();
-        foreach (var elem in FindChildren(parent, "excludedCategory"))
+
+        foreach (var element in FindChildren(parent, "excludedCategory"))
         {
-            if (!int.TryParse(elem.Attribute("lacv")?.Value, out var lacv)) continue;
+            var tagSetRef = EmptyToNull(element.Attribute("tagSetRef")?.Value)
+                ?? EmptyToNull(element.Attribute("tagSetId")?.Value);
+            if (tagSetRef is null)
+            {
+                errors.Add(new SpifParseError("excludedCategory missing required 'tagSetRef' or 'tagSetId' attribute", GetLineNumber(element)));
+                continue;
+            }
+
+            if (!TryParseLacv(element.Attribute("lacv")?.Value, out var lacv))
+            {
+                errors.Add(new SpifParseError("excludedCategory missing required or valid 'lacv' attribute", GetLineNumber(element)));
+                continue;
+            }
+
             builder.Add(new ExcludedCategoryRef
             {
-                TagSetRef = elem.Attribute("tagSetRef")?.Value ?? "",
-                TagType = ParseTagType(elem.Attribute("tagType")?.Value ?? "notApplicable"),
+                TagSetRef = tagSetRef,
+                TagType = ParseTagType(element.Attribute("tagType")?.Value, element, warnings),
                 Lacv = lacv
             });
         }
+
         return builder.ToImmutable();
     }
 
-    private ImmutableList<string> ParseExcludedClasses(XElement parent)
+    private static ImmutableList<string> ParseExcludedClasses(XElement parent)
+        => FindChildren(parent, "excludedClass")
+            .Select(element => element.Value.Trim())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(NameComparer)
+            .ToImmutableList();
+
+    private static ImmutableList<EquivalentPolicy> ParseEquivalentPolicies(
+        XElement? equivalentPoliciesElement,
+        List<SpifParseWarning> warnings,
+        List<SpifParseError> errors)
     {
-        var builder = ImmutableList.CreateBuilder<string>();
-        foreach (var elem in FindChildren(parent, "excludedClass"))
+        if (equivalentPoliciesElement is null)
         {
-            var name = elem.Value.Trim();
-            if (!string.IsNullOrEmpty(name))
-                builder.Add(name);
+            return ImmutableList<EquivalentPolicy>.Empty;
         }
-        return builder.ToImmutable();
-    }
 
-    private ImmutableList<EquivalentPolicy> ParseEquivalentPolicies(XElement parent)
-    {
         var builder = ImmutableList.CreateBuilder<EquivalentPolicy>();
-        foreach (var elem in FindChildren(parent, "equivalentPolicy"))
+
+        foreach (var element in FindChildren(equivalentPoliciesElement, "equivalentPolicy"))
         {
+            var policyOid = EmptyToNull(element.Attribute("id")?.Value);
+            if (policyOid is null)
+            {
+                errors.Add(new SpifParseError("equivalentPolicy missing required 'id' attribute", GetLineNumber(element)));
+                continue;
+            }
+
+            var name = EmptyToNull(element.Attribute("name")?.Value) ?? policyOid;
+            if (string.Equals(name, policyOid, StringComparison.Ordinal))
+            {
+                warnings.Add(new SpifParseWarning(
+                    $"equivalentPolicy '{policyOid}' is missing a display name; using the OID as the name",
+                    GetLineNumber(element)));
+            }
+
             builder.Add(new EquivalentPolicy
             {
-                Name = elem.Attribute("name")?.Value ?? "Unknown",
-                PolicyOid = elem.Attribute("id")?.Value ?? "",
-                DocRefUri = elem.Attribute("docRefURI")?.Value
+                Name = name,
+                PolicyOid = policyOid,
+                DocRefUri = EmptyToNull(element.Attribute("docRefURI")?.Value)
             });
         }
+
         return builder.ToImmutable();
     }
 
-    private PrivacyMarks ParsePrivacyMarks(XElement parent)
+    private static PrivacyMarks? ParsePrivacyMarks(XElement? privacyMarksElement, List<SpifParseWarning> warnings)
     {
+        if (privacyMarksElement is null)
+        {
+            return null;
+        }
+
         var marks = ImmutableList.CreateBuilder<PrivacyMark>();
-        foreach (var elem in FindChildren(parent, "privacyMark"))
+        foreach (var element in FindChildren(privacyMarksElement, "privacyMark"))
         {
             marks.Add(new PrivacyMark
             {
-                Name = elem.Attribute("name")?.Value ?? "",
-                Obsolete = ParseBool(elem.Attribute("obsolete")?.Value),
-                MarkingData = ParseMarkingDataList(elem)
+                Name = EmptyToNull(element.Attribute("name")?.Value) ?? string.Empty,
+                Obsolete = ParseBool(element.Attribute("obsolete")?.Value),
+                MarkingData = ParseMarkingDataList(element, warnings, [])
             });
         }
 
-        int.TryParse(parent.Attribute("maxSelection")?.Value, out var maxSel);
-        int.TryParse(parent.Attribute("minSelection")?.Value, out var minSel);
+        var maxSelection = ParseNullableInt(privacyMarksElement.Attribute("maxSelection")?.Value);
+        var minSelection = ParseNullableInt(privacyMarksElement.Attribute("minSelection")?.Value);
+
+        if (maxSelection is null && ParseBool(privacyMarksElement.Attribute("singleSelection")?.Value))
+        {
+            maxSelection = 1;
+        }
 
         return new PrivacyMarks
         {
-            MaxSelection = maxSel > 0 ? maxSel : null,
-            MinSelection = minSel > 0 ? minSel : null,
+            MaxSelection = maxSelection,
+            MinSelection = minSelection,
             Marks = marks.ToImmutable()
         };
     }
 
-    private ImmutableList<MarkingData> ParseMarkingDataList(XElement parent)
+    private static ImmutableList<MarkingData> ParseMarkingDataList(
+        XElement parent,
+        List<SpifParseWarning> warnings,
+        List<SpifParseError> errors)
     {
         var builder = ImmutableList.CreateBuilder<MarkingData>();
-        foreach (var elem in FindChildren(parent, "markingData"))
+
+        foreach (var element in FindChildren(parent, "markingData"))
         {
-            var codes = ImmutableList.CreateBuilder<string>();
-            foreach (var codeElem in FindChildren(elem, "code"))
+            var phrase = EmptyToNull(element.Attribute("phrase")?.Value);
+            if (phrase is null)
             {
-                codes.Add(codeElem.Value.Trim());
+                errors.Add(new SpifParseError("markingData missing required 'phrase' attribute", GetLineNumber(element)));
+                continue;
+            }
+
+            var codes = FindChildren(element, "code")
+                .Select(code => code.Value.Trim())
+                .Where(code => !string.IsNullOrWhiteSpace(code))
+                .ToImmutableList();
+
+            if (codes.Count == 0)
+            {
+                warnings.Add(new SpifParseWarning("markingData has no code entries", GetLineNumber(element)));
             }
 
             builder.Add(new MarkingData
             {
-                Phrase = elem.Attribute("phrase")?.Value ?? "",
-                ShortPhrase = elem.Attribute("shortPhrase")?.Value,
-                SimplePhrase = elem.Attribute("simplePhrase")?.Value,
-                InputPhrase = elem.Attribute("inputPhrase")?.Value,
-                Language = elem.Attribute(XNamespace.Xml + "lang")?.Value,
-                Codes = codes.ToImmutable()
+                Phrase = phrase,
+                ShortPhrase = EmptyToNull(element.Attribute("shortPhrase")?.Value),
+                SimplePhrase = EmptyToNull(element.Attribute("simplePhrase")?.Value),
+                InputPhrase = EmptyToNull(element.Attribute("inputPhrase")?.Value),
+                Language = EmptyToNull(element.Attribute(XNamespace.Xml + "lang")?.Value),
+                Codes = codes
             });
         }
+
         return builder.ToImmutable();
     }
 
-    private ImmutableList<MarkingQualifier> ParseMarkingQualifiers(XElement parent)
+    private static ImmutableList<MarkingQualifier> ParseMarkingQualifiers(
+        XElement parent,
+        List<SpifParseWarning> warnings)
     {
         var builder = ImmutableList.CreateBuilder<MarkingQualifier>();
-        foreach (var elem in FindChildren(parent, "markingQualifier"))
+
+        foreach (var element in FindChildren(parent, "markingQualifier"))
         {
-            var qualifiers = ImmutableList.CreateBuilder<QualifierEntry>();
-            foreach (var qElem in FindChildren(elem, "qualifier"))
+            var markingCode = EmptyToNull(element.Attribute("markingCode")?.Value);
+            if (markingCode is null)
             {
+                warnings.Add(new SpifParseWarning("markingQualifier missing markingCode and was skipped", GetLineNumber(element)));
+                continue;
+            }
+
+            var qualifiers = ImmutableList.CreateBuilder<QualifierEntry>();
+            foreach (var qualifierElement in FindChildren(element, "qualifier"))
+            {
+                var text = EmptyToNull(qualifierElement.Attribute("markingQualifier")?.Value);
+                if (text is null)
+                {
+                    warnings.Add(new SpifParseWarning("qualifier missing markingQualifier text and was skipped", GetLineNumber(qualifierElement)));
+                    continue;
+                }
+
                 qualifiers.Add(new QualifierEntry
                 {
-                    Text = qElem.Attribute("markingQualifier")?.Value ?? "",
-                    Code = ParseQualifierCode(qElem.Attribute("qualifierCode")?.Value)
+                    Text = text,
+                    Code = ParseQualifierCode(qualifierElement.Attribute("qualifierCode")?.Value, qualifierElement, warnings)
                 });
             }
 
             builder.Add(new MarkingQualifier
             {
-                MarkingCode = elem.Attribute("markingCode")?.Value ?? "",
+                MarkingCode = markingCode,
                 Qualifiers = qualifiers.ToImmutable()
             });
         }
+
         return builder.ToImmutable();
     }
 
-    private void ValidateSemantics(
-        ImmutableList<SecurityClassification> classifications,
-        ImmutableList<SecurityCategoryTagSet> tagSets,
+    private static void ValidateSemantics(
+        Spif spif,
         List<SpifParseWarning> warnings,
         List<SpifParseError> errors)
     {
-        // Check classification lacv uniqueness
-        var seenLacvs = new HashSet<int>();
-        foreach (var cls in classifications)
+        if (string.IsNullOrWhiteSpace(spif.PolicyId.Oid))
         {
-            if (!seenLacvs.Add(cls.Lacv.Value))
-                errors.Add(new SpifParseError(
-                    $"Duplicate classification lacv: {cls.Lacv} (name: {cls.Name})"));
+            errors.Add(new SpifParseError("securityPolicyId must contain a policy OID"));
         }
 
-        // Check category lacv uniqueness within each tag
-        foreach (var tagSet in tagSets)
+        if (spif.Classifications.Count == 0)
         {
+            errors.Add(new SpifParseError("SPIF must define at least one securityClassification"));
+        }
+
+        var classificationLacvs = new Dictionary<LacvValue, string>();
+        var classificationHierarchies = new Dictionary<int, string>();
+        var classificationNames = new HashSet<string>(NameComparer);
+        foreach (var classification in spif.Classifications)
+        {
+            if (!classificationNames.Add(classification.Name))
+            {
+                errors.Add(new SpifParseError($"Duplicate classification name '{classification.Name}'"));
+            }
+
+            if (!classificationLacvs.TryAdd(classification.Lacv, classification.Name))
+            {
+                errors.Add(new SpifParseError(
+                    $"Duplicate classification lacv '{classification.Lacv}' for '{classification.Name}' and '{classificationLacvs[classification.Lacv]}'"));
+            }
+
+            if (!classificationHierarchies.TryAdd(classification.Hierarchy, classification.Name))
+            {
+                warnings.Add(new SpifParseWarning(
+                    $"Multiple classifications share hierarchy '{classification.Hierarchy}' ('{classificationHierarchies[classification.Hierarchy]}' and '{classification.Name}')"));
+            }
+        }
+
+        var tagSetOids = new HashSet<string>(OidComparer);
+        foreach (var tagSet in spif.CategoryTagSets)
+        {
+            if (!tagSetOids.Add(tagSet.TagSetOid))
+            {
+                errors.Add(new SpifParseError($"Duplicate securityCategoryTagSet id '{tagSet.TagSetOid}'"));
+            }
+
+            var tagNames = new HashSet<string>(NameComparer);
             foreach (var tag in tagSet.Tags)
             {
-                var seenCatLacvs = new HashSet<int>();
-                foreach (var cat in tag.Categories)
+                if (!tagNames.Add(tag.Name))
                 {
-                    if (!seenCatLacvs.Add(cat.Lacv.Value))
+                    errors.Add(new SpifParseError($"Duplicate tag name '{tag.Name}' in tag set '{tagSet.Name}'"));
+                }
+
+                var categoryLacvs = new Dictionary<LacvValue, string>();
+                var categoryNames = new HashSet<string>(NameComparer);
+                foreach (var category in tag.Categories)
+                {
+                    if (!categoryNames.Add(category.Name))
+                    {
+                        errors.Add(new SpifParseError($"Duplicate category name '{category.Name}' in tag '{tag.Name}'"));
+                    }
+
+                    if (!categoryLacvs.TryAdd(category.Lacv, category.Name))
+                    {
                         errors.Add(new SpifParseError(
-                            $"Duplicate category lacv {cat.Lacv} in tag '{tag.Name}' " +
-                            $"of tag set '{tagSet.Name}'"));
+                            $"Duplicate category lacv '{category.Lacv}' in tag '{tag.Name}' of tag set '{tagSet.Name}'"));
+                    }
+
+                    if (category.NotBefore is not null && category.NotAfter is not null && category.NotBefore > category.NotAfter)
+                    {
+                        errors.Add(new SpifParseError(
+                            $"Category '{category.Name}' has notBefore later than notAfter"));
+                    }
+
+                    if (category.RequiredClass is not null && !classificationNames.Contains(category.RequiredClass))
+                    {
+                        warnings.Add(new SpifParseWarning(
+                            $"Category '{category.Name}' references unknown requiredClass '{category.RequiredClass}'"));
+                    }
                 }
             }
         }
-    }
 
-    // ── Helper methods ──
-
-    /// <summary>Find a child element by local name, ignoring namespace.</summary>
-    private static XElement? FindChild(XElement parent, string localName)
-        => parent.Elements().FirstOrDefault(e => e.Name.LocalName == localName);
-
-    /// <summary>Find all child elements by local name, ignoring namespace.</summary>
-    private static IEnumerable<XElement> FindChildren(XElement parent, string localName)
-        => parent.Elements().Where(e => e.Name.LocalName == localName);
-
-    private static TagType ParseTagType(string value) => value.ToLowerInvariant() switch
-    {
-        "restrictive" => TagType.Restrictive,
-        "permissive" => TagType.Permissive,
-        "enumerated" => TagType.Enumerated,
-        "tagtype7" => TagType.TagType7,
-        _ => TagType.NotApplicable
-    };
-
-    private static EnumType ParseEnumType(string value) => value.ToLowerInvariant() switch
-    {
-        "restrictive" => EnumType.Restrictive,
-        "permissive" => EnumType.Permissive,
-        _ => EnumType.Restrictive
-    };
-
-    private static EquivalencyDirection ParseEquivDirection(string? value) => value?.ToLowerInvariant() switch
-    {
-        "encrypt" => EquivalencyDirection.Encrypt,
-        "decrypt" => EquivalencyDirection.Decrypt,
-        "both" => EquivalencyDirection.Both,
-        _ => EquivalencyDirection.Both
-    };
-
-    private static QualifierCode ParseQualifierCode(string? value) => value?.ToLowerInvariant() switch
-    {
-        "prefix" => QualifierCode.Prefix,
-        "suffix" => QualifierCode.Suffix,
-        "separator" => QualifierCode.Separator,
-        "finalseparator" => QualifierCode.FinalSeparator,
-        _ => QualifierCode.Prefix
-    };
-
-    private static bool ParseBool(string? value)
-        => value is not null && (value == "true" || value == "1");
-
-    private static DateTimeOffset? ParseGenTime(string value)
-    {
-        // genTime format: YYYYMMDDHHMMSSZ or variations
-        if (DateTimeOffset.TryParse(value, out var dto))
-            return dto;
-
-        // Try YYYYMMDDHHMMSSZ format
-        if (value.Length >= 14 && value.EndsWith("Z", StringComparison.OrdinalIgnoreCase))
+        foreach (var classification in spif.Classifications)
         {
-            var cleaned = value[..14];
-            if (DateTime.TryParseExact(cleaned, "yyyyMMddHHmmss",
-                System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.AssumeUniversal, out var dt))
+            ValidateConstraintReferences(classification.RequiredCategories, classification.ExcludedCategories, spif, $"classification '{classification.Name}'", warnings);
+        }
+
+        foreach (var tagSet in spif.CategoryTagSets)
+        {
+            foreach (var tag in tagSet.Tags)
             {
-                return new DateTimeOffset(dt, TimeSpan.Zero);
+                foreach (var category in tag.Categories)
+                {
+                    ValidateConstraintReferences(category.RequiredCategories, category.ExcludedCategories, spif, $"category '{category.Name}'", warnings);
+                }
             }
         }
 
+        var policyNames = new HashSet<string>(NameComparer) { spif.PolicyId.Name };
+        foreach (var equivalentPolicy in spif.EquivalentPolicies)
+        {
+            if (!policyNames.Add(equivalentPolicy.Name))
+            {
+                warnings.Add(new SpifParseWarning($"Equivalent policy name '{equivalentPolicy.Name}' is duplicated"));
+            }
+        }
+    }
+
+    private static void ValidateConstraintReferences(
+        ImmutableList<RequiredCategoryConstraint> requiredCategories,
+        ImmutableList<ExcludedCategoryRef> excludedCategories,
+        Spif spif,
+        string owner,
+        List<SpifParseWarning> warnings)
+    {
+        foreach (var required in requiredCategories)
+        {
+            foreach (var categoryGroup in required.CategoryGroups)
+            {
+                ValidateCategoryReference(spif, owner, categoryGroup.TagSetRef, categoryGroup.Lacv, warnings);
+            }
+        }
+
+        foreach (var excluded in excludedCategories)
+        {
+            ValidateCategoryReference(spif, owner, excluded.TagSetRef, excluded.Lacv, warnings);
+        }
+    }
+
+    private static void ValidateCategoryReference(
+        Spif spif,
+        string owner,
+        string tagSetRef,
+        LacvValue lacv,
+        List<SpifParseWarning> warnings)
+    {
+        var tagSet = spif.CategoryTagSets.FirstOrDefault(set =>
+            string.Equals(set.TagSetOid, tagSetRef, StringComparison.Ordinal) ||
+            string.Equals(set.Name, tagSetRef, StringComparison.OrdinalIgnoreCase));
+
+        if (tagSet is null)
+        {
+            warnings.Add(new SpifParseWarning($"{owner} references unknown tag set '{tagSetRef}'"));
+            return;
+        }
+
+        if (!tagSet.Tags.SelectMany(tag => tag.Categories).Any(category => category.Lacv.Equals(lacv)))
+        {
+            warnings.Add(new SpifParseWarning($"{owner} references unknown category lacv '{lacv}' in tag set '{tagSetRef}'"));
+        }
+    }
+
+    private static XElement? FindRequiredChild(XElement parent, string localName, List<SpifParseError> errors)
+    {
+        var child = FindChild(parent, localName);
+        if (child is null)
+        {
+            errors.Add(new SpifParseError($"Missing {localName} element", GetLineNumber(parent)));
+        }
+
+        return child;
+    }
+
+    private static XElement? FindChild(XElement parent, string localName)
+        => parent.Elements().FirstOrDefault(element => string.Equals(element.Name.LocalName, localName, StringComparison.Ordinal));
+
+    private static IEnumerable<XElement> FindChildren(XElement parent, string localName)
+        => parent.Elements().Where(element => string.Equals(element.Name.LocalName, localName, StringComparison.Ordinal));
+
+    private static bool TryParseLacv(string? value, out LacvValue lacv)
+    {
+        if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+        {
+            lacv = new LacvValue(parsed);
+            return true;
+        }
+
+        lacv = default;
+        return false;
+    }
+
+    private static EnumType? ParseEnumType(string? value, XElement element, List<SpifParseWarning> warnings)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (string.Equals(value, "restrictive", StringComparison.OrdinalIgnoreCase))
+        {
+            return EnumType.Restrictive;
+        }
+
+        if (string.Equals(value, "permissive", StringComparison.OrdinalIgnoreCase))
+        {
+            return EnumType.Permissive;
+        }
+
+        warnings.Add(new SpifParseWarning($"Unknown enumType '{value}', defaulting to restrictive", GetLineNumber(element)));
+        return EnumType.Restrictive;
+    }
+
+    private static TagType ParseTagType(string? value, XElement element, List<SpifParseWarning> warnings)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return TagType.NotApplicable;
+        }
+
+        if (string.Equals(value, "restrictive", StringComparison.OrdinalIgnoreCase))
+        {
+            return TagType.Restrictive;
+        }
+
+        if (string.Equals(value, "permissive", StringComparison.OrdinalIgnoreCase))
+        {
+            return TagType.Permissive;
+        }
+
+        if (string.Equals(value, "enumerated", StringComparison.OrdinalIgnoreCase))
+        {
+            return TagType.Enumerated;
+        }
+
+        if (string.Equals(value, "tagType7", StringComparison.OrdinalIgnoreCase))
+        {
+            return TagType.TagType7;
+        }
+
+        if (string.Equals(value, "notApplicable", StringComparison.OrdinalIgnoreCase))
+        {
+            return TagType.NotApplicable;
+        }
+
+        warnings.Add(new SpifParseWarning($"Unknown tagType '{value}', defaulting to notApplicable", GetLineNumber(element)));
+        return TagType.NotApplicable;
+    }
+
+    private static EquivalencyDirection ParseEquivalencyDirection(string? value, XElement element, List<SpifParseWarning> warnings)
+    {
+        if (string.IsNullOrWhiteSpace(value) || string.Equals(value, "both", StringComparison.OrdinalIgnoreCase))
+        {
+            return EquivalencyDirection.Both;
+        }
+
+        if (string.Equals(value, "encrypt", StringComparison.OrdinalIgnoreCase))
+        {
+            return EquivalencyDirection.Encrypt;
+        }
+
+        if (string.Equals(value, "decrypt", StringComparison.OrdinalIgnoreCase))
+        {
+            return EquivalencyDirection.Decrypt;
+        }
+
+        warnings.Add(new SpifParseWarning($"Unknown equivalency direction '{value}', defaulting to both", GetLineNumber(element)));
+        return EquivalencyDirection.Both;
+    }
+
+    private static QualifierCode ParseQualifierCode(string? value, XElement element, List<SpifParseWarning> warnings)
+    {
+        if (string.IsNullOrWhiteSpace(value) || string.Equals(value, "prefix", StringComparison.OrdinalIgnoreCase))
+        {
+            return QualifierCode.Prefix;
+        }
+
+        if (string.Equals(value, "suffix", StringComparison.OrdinalIgnoreCase))
+        {
+            return QualifierCode.Suffix;
+        }
+
+        if (string.Equals(value, "separator", StringComparison.OrdinalIgnoreCase))
+        {
+            return QualifierCode.Separator;
+        }
+
+        if (string.Equals(value, "finalSeparator", StringComparison.OrdinalIgnoreCase))
+        {
+            return QualifierCode.FinalSeparator;
+        }
+
+        warnings.Add(new SpifParseWarning($"Unknown qualifierCode '{value}', defaulting to prefix", GetLineNumber(element)));
+        return QualifierCode.Prefix;
+    }
+
+    private static bool ParseBool(string? value)
+        => string.Equals(value, "true", StringComparison.OrdinalIgnoreCase) || value == "1";
+
+    private static int? ParseNullableInt(string? value)
+        => int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : null;
+
+    private static DateTimeOffset? ParseOptionalDateTime(
+        string? value,
+        XElement source,
+        List<SpifParseWarning> warnings,
+        string fieldName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (TryParseGenTime(value, out var genTime))
+        {
+            return genTime;
+        }
+
+        if (DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dateTimeOffset))
+        {
+            return dateTimeOffset;
+        }
+
+        warnings.Add(new SpifParseWarning($"Could not parse {fieldName} value '{value}'", GetLineNumber(source)));
         return null;
     }
 
-    private static DateTimeOffset? ParseIso8601(string value)
+    private static bool TryParseGenTime(string value, out DateTimeOffset result)
     {
-        if (DateTimeOffset.TryParse(value, out var dto))
-            return dto;
+        string[] formats =
+        [
+            "yyyyMMddHHmmss'Z'",
+            "yyyyMMddHHmm'Z'",
+            "yyyyMMddHH'Z'",
+            "yyyyMMddHHmmsszzz",
+            "yyyyMMddHHmmzzz",
+            "yyyyMMddHHzzz",
+            "yyyyMMddHHmmssK",
+            "yyyyMMddHHmmK",
+            "yyyyMMddHHK"
+        ];
+
+        if (DateTimeOffset.TryParseExact(
+            value,
+            formats,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+            out result))
+        {
+            return true;
+        }
+
+        var normalized = NormalizeGenTimeOffset(value);
+        if (!ReferenceEquals(normalized, value) &&
+            DateTimeOffset.TryParseExact(
+                normalized,
+                formats,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out result))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static string NormalizeGenTimeOffset(string value)
+    {
+        if (value.Length < 5)
+        {
+            return value;
+        }
+
+        var signIndex = Math.Max(value.LastIndexOf('+'), value.LastIndexOf('-'));
+        if (signIndex <= 0)
+        {
+            return value;
+        }
+
+        var offsetPart = value[signIndex..];
+        if (offsetPart.Length == 5 && offsetPart[3] != ':')
+        {
+            return value.Insert(signIndex + 3, ":");
+        }
+
+        return value;
+    }
+
+    private static bool IsSupportedRequiredOperation(string operation)
+        => string.Equals(operation, "all", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(operation, "oneOrMore", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(operation, "onlyOne", StringComparison.OrdinalIgnoreCase);
+
+    private static string? EmptyToNull(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static int? GetLineNumber(XObject? node)
+    {
+        if (node is IXmlLineInfo lineInfo && lineInfo.HasLineInfo())
+        {
+            return lineInfo.LineNumber;
+        }
+
         return null;
     }
 }
