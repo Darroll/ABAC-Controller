@@ -1,0 +1,985 @@
+@*
+    Component: SpifEditor
+    Purpose: SPIF document builder. Provides a split-pane form editor with live XML preview
+             and bidirectional section highlighting for creating or editing SPIF policy documents.
+    Route: /spif/create and /spif/edit/{SpifId:guid}
+    Dependencies: HttpClient, SpifFormState, SpifMetadataSection, SpifClassificationsSection,
+                  SpifTagSetsSection, NavigationManager, IJSRuntime.
+*@
+@page "/spif/create"
+@page "/spif/edit/{SpifId:guid}"
+@using AbacController.Blazor.Components.SpifBuilder
+@using System.Text
+@using System.Xml.Linq
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<div class="d-flex align-items-center gap-3 mb-3">
+    <button class="btn btn-outline-secondary btn-sm" @onclick="GoBack">
+        <span class="oi oi-arrow-left"></span> Back to SPIF Management
+    </button>
+    <h2 class="mb-0">@(IsEditMode ? "Edit SPIF" : "Create New SPIF")</h2>
+</div>
+
+@if (_loadingExisting)
+{
+    <p><em>Loading existing SPIF...</em></p>
+}
+else
+{
+    <div class="spif-split-editor">
+        @* ═══════════════════════════════════════════════════════════════════════
+           LEFT PANE: Visual Form Editor
+           ═══════════════════════════════════════════════════════════════════════ *@
+        <div class="spif-pane spif-form-pane">
+            <div class="spif-pane-header">
+                <span class="oi oi-pencil me-2"></span>Form Builder
+            </div>
+            <div class="spif-pane-body">
+                <CascadingValue Value="_state">
+
+                    @* ── Section: Metadata ── *@
+                    <SpifMetadataSection
+                        ActiveSection="@_activeSection"
+                        OnSectionActivated="@(s => ActivateSection(s, "form"))"
+                        OnChanged="OnFormChanged" />
+
+                    @* ── Section: Security Classifications ── *@
+                    <SpifClassificationsSection
+                        ActiveSection="@_activeSection"
+                        OnSectionActivated="@(s => ActivateSection(s, "form"))"
+                        OnChanged="OnFormChanged" />
+
+                    @* ── Section: Tag Sets ── *@
+                    <SpifTagSetsSection
+                        ActiveSection="@_activeSection"
+                        OnSectionActivated="@(s => ActivateSection(s, "form"))"
+                        OnChanged="OnFormChanged" />
+
+                    @* ── Section: Equivalent Policies ── *@
+                    <div class="spif-section @SectionClass("equivalentpolicies")"
+                         data-form-section="equivalentpolicies"
+                         @onclick="@(() => ActivateSection("equivalentpolicies", "form"))"
+                         @onfocusin="@(() => ActivateSection("equivalentpolicies", "form"))">
+                        <div class="spif-section-label">Equivalent Policies</div>
+                        <p class="text-muted small mb-2">Cross-policy translation mappings for interoperability with foreign SPIFs.</p>
+
+                        @for (var i = 0; i < _state.EquivalentPolicies.Count; i++)
+                        {
+                            var epIdx = i;
+                            <div class="card mb-2 border-start border-info border-2" data-spif-field="equivalentpolicy-@epIdx">
+                                <div class="card-header d-flex justify-content-between align-items-center py-1 px-2">
+                                    <div class="d-flex align-items-center gap-1">
+                                        <button class="btn btn-sm btn-link p-0" @onclick="() => _state.EquivalentPolicies[epIdx].Expanded = !_state.EquivalentPolicies[epIdx].Expanded">
+                                            <span class="oi @(_state.EquivalentPolicies[epIdx].Expanded ? "oi-chevron-bottom" : "oi-chevron-right")" style="font-size:0.7rem;"></span>
+                                        </button>
+                                        <strong class="small">@(string.IsNullOrWhiteSpace(_state.EquivalentPolicies[epIdx].PolicyName) ? $"Policy {epIdx + 1}" : _state.EquivalentPolicies[epIdx].PolicyName)</strong>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-danger py-0 px-1" @onclick="() => InlineChanged(() => _state.EquivalentPolicies.RemoveAt(epIdx))">
+                                        <span class="oi oi-x" style="font-size:0.6rem;"></span>
+                                    </button>
+                                </div>
+
+                                @if (_state.EquivalentPolicies[epIdx].Expanded)
+                                {
+                                    <div class="card-body py-2 px-3">
+                                        <div class="row mb-2 g-2">
+                                            <div class="col-md-5">
+                                                <label class="form-label small mb-0">Policy OID <span class="text-danger">*</span></label>
+                                                <input type="text" class="form-control form-control-sm" value="@_state.EquivalentPolicies[epIdx].PolicyOid"
+                                                       @onchange="@(e => InlineChanged(() => _state.EquivalentPolicies[epIdx].PolicyOid = e.Value?.ToString() ?? ""))" />
+                                            </div>
+                                            <div class="col-md-7">
+                                                <label class="form-label small mb-0">Policy Name <span class="text-danger">*</span></label>
+                                                <input type="text" class="form-control form-control-sm" value="@_state.EquivalentPolicies[epIdx].PolicyName"
+                                                       @onchange="@(e => InlineChanged(() => _state.EquivalentPolicies[epIdx].PolicyName = e.Value?.ToString() ?? ""))" />
+                                            </div>
+                                        </div>
+
+                                        <h6 class="small fw-bold mt-2 mb-1">Classification Mappings</h6>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-borderless align-middle mb-1" style="font-size:0.82rem;">
+                                                <thead>
+                                                    <tr class="text-muted">
+                                                        <th>Source LACV (Local)</th>
+                                                        <th>Target LACV (Foreign)</th>
+                                                        <th style="width:30px;"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @for (var j = 0; j < _state.EquivalentPolicies[epIdx].ClassificationMappings.Count; j++)
+                                                    {
+                                                        var cmIdx = j;
+                                                        var cmEpIdx = epIdx;
+                                                        <tr>
+                                                            <td>
+                                                                <select class="form-select form-select-sm" value="@_state.EquivalentPolicies[cmEpIdx].ClassificationMappings[cmIdx].SourceLacv"
+                                                                        @onchange="@(e => InlineChanged(() => _state.EquivalentPolicies[cmEpIdx].ClassificationMappings[cmIdx].SourceLacv = int.TryParse(e.Value?.ToString(), out var v) ? v : 0))">
+                                                                    @foreach (var c in _state.Classifications.Where(x => !string.IsNullOrWhiteSpace(x.Name)))
+                                                                    {
+                                                                        <option value="@c.LacvValue">@c.Name (@c.LacvValue)</option>
+                                                                    }
+                                                                </select>
+                                                            </td>
+                                                            <td>
+                                                                <input type="number" class="form-control form-control-sm" value="@_state.EquivalentPolicies[cmEpIdx].ClassificationMappings[cmIdx].TargetLacv"
+                                                                       @onchange="@(e => InlineChanged(() => _state.EquivalentPolicies[cmEpIdx].ClassificationMappings[cmIdx].TargetLacv = int.TryParse(e.Value?.ToString(), out var v) ? v : 0))" />
+                                                            </td>
+                                                            <td>
+                                                                <button class="btn btn-sm btn-outline-danger p-0" style="width:22px;height:22px;line-height:1;" @onclick="() => InlineChanged(() => _state.EquivalentPolicies[cmEpIdx].ClassificationMappings.RemoveAt(cmIdx))">
+                                                                    <span class="oi oi-x" style="font-size:0.6rem;"></span>
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <button class="btn btn-sm btn-outline-primary py-0" style="font-size:0.8rem;" @onclick="() => InlineChanged(() => _state.EquivalentPolicies[epIdx].ClassificationMappings.Add(new ClassificationMappingEntry()))">+ Classification Mapping</button>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => InlineChanged(() => _state.EquivalentPolicies.Add(new EquivalentPolicyEntry()))">+ Add Equivalent Policy</button>
+                    </div>
+
+                    @* ── Section: Extensions ── *@
+                    <div class="spif-section @SectionClass("extensions")"
+                         data-form-section="extensions"
+                         @onclick="@(() => ActivateSection("extensions", "form"))"
+                         @onfocusin="@(() => ActivateSection("extensions", "form"))">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="spif-section-label mb-0">Extensions</div>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn @(_state.ExtensionMode == "fields" ? "btn-primary" : "btn-outline-primary") btn-sm py-0" style="font-size:0.75rem;"
+                                        @onclick="@(() => InlineChanged(() => _state.ExtensionMode = "fields"))">Fields</button>
+                                <button class="btn @(_state.ExtensionMode == "xml" ? "btn-primary" : "btn-outline-primary") btn-sm py-0" style="font-size:0.75rem;"
+                                        @onclick="@(() => InlineChanged(() => _state.ExtensionMode = "xml"))">Raw XML</button>
+                            </div>
+                        </div>
+                        <p class="text-muted small mb-2">Custom data in the <code>&lt;extensions&gt;</code> element.</p>
+
+                        @if (_state.ExtensionMode == "fields")
+                        {
+                            @if (_state.ExtensionFields.Count > 0)
+                            {
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-borderless align-middle mb-1" style="font-size:0.82rem;">
+                                        <thead>
+                                            <tr class="text-muted">
+                                                <th>Field Name</th>
+                                                <th>Field Value</th>
+                                                <th style="width:110px;">Charset</th>
+                                                <th style="width:30px;"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @for (var i = 0; i < _state.ExtensionFields.Count; i++)
+                                            {
+                                                var extIdx = i;
+                                                <tr data-spif-field="extension-@extIdx">
+                                                    <td><input type="text" class="form-control form-control-sm" value="@_state.ExtensionFields[extIdx].FieldName" placeholder="e.g., OrgPolicy"
+                                                               @onchange="@(e => InlineChanged(() => _state.ExtensionFields[extIdx] = _state.ExtensionFields[extIdx] with { FieldName = e.Value?.ToString() ?? "" }))" /></td>
+                                                    <td><input type="text" class="form-control form-control-sm" value="@_state.ExtensionFields[extIdx].FieldValue" placeholder="Value"
+                                                               @onchange="@(e => InlineChanged(() => _state.ExtensionFields[extIdx] = _state.ExtensionFields[extIdx] with { FieldValue = e.Value?.ToString() ?? "" }))" /></td>
+                                                    <td>
+                                                        <select class="form-select form-select-sm" value="@(_state.ExtensionFields[extIdx].CharSetConstraint ?? "")"
+                                                                @onchange="@(e => InlineChanged(() => _state.ExtensionFields[extIdx] = _state.ExtensionFields[extIdx] with { CharSetConstraint = string.IsNullOrWhiteSpace(e.Value?.ToString()) ? null : e.Value?.ToString() }))">
+                                                            <option value="">—</option>
+                                                            <option value="ASCII">ASCII</option>
+                                                            <option value="UTF-8">UTF-8</option>
+                                                            <option value="UTF-16">UTF-16</option>
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-outline-danger p-0" style="width:22px;height:22px;line-height:1;" @onclick="() => InlineChanged(() => _state.ExtensionFields.RemoveAt(extIdx))">
+                                                            <span class="oi oi-x" style="font-size:0.6rem;"></span>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => InlineChanged(() => _state.ExtensionFields.Add(new ExtensionFieldEntry()))">+ Add Field</button>
+                        }
+                        else
+                        {
+                            <textarea class="form-control @(_state.ExtensionXmlError is not null ? "is-invalid" : "")"
+                                      rows="5" @bind="_state.RawExtensionXml" @bind:after="ValidateExtensionXml"
+                                      style="font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.8rem; tab-size: 2;"
+                                      placeholder="&lt;freeFormField fieldName=&quot;OrgPolicy&quot; fieldValue=&quot;Value&quot; /&gt;"></textarea>
+                            @if (_state.ExtensionXmlError is not null)
+                            {
+                                <div class="invalid-feedback">@_state.ExtensionXmlError</div>
+                            }
+                        }
+                    </div>
+
+                </CascadingValue>
+
+                @* ── Form Actions ── *@
+                <div class="d-flex gap-2 mt-3 pb-3">
+                    <button class="btn btn-sm btn-primary" @onclick="SaveSpif" disabled="@_processing">
+                        @(_processing ? "Saving..." : (IsEditMode ? "Update SPIF" : "Import SPIF"))
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        @* ═══════════════════════════════════════════════════════════════════════
+           DIVIDER
+           ═══════════════════════════════════════════════════════════════════════ *@
+        <div class="spif-divider"></div>
+
+        @* ═══════════════════════════════════════════════════════════════════════
+           RIGHT PANE: XML Preview / Editor
+           ═══════════════════════════════════════════════════════════════════════ *@
+        <div class="spif-pane spif-xml-pane">
+            <div class="spif-pane-header d-flex justify-content-between align-items-center">
+                <span>
+                    <span class="oi oi-code me-2"></span>XML @(_xmlPaneMode == "preview" ? "Preview" : "Editor")
+                </span>
+                <div class="d-flex gap-2 align-items-center">
+                    @if (_xmlPaneMode == "preview")
+                    {
+                        <button class="btn btn-sm btn-outline-light py-0 px-1" style="font-size:0.7rem;"
+                                @onclick="CollapseAllXmlSections" title="Collapse all">
+                            <span class="oi oi-collapse-up" style="font-size:0.6rem;"></span> Collapse
+                        </button>
+                        <button class="btn btn-sm btn-outline-light py-0 px-1" style="font-size:0.7rem;"
+                                @onclick="ExpandAllXmlSections" title="Expand all">
+                            <span class="oi oi-expand-down" style="font-size:0.6rem;"></span> Expand
+                        </button>
+                    }
+                    @if (_xmlPaneMode == "edit")
+                    {
+                        <button class="btn btn-sm btn-outline-light py-0 px-2" style="font-size:0.75rem;" @onclick="RefreshXmlFromForm">
+                            <span class="oi oi-reload"></span> From Form
+                        </button>
+                    }
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-sm @(_xmlPaneMode == "preview" ? "btn-light" : "btn-outline-light") py-0" style="font-size:0.75rem;"
+                                @onclick="@(() => _xmlPaneMode = "preview")">Preview</button>
+                        <button class="btn btn-sm @(_xmlPaneMode == "edit" ? "btn-light" : "btn-outline-light") py-0" style="font-size:0.75rem;"
+                                @onclick="SwitchToEditMode">Edit</button>
+                    </div>
+                </div>
+            </div>
+            <div class="spif-pane-body spif-xml-body">
+                @if (_xmlPaneMode == "preview")
+                {
+                    var validCls = _state.Classifications.Where(c => !string.IsNullOrWhiteSpace(c.Name)).ToList();
+                    var validSets = _state.TagSets.Where(ts => !string.IsNullOrWhiteSpace(ts.Name)).ToList();
+                    var validPolicies = _state.EquivalentPolicies.Where(ep => !string.IsNullOrWhiteSpace(ep.PolicyOid)).ToList();
+                    var hasExtFields = _state.ExtensionFields.Any(f => !string.IsNullOrWhiteSpace(f.FieldName));
+                    var hasRawXml = _state.ExtensionMode == "xml" && !string.IsNullOrWhiteSpace(_state.RawExtensionXml) && _state.ExtensionXmlError is null;
+
+                    <div class="xml-preview-container" @ref="_xmlPreviewRef">
+                        @* ── Metadata ── *@
+                        @{ var metaCol = _collapsedXmlSections.Contains("metadata"); }
+                        <div class="xml-section xml-collapsible @XmlSectionClass("metadata") @(metaCol ? "xml-section-collapsed" : "")"
+                             data-xml-section="metadata"
+                             @onclick="@(() => ActivateSection("metadata", "xml"))">
+                            <span class="xml-toggle" @onclick="@(() => ToggleXmlCollapse("metadata"))" @onclick:stopPropagation="true">@(metaCol ? "▶" : "▼")</span>@(metaCol ? GetXmlCollapseSummary("metadata") : GetMetadataXml())
+                        </div>
+
+                        @* ── Classifications ── *@
+                        @if (validCls.Count > 0)
+                        {
+                            var clsCol = _collapsedXmlSections.Contains("classifications");
+                            <div class="xml-section xml-collapsible @XmlSectionClass("classifications") @(clsCol ? "xml-section-collapsed" : "")"
+                                 data-xml-section="classifications"
+                                 @onclick="@(() => ActivateSection("classifications", "xml"))">
+                                <span class="xml-toggle" @onclick="@(() => ToggleXmlCollapse("classifications"))" @onclick:stopPropagation="true">@(clsCol ? "▶" : "▼")</span>
+                                @if (clsCol)
+                                {
+                                    @GetXmlCollapseSummary("classifications")
+                                }
+                                else
+                                {
+                                    @("  <securityClassifications>\n")
+                                    @for (var ci = 0; ci < validCls.Count; ci++)
+                                    {
+                                        var c = validCls[ci];
+                                        var h = ci + 1;
+                                        @($"    <securityClassification name=\"{c.Name}\" lacv=\"{c.LacvValue}\" hierarchy=\"{h}\" />\n")
+                                    }
+                                    @("  </securityClassifications>")
+                                }
+                            </div>
+                        }
+
+                        @* ── Tag Sets ── *@
+                        @if (validSets.Count > 0)
+                        {
+                            var tsCol = _collapsedXmlSections.Contains("tagsets");
+                            <div class="xml-section xml-collapsible @XmlSectionClass("tagsets") @(tsCol ? "xml-section-collapsed" : "")"
+                                 data-xml-section="tagsets"
+                                 @onclick="@(() => ActivateSection("tagsets", "xml"))">
+                                <span class="xml-toggle" @onclick="@(() => ToggleXmlCollapse("tagsets"))" @onclick:stopPropagation="true">@(tsCol ? "▶" : "▼")</span>
+                                @if (tsCol)
+                                {
+                                    @GetXmlCollapseSummary("tagsets")
+                                }
+                                else
+                                {
+                                    @("  <securityCategoryTagSets>\n")
+                                    @for (var si = 0; si < validSets.Count; si++)
+                                    {
+                                        var ts = validSets[si];
+                                        var tsId = GetTagSetId(ts, si);
+                                        @(GetTagSetOpenXml(ts, si) + "\n")
+                                        @foreach (var tag in ts.Tags.Where(t => !string.IsNullOrWhiteSpace(t.TagName)))
+                                        {
+                                            @($"      <securityCategoryTag tagName=\"{tag.TagName}\" lacv=\"{tag.LacvValue}\" tagType=\"{tag.TagType}\" />\n")
+                                        }
+                                        @("    </securityCategoryTagSet>\n")
+                                    }
+                                    @("  </securityCategoryTagSets>")
+                                }
+                            </div>
+                        }
+
+                        @* ── Equivalent Policies ── *@
+                        @if (validPolicies.Count > 0)
+                        {
+                            var epCol = _collapsedXmlSections.Contains("equivalentpolicies");
+                            <div class="xml-section xml-collapsible @XmlSectionClass("equivalentpolicies") @(epCol ? "xml-section-collapsed" : "")"
+                                 data-xml-section="equivalentpolicies"
+                                 @onclick="@(() => ActivateSection("equivalentpolicies", "xml"))">
+                                <span class="xml-toggle" @onclick="@(() => ToggleXmlCollapse("equivalentpolicies"))" @onclick:stopPropagation="true">@(epCol ? "▶" : "▼")</span>
+                                @if (epCol)
+                                {
+                                    @GetXmlCollapseSummary("equivalentpolicies")
+                                }
+                                else
+                                {
+                                    @("  <equivalentPolicies>\n")
+                                    @foreach (var ep in validPolicies)
+                                    {
+                                        @(GetEquivalentPolicyXml(ep) + "\n")
+                                    }
+                                    @("  </equivalentPolicies>")
+                                }
+                            </div>
+                        }
+
+                        @* ── Extensions ── *@
+                        @if (hasExtFields || hasRawXml)
+                        {
+                            var extCol = _collapsedXmlSections.Contains("extensions");
+                            <div class="xml-section xml-collapsible @XmlSectionClass("extensions") @(extCol ? "xml-section-collapsed" : "")"
+                                 data-xml-section="extensions"
+                                 @onclick="@(() => ActivateSection("extensions", "xml"))">
+                                <span class="xml-toggle" @onclick="@(() => ToggleXmlCollapse("extensions"))" @onclick:stopPropagation="true">@(extCol ? "▶" : "▼")</span>
+                                @(extCol ? GetXmlCollapseSummary("extensions") : GetExtensionsXml())
+                            </div>
+                        }
+
+                        <div class="xml-section">@("</SPIF>")</div>
+                    </div>
+                }
+                else
+                {
+                    <textarea class="form-control xml-editor-textarea" value="@_rawXml"
+                              @oninput="OnXmlTextChanged"
+                              style="font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.82rem; flex:1; resize:none; border:none; border-radius:0;"
+                              placeholder="Paste or type SPIF 3.0 XML here..."></textarea>
+                    <div class="d-flex gap-2 px-2 py-2 border-top bg-light">
+                        <button class="btn btn-sm btn-primary" @onclick="ImportXml" disabled="@_processing">
+                            @(_processing ? "Importing..." : "Import XML")
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger mt-3 py-2 small">@_errorMessage</div>
+}
+@if (!string.IsNullOrEmpty(_successMessage))
+{
+    <div class="alert alert-success mt-3 py-2 small">@_successMessage</div>
+}
+
+<style>
+    /* ═══ Split Editor Layout ═══ */
+    .spif-split-editor {
+        display: flex;
+        height: calc(100vh - 180px);
+        min-height: 500px;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        overflow: hidden;
+        background: #fff;
+    }
+
+    .spif-pane {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .spif-pane-header {
+        padding: 0.5rem 0.75rem;
+        font-weight: 600;
+        font-size: 0.85rem;
+        border-bottom: 1px solid #dee2e6;
+        flex-shrink: 0;
+    }
+
+    .spif-form-pane .spif-pane-header {
+        background: #f8f9fa;
+        color: #1a1a2e;
+    }
+
+    .spif-xml-pane .spif-pane-header {
+        background: #1a1a2e;
+        color: #e0e0e0;
+    }
+
+    .spif-pane-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0.75rem;
+    }
+
+    .spif-xml-body {
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .spif-divider {
+        width: 4px;
+        background: #dee2e6;
+        flex-shrink: 0;
+    }
+
+    /* ═══ Form Sections (Left Pane) ═══ */
+    .spif-section {
+        padding: 0.6rem 0.75rem;
+        margin-bottom: 0.5rem;
+        border-left: 3px solid transparent;
+        border-radius: 4px;
+        transition: background-color 0.15s ease, border-color 0.15s ease;
+        cursor: default;
+    }
+
+    .spif-section:hover { background-color: #f8f9fa; }
+
+    .spif-section.active {
+        background-color: #e8f0fe;
+        border-left-color: #1a73e8;
+    }
+
+    .spif-section-label {
+        font-weight: 700;
+        font-size: 0.85rem;
+        color: #1a1a2e;
+        margin-bottom: 0.4rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    /* ═══ XML Preview (Right Pane) ═══ */
+    .xml-preview-container {
+        font-family: 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace;
+        font-size: 0.82rem;
+        line-height: 1.55;
+        white-space: pre;
+        padding: 0.5rem;
+        flex: 1;
+        overflow-y: auto;
+        background: #fafafa;
+        color: #333;
+        tab-size: 2;
+    }
+
+    .xml-section {
+        padding: 0.25rem 0.5rem;
+        border-left: 3px solid transparent;
+        border-radius: 3px;
+        transition: background-color 0.15s ease, border-color 0.15s ease;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .xml-section:hover { background-color: #e3e8ef; }
+
+    .xml-section.active {
+        background-color: #d2e3fc;
+        border-left-color: #1a73e8;
+    }
+
+    .xml-collapsible {
+        position: relative;
+        padding-left: 1.5rem;
+    }
+
+    .xml-toggle {
+        position: absolute;
+        left: 0.15rem;
+        top: 0.2rem;
+        cursor: pointer;
+        color: #666;
+        font-size: 0.75rem;
+        user-select: none;
+        z-index: 1;
+        padding: 0.1rem 0.2rem;
+        border-radius: 3px;
+    }
+
+    .xml-toggle:hover {
+        color: #1a73e8;
+        background-color: rgba(26, 115, 232, 0.12);
+    }
+
+    .xml-section-collapsed {
+        color: #888;
+        font-style: italic;
+    }
+
+    .xml-editor-textarea {
+        font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+        font-size: 0.82rem;
+        line-height: 1.55;
+        background: #fafafa;
+    }
+</style>
+
+@code {
+    [Parameter] public Guid? SpifId { get; set; }
+
+    private bool IsEditMode => SpifId.HasValue;
+
+    private readonly SpifFormState _state = new();
+    private string? _activeSection;
+    private string _xmlPaneMode = "preview";
+    private ElementReference _xmlPreviewRef;
+
+    private bool _processing;
+    private bool _loadingExisting;
+    private string? _errorMessage;
+    private string? _successMessage;
+
+    private string _rawXml = string.Empty;
+    private bool _syncingFromForm;
+    private bool _syncingFromXml;
+    private System.Threading.Timer? _xmlDebounceTimer;
+
+    private readonly HashSet<string> _collapsedXmlSections = [];
+    private readonly string _previewDate = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
+
+    private Guid? _lastSpifId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (SpifId == _lastSpifId) return;
+        _lastSpifId = SpifId;
+        ResetFormState();
+        if (IsEditMode) await LoadExistingSpifAsync();
+    }
+
+    private void ResetFormState()
+    {
+        _activeSection = null;
+        _xmlPaneMode = "preview";
+        _processing = false;
+        _loadingExisting = false;
+        _errorMessage = null;
+        _successMessage = null;
+        _state.Reset();
+        _rawXml = string.Empty;
+    }
+
+    private async Task LoadExistingSpifAsync()
+    {
+        _loadingExisting = true;
+        try
+        {
+            var spifs = await Http.GetFromJsonAsync<List<SpifSummary>>("api/v1/pap/spifs");
+            var spif = spifs?.FirstOrDefault(s => s.Id == SpifId);
+            if (spif is not null)
+            {
+                var detail = await Http.GetFromJsonAsync<SpifDetail>($"api/v1/pap/spifs/{SpifId}");
+                if (detail is not null && !string.IsNullOrWhiteSpace(detail.RawXml))
+                {
+                    _rawXml = detail.RawXml;
+                    PopulateFormFromXml(detail.RawXml);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to load SPIF: {ex.Message}";
+        }
+        finally
+        {
+            _loadingExisting = false;
+        }
+    }
+
+    private void PopulateFormFromXml(string xml)
+    {
+        try
+        {
+            var doc = XDocument.Parse(xml);
+            var root = doc.Root;
+            if (root is null) return;
+
+            XNamespace ns = "urn:xmlspif:spif:3.0";
+            var hasNs = root.Name.Namespace == ns;
+            XName N(string local) => hasNs ? ns + local : local;
+
+            _state.PolicyOid = root.Element(N("securityPolicyId"))?.Attribute("oid")?.Value ?? "";
+            _state.PolicyName = root.Element(N("originator"))?.Value ?? _state.PolicyOid;
+            _state.DefaultSecurityPolicyId = root.Element(N("defaultSecurityPolicyId"))?.Attribute("oid")?.Value;
+
+            _state.Classifications.Clear();
+            var classContainer = root.Element(N("securityClassifications"));
+            if (classContainer is not null)
+            {
+                foreach (var sc in classContainer.Elements(N("securityClassification")))
+                {
+                    var name = sc.Attribute("name")?.Value ?? "";
+                    var lacv = int.TryParse(sc.Attribute("lacv")?.Value, out var lv) ? lv : 0;
+                    string? phraseText = null, portionAbbr = null, markingCode = null, fgColor = null, bgColor = null;
+                    var isPortionMarking = true;
+                    var md = sc.Element(N("markingData"));
+                    if (md is not null)
+                    {
+                        var mp = md.Element(N("markingPhrase"));
+                        if (mp is not null)
+                        {
+                            phraseText = mp.Attribute("phraseText")?.Value;
+                            portionAbbr = mp.Attribute("portionAbbreviation")?.Value;
+                            isPortionMarking = mp.Attribute("isPortionMarking")?.Value != "false";
+                        }
+                        markingCode = md.Element(N("markingCode"))?.Attribute("codeValue")?.Value;
+                        fgColor = md.Element(N("foregroundColor"))?.Attribute("value")?.Value;
+                        bgColor = md.Element(N("backgroundColor"))?.Attribute("value")?.Value;
+                    }
+                    _state.Classifications.Add(new ClassificationEntry(name, lacv, phraseText, portionAbbr, isPortionMarking, markingCode, fgColor, bgColor));
+                }
+            }
+
+            if (_state.Classifications.Count == 0)
+                _state.Classifications.Add(new ClassificationEntry("UNCLASSIFIED", 0));
+
+            _state.TagSets.Clear();
+            var tagSetsContainer = root.Element(N("securityCategoryTagSets"));
+            if (tagSetsContainer is not null)
+            {
+                foreach (var tsEl in tagSetsContainer.Elements(N("securityCategoryTagSet")))
+                {
+                    var ts = new TagSetEntry
+                    {
+                        Name = tsEl.Attribute("tagSetName")?.Value ?? "",
+                        TagSetId = tsEl.Attribute("tagSetId")?.Value,
+                        DisplayName = tsEl.Attribute("displayName")?.Value,
+                        DisplayOrder = int.TryParse(tsEl.Attribute("displayOrder")?.Value, out var dov) ? dov : 1,
+                        MinLacv = int.TryParse(tsEl.Attribute("applicableClassificationMinLacv")?.Value, out var mlv) ? mlv : null,
+                        Expanded = false
+                    };
+
+                    foreach (var tagEl in tsEl.Elements(N("securityCategoryTag")))
+                    {
+                        ts.Tags.Add(new TagEntry
+                        {
+                            TagName = tagEl.Attribute("tagName")?.Value ?? "",
+                            LacvValue = int.TryParse(tagEl.Attribute("lacv")?.Value, out var tlv) ? tlv : 1,
+                            TagType = tagEl.Attribute("tagType")?.Value ?? "restrictive"
+                        });
+                    }
+
+                    _state.TagSets.Add(ts);
+                }
+            }
+
+            _state.EquivalentPolicies.Clear();
+            var eqContainer = root.Element(N("equivalentPolicies"));
+            if (eqContainer is not null)
+            {
+                foreach (var epEl in eqContainer.Elements(N("equivalentPolicy")))
+                {
+                    var ep = new EquivalentPolicyEntry
+                    {
+                        PolicyOid = epEl.Attribute("policyOid")?.Value ?? "",
+                        PolicyName = epEl.Attribute("policyName")?.Value ?? "",
+                        Expanded = false
+                    };
+                    _state.EquivalentPolicies.Add(ep);
+                }
+            }
+        }
+        catch { /* Silently fail — raw XML editor still works */ }
+    }
+
+    private void GoBack() => Nav.NavigateTo("/spif");
+
+    private void OnFormChanged()
+    {
+        if (_syncingFromXml) return;
+        _syncingFromForm = true;
+        try { _rawXml = GetFullXml(); }
+        finally { _syncingFromForm = false; }
+        StateHasChanged();
+    }
+
+    private void InlineChanged(Action mutation)
+    {
+        mutation();
+        OnFormChanged();
+    }
+
+    private void OnXmlTextChanged(ChangeEventArgs e)
+    {
+        _rawXml = e.Value?.ToString() ?? "";
+        _xmlDebounceTimer?.Dispose();
+        _xmlDebounceTimer = new System.Threading.Timer(_ =>
+        {
+            InvokeAsync(() =>
+            {
+                if (!_syncingFromForm)
+                {
+                    _syncingFromXml = true;
+                    try { PopulateFormFromXml(_rawXml); }
+                    finally { _syncingFromXml = false; }
+                }
+                StateHasChanged();
+            });
+        }, null, 600, System.Threading.Timeout.Infinite);
+    }
+
+    private async Task ActivateSection(string section, string source = "form")
+    {
+        _activeSection = section;
+        StateHasChanged();
+    }
+
+    private string SectionClass(string section) => _activeSection == section ? "active" : "";
+    private string XmlSectionClass(string section) => _activeSection == section ? "active" : "";
+
+    private void ToggleXmlCollapse(string section)
+    {
+        if (!_collapsedXmlSections.Remove(section))
+            _collapsedXmlSections.Add(section);
+    }
+
+    private void CollapseAllXmlSections()
+    {
+        _collapsedXmlSections.UnionWith(["metadata", "classifications", "tagsets", "equivalentpolicies", "extensions"]);
+    }
+
+    private void ExpandAllXmlSections() => _collapsedXmlSections.Clear();
+
+    private string GetXmlCollapseSummary(string section) => section switch
+    {
+        "metadata" => "<?xml ... > <SPIF> ··· metadata ···",
+        "classifications" => $"  <securityClassifications> ··· {_state.Classifications.Count(c => !string.IsNullOrWhiteSpace(c.Name))} classification(s) ··· </securityClassifications>",
+        "tagsets" => $"  <securityCategoryTagSets> ··· {_state.TagSets.Count(ts => !string.IsNullOrWhiteSpace(ts.Name))} tag set(s) ··· </securityCategoryTagSets>",
+        "equivalentpolicies" => $"  <equivalentPolicies> ··· {_state.EquivalentPolicies.Count(ep => !string.IsNullOrWhiteSpace(ep.PolicyOid))} policy(ies) ··· </equivalentPolicies>",
+        "extensions" => $"  <extensions> ··· {_state.ExtensionFields.Count(f => !string.IsNullOrWhiteSpace(f.FieldName))} field(s) ··· </extensions>",
+        _ => ""
+    };
+
+    private string GetMetadataXml()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+        sb.AppendLine("<SPIF xmlns=\"urn:xmlspif:spif:3.0\" version=\"3\">");
+        sb.AppendLine($"  <securityPolicyId oid=\"{_state.PolicyOid}\" />");
+        sb.AppendLine("  <spifVersionNumber value=\"1\" />");
+        sb.AppendLine($"  <creationDate value=\"{_previewDate}\" />");
+        if (!string.IsNullOrWhiteSpace(_state.PolicyName))
+            sb.AppendLine($"  <originator>{_state.PolicyName}</originator>");
+        if (!string.IsNullOrWhiteSpace(_state.DefaultSecurityPolicyId))
+            sb.AppendLine($"  <defaultSecurityPolicyId oid=\"{_state.DefaultSecurityPolicyId}\" />");
+        return sb.ToString().TrimEnd('\r', '\n');
+    }
+
+    private string GetTagSetOpenXml(TagSetEntry ts, int index)
+    {
+        var sb = new StringBuilder();
+        var tsId = string.IsNullOrWhiteSpace(ts.TagSetId) ? $"{_state.PolicyOid}.{index + 1}" : ts.TagSetId;
+        sb.Append($"    <securityCategoryTagSet tagSetName=\"{ts.Name}\" tagSetId=\"{tsId}\"");
+        if (!string.IsNullOrWhiteSpace(ts.DisplayName)) sb.Append($" displayName=\"{ts.DisplayName}\"");
+        if (ts.DisplayOrder != 0) sb.Append($" displayOrder=\"{ts.DisplayOrder}\"");
+        if (ts.MinLacv.HasValue) sb.Append($" applicableClassificationMinLacv=\"{ts.MinLacv.Value}\"");
+        sb.Append(">");
+        return sb.ToString();
+    }
+
+    private string GetTagSetId(TagSetEntry ts, int index)
+        => string.IsNullOrWhiteSpace(ts.TagSetId) ? $"{_state.PolicyOid}.{index + 1}" : ts.TagSetId;
+
+    private string GetEquivalentPolicyXml(EquivalentPolicyEntry ep)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"    <equivalentPolicy policyOid=\"{ep.PolicyOid}\" policyName=\"{ep.PolicyName}\">");
+        foreach (var cm in ep.ClassificationMappings)
+            sb.AppendLine($"      <classificationMapping sourceLacv=\"{cm.SourceLacv}\" targetLacv=\"{cm.TargetLacv}\" />");
+        sb.Append("    </equivalentPolicy>");
+        return sb.ToString();
+    }
+
+    private string GetExtensionsXml()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("  <extensions>");
+        foreach (var f in _state.ExtensionFields.Where(f => !string.IsNullOrWhiteSpace(f.FieldName)))
+        {
+            sb.Append($"    <freeFormField fieldName=\"{f.FieldName}\" fieldValue=\"{f.FieldValue}\"");
+            if (!string.IsNullOrWhiteSpace(f.CharSetConstraint)) sb.Append($" charSetConstraint=\"{f.CharSetConstraint}\"");
+            sb.AppendLine(" />");
+        }
+        sb.Append("  </extensions>");
+        return sb.ToString();
+    }
+
+    private string GetFullXml()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine(GetMetadataXml());
+
+        var validCls = _state.Classifications.Where(c => !string.IsNullOrWhiteSpace(c.Name)).ToList();
+        if (validCls.Count > 0)
+        {
+            sb.AppendLine("  <securityClassifications>");
+            var hierarchy = 1;
+            foreach (var c in validCls)
+                sb.AppendLine($"    <securityClassification name=\"{c.Name}\" lacv=\"{c.LacvValue}\" hierarchy=\"{hierarchy++}\" />");
+            sb.AppendLine("  </securityClassifications>");
+        }
+
+        var validSets = _state.TagSets.Where(ts => !string.IsNullOrWhiteSpace(ts.Name)).ToList();
+        if (validSets.Count > 0)
+        {
+            sb.AppendLine("  <securityCategoryTagSets>");
+            for (var si = 0; si < validSets.Count; si++)
+            {
+                var ts = validSets[si];
+                sb.AppendLine(GetTagSetOpenXml(ts, si));
+                foreach (var tag in ts.Tags.Where(t => !string.IsNullOrWhiteSpace(t.TagName)))
+                    sb.AppendLine($"      <securityCategoryTag tagName=\"{tag.TagName}\" lacv=\"{tag.LacvValue}\" tagType=\"{tag.TagType}\" />");
+                sb.AppendLine("    </securityCategoryTagSet>");
+            }
+            sb.AppendLine("  </securityCategoryTagSets>");
+        }
+
+        var validEps = _state.EquivalentPolicies.Where(ep => !string.IsNullOrWhiteSpace(ep.PolicyOid)).ToList();
+        if (validEps.Count > 0)
+        {
+            sb.AppendLine("  <equivalentPolicies>");
+            foreach (var ep in validEps) sb.AppendLine(GetEquivalentPolicyXml(ep));
+            sb.AppendLine("  </equivalentPolicies>");
+        }
+
+        var hasExt = _state.ExtensionFields.Any(f => !string.IsNullOrWhiteSpace(f.FieldName));
+        if (hasExt) sb.AppendLine(GetExtensionsXml());
+
+        sb.Append("</SPIF>");
+        return sb.ToString();
+    }
+
+    private void SwitchToEditMode()
+    {
+        if (string.IsNullOrWhiteSpace(_rawXml)) _rawXml = GetFullXml();
+        _xmlPaneMode = "edit";
+    }
+
+    private void RefreshXmlFromForm() => _rawXml = GetFullXml();
+
+    private void ValidateExtensionXml()
+    {
+        if (string.IsNullOrWhiteSpace(_state.RawExtensionXml))
+        {
+            _state.ExtensionXmlError = null;
+            OnFormChanged();
+            return;
+        }
+        try
+        {
+            XElement.Parse($"<_root xmlns=\"urn:xmlspif:spif:3.0\">{_state.RawExtensionXml}</_root>");
+            _state.ExtensionXmlError = null;
+        }
+        catch (System.Xml.XmlException ex)
+        {
+            _state.ExtensionXmlError = $"Invalid XML: {ex.Message}";
+        }
+        OnFormChanged();
+    }
+
+    private async Task SaveSpif()
+    {
+        _processing = true;
+        _errorMessage = null;
+        _successMessage = null;
+        try
+        {
+            var xml = GetFullXml();
+            var request = new { Xml = xml, Activate = true };
+            var response = await Http.PostAsJsonAsync("api/v1/pap/spifs/import", request);
+            if (response.IsSuccessStatusCode)
+            {
+                _successMessage = IsEditMode ? "SPIF updated successfully." : "SPIF imported successfully.";
+                if (!IsEditMode) Nav.NavigateTo("/spif");
+            }
+            else
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                _errorMessage = $"Failed to save SPIF: {response.StatusCode} — {body}";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error saving SPIF: {ex.Message}";
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    private async Task ImportXml()
+    {
+        _processing = true;
+        _errorMessage = null;
+        _successMessage = null;
+        try
+        {
+            var request = new { Xml = _rawXml, Activate = true };
+            var response = await Http.PostAsJsonAsync("api/v1/pap/spifs/import", request);
+            if (response.IsSuccessStatusCode)
+            {
+                _successMessage = "SPIF imported successfully.";
+                Nav.NavigateTo("/spif");
+            }
+            else
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                _errorMessage = $"Import failed: {response.StatusCode} — {body}";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error importing: {ex.Message}";
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    // DTOs for API responses
+    private sealed record SpifSummary(Guid Id, string PolicyOid, string Name, bool IsActive, DateTimeOffset ImportedAt);
+    private sealed record SpifDetail(Guid Id, string PolicyOid, string Name, string RawXml);
+}

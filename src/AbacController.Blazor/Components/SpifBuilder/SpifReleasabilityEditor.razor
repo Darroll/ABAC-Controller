@@ -1,0 +1,154 @@
+@*
+    Component: SpifReleasabilityEditor
+    Purpose: Releasability editing component. Specialized tag set editor for managing
+             nation/group releasability entries with a checklist-style UI and constraint management.
+    Dependencies: TagSetEntry, TagEntry, ClassificationEntry, SpifConstraintsPanel, EventCallback.
+*@
+@using AbacController.Blazor.Components.SpifBuilder
+
+<div class="card mb-2 border-start border-2" style="border-left-color: #198754 !important;" data-spif-field="tagset-@TagSetIndex">
+    <div class="card-header d-flex justify-content-between align-items-center py-1 px-2">
+        <div class="d-flex align-items-center gap-1">
+            <button class="btn btn-sm btn-link p-0" @onclick="ToggleExpand" @onclick:stopPropagation="true">
+                <span class="oi @(TagSet.Expanded ? "oi-chevron-bottom" : "oi-chevron-right")" style="font-size:0.7rem;"></span>
+            </button>
+            <span class="oi oi-globe me-1" style="font-size:0.7rem; color:#198754;"></span>
+            <strong class="small">@(string.IsNullOrWhiteSpace(TagSet.Name) ? $"Tag Set {TagSetIndex + 1}" : TagSet.Name)</strong>
+            <span class="badge bg-success" style="font-size:0.65rem;">@(TagSet.Tags.Count) nations</span>
+            @if (TagSet.MinLacv.HasValue)
+            {
+                var minName = Classifications.FirstOrDefault(c => c.LacvValue == TagSet.MinLacv.Value)?.Name ?? $"LACV {TagSet.MinLacv}";
+                <span class="badge bg-light text-dark border" style="font-size:0.6rem;">Min: @minName</span>
+            }
+        </div>
+        <button class="btn btn-sm btn-outline-danger py-0 px-1" @onclick="OnRemove" @onclick:stopPropagation="true">
+            <span class="oi oi-x" style="font-size:0.6rem;"></span>
+        </button>
+    </div>
+
+    @if (TagSet.Expanded)
+    {
+        <div class="card-body py-2 px-3">
+            <div class="row mb-2 g-2">
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">Name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control form-control-sm" value="@TagSet.Name"
+                           @onchange="@(e => { TagSet.Name = e.Value?.ToString() ?? ""; NotifyChanged(); })" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">Display Name</label>
+                    <input type="text" class="form-control form-control-sm" value="@TagSet.DisplayName"
+                           @onchange="@(e => { TagSet.DisplayName = e.Value?.ToString(); NotifyChanged(); })" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-0">OID</label>
+                    <input type="text" class="form-control form-control-sm" value="@TagSet.TagSetId"
+                           placeholder="Auto" @onchange="@(e => { TagSet.TagSetId = e.Value?.ToString(); NotifyChanged(); })" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-0">Order</label>
+                    <input type="number" class="form-control form-control-sm" value="@TagSet.DisplayOrder"
+                           @onchange="@(e => { TagSet.DisplayOrder = int.TryParse(e.Value?.ToString(), out var v) ? v : 0; NotifyChanged(); })" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-0">Min LACV</label>
+                    <select class="form-select form-select-sm"
+                            value="@TagSet.MinLacv?.ToString()"
+                            @onchange="@(e => { TagSet.MinLacv = int.TryParse(e.Value?.ToString(), out var v) ? v : null; NotifyChanged(); })">
+                        <option value="">—</option>
+                        @foreach (var c in Classifications.Where(x => !string.IsNullOrWhiteSpace(x.Name)))
+                        {
+                            <option value="@c.LacvValue">@c.Name</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <h6 class="small fw-bold mt-2 mb-1">Nations / Groups</h6>
+            <div class="spif-rel-grid">
+                @for (var j = 0; j < TagSet.Tags.Count; j++)
+                {
+                    var tagIdx = j;
+                    var tag = TagSet.Tags[tagIdx];
+                    <div class="spif-rel-item" data-spif-field="tagset-@TagSetIndex-tag-@tagIdx">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="oi oi-check text-success" style="font-size:0.7rem;"></span>
+                            <input type="text" class="form-control form-control-sm spif-rel-name" value="@tag.TagName"
+                                   @onchange="@(e => UpdateTag(tagIdx, t => t with { TagName = e.Value?.ToString() ?? "" }))" />
+                            @if (!string.IsNullOrWhiteSpace(tag.MarkingCode ?? tag.PortionAbbreviation))
+                            {
+                                <span class="badge bg-light text-dark border" style="font-size:0.65rem;">@(tag.MarkingCode ?? tag.PortionAbbreviation)</span>
+                            }
+                            <button class="btn btn-sm btn-outline-danger p-0 ms-auto" style="width:20px;height:20px;line-height:1;" @onclick="() => RemoveTag(tagIdx)">
+                                <span class="oi oi-x" style="font-size:0.55rem;"></span>
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+            <button class="btn btn-sm btn-outline-success py-0 mt-1" style="font-size:0.8rem;" @onclick="AddNation">+ Add Nation/Group</button>
+
+            <SpifConstraintsPanel
+                Constraints="TagSet.Constraints"
+                AllTagSets="AllTagSets"
+                OwnerTagSetId="@(TagSet.TagSetId ?? TagSet.Name)"
+                OnChanged="OnChanged" />
+        </div>
+    }
+</div>
+
+<style>
+    .spif-rel-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 0.25rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .spif-rel-item {
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        padding: 0.2rem 0.4rem;
+        background: #f9f9f9;
+    }
+
+    .spif-rel-name {
+        max-width: 120px;
+    }
+</style>
+
+@code {
+    [Parameter] public required int TagSetIndex { get; set; }
+    [Parameter] public required TagSetEntry TagSet { get; set; }
+    [Parameter] public required List<ClassificationEntry> Classifications { get; set; }
+    [Parameter] public required List<TagSetEntry> AllTagSets { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public EventCallback OnRemove { get; set; }
+
+    private void ToggleExpand()
+    {
+        TagSet.Expanded = !TagSet.Expanded;
+        NotifyChanged();
+    }
+
+    private void NotifyChanged() => OnChanged.InvokeAsync();
+
+    private void AddNation()
+    {
+        var nextLacv = TagSet.Tags.Count > 0 ? TagSet.Tags.Max(t => t.LacvValue) + 1 : 1;
+        TagSet.Tags.Add(new TagEntry { TagName = $"NATION{TagSet.Tags.Count + 1}", LacvValue = nextLacv, TagType = "permissive" });
+        NotifyChanged();
+    }
+
+    private void RemoveTag(int idx)
+    {
+        TagSet.Tags.RemoveAt(idx);
+        NotifyChanged();
+    }
+
+    private void UpdateTag(int idx, Func<TagEntry, TagEntry> transform)
+    {
+        TagSet.Tags[idx] = transform(TagSet.Tags[idx]);
+        NotifyChanged();
+    }
+}

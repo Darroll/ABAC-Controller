@@ -1,0 +1,387 @@
+@*
+    Component: PipSources
+    Purpose: PIP (Policy Information Point) source management. Lists configured attribute
+             sources, allows create/edit/delete and connectivity testing.
+    Route: /pip
+    Dependencies: HttpClient.
+*@
+@page "/pip"
+@inject HttpClient Http
+
+<h2>PIP Source Management</h2>
+<p class="text-muted" style="margin-top:-0.5rem; margin-bottom:1.5rem; font-size:0.95rem;">
+    Configure attribute sources for policy evaluation decisions.
+</p>
+
+<div class="mb-3">
+    <button class="btn btn-success" @onclick="ShowAddForm">
+        <span class="oi oi-plus"></span> Add PIP Source
+    </button>
+</div>
+
+@if (_showForm)
+{
+    <div class="card mb-4">
+        <div class="card-header">
+            <strong>@(_editingId is null ? "New PIP Source" : "Edit PIP Source")</strong>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label small">ID <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control form-control-sm" @bind="_form.Id" placeholder="e.g., ldap-primary" disabled="@(_editingId is not null)" />
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label small">Name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control form-control-sm" @bind="_form.Name" placeholder="e.g., LDAP Directory" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">Source Type <span class="text-danger">*</span></label>
+                    <select class="form-select form-select-sm" @bind="_form.SourceType">
+                        <option value="">— Select type —</option>
+                        <option value="ldap">LDAP</option>
+                        <option value="rest">REST API</option>
+                        <option value="database">Database</option>
+                        <option value="static">Static / File</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                </div>
+                <div class="col-md-12">
+                    <label class="form-label small">Provides Attributes</label>
+                    <input type="text" class="form-control form-control-sm" @bind="_form.ProvidesAttributes" placeholder="Comma-separated: subject.clearance, subject.groups" />
+                    <small class="text-muted">Attribute names this source provides for PDP evaluation.</small>
+                </div>
+                <div class="col-md-12">
+                    <label class="form-label small">Configuration JSON</label>
+                    <textarea class="form-control form-control-sm" rows="4" @bind="_form.ConfigJson"
+                              style="font-family: 'Cascadia Code', Consolas, monospace; font-size:0.82rem;"
+                              placeholder="{&quot;url&quot;: &quot;ldap://example.com:389&quot;, &quot;baseDn&quot;: &quot;dc=example,dc=com&quot;}"></textarea>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Priority</label>
+                    <input type="number" class="form-control form-control-sm" @bind="_form.Priority" />
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <div class="form-check mb-1">
+                        <input type="checkbox" class="form-check-input" id="isRequired" @bind="_form.IsRequired" />
+                        <label class="form-check-label small" for="isRequired">Required</label>
+                    </div>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <div class="form-check mb-1">
+                        <input type="checkbox" class="form-check-input" id="cacheEnabled" @bind="_form.CacheEnabled" />
+                        <label class="form-check-label small" for="cacheEnabled">Cache Enabled</label>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Cache TTL (seconds)</label>
+                    <input type="number" class="form-control form-control-sm" @bind="_form.CacheTtlSeconds" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Cache Max Entries</label>
+                    <input type="number" class="form-control form-control-sm" @bind="_form.CacheMaxEntries" />
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(_formError))
+            {
+                <div class="alert alert-danger mt-3 py-2 small">@_formError</div>
+            }
+
+            <div class="mt-3 d-flex gap-2">
+                <button class="btn btn-primary" @onclick="SaveSource" disabled="@_saving">
+                    @(_saving ? "Saving..." : "Save")
+                </button>
+                <button class="btn btn-secondary" @onclick="CancelForm">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(_pageError))
+{
+    <div class="alert alert-danger">@_pageError</div>
+}
+
+@if (_sources is null)
+{
+    <p><em>Loading PIP sources...</em></p>
+}
+else if (_sources.Count == 0)
+{
+    <div class="alert alert-info">No PIP sources configured.</div>
+}
+else
+{
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Priority</th>
+                <th>Cache</th>
+                <th>Required</th>
+                <th>Attributes</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var src in _sources.OrderBy(s => s.Priority))
+            {
+                <tr>
+                    <td><code style="font-size:0.8rem;">@src.Id</code></td>
+                    <td>@src.Name</td>
+                    <td><span class="badge bg-secondary" style="font-size:0.75rem;">@src.SourceType</span></td>
+                    <td>@src.Priority</td>
+                    <td>
+                        @if (src.CacheEnabled)
+                        {
+                            <span class="badge bg-info text-dark" style="font-size:0.75rem;">@src.CacheTtlSeconds s</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted small">off</span>
+                        }
+                    </td>
+                    <td>
+                        @if (src.IsRequired)
+                        {
+                            <span class="badge bg-warning text-dark" style="font-size:0.75rem;">Required</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted small">optional</span>
+                        }
+                    </td>
+                    <td>
+                        @if (!string.IsNullOrWhiteSpace(src.ProvidesAttributes))
+                        {
+                            <small class="text-muted">@src.ProvidesAttributes</small>
+                        }
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => EditSource(src)">
+                            <span class="oi oi-pencil"></span>
+                        </button>
+                        <button class="btn btn-sm btn-outline-info me-1" @onclick="() => TestSource(src.Id)" disabled="@_testing">
+                            <span class="oi oi-pulse"></span> Test
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteSource(src.Id)" disabled="@_deleting">
+                            <span class="oi oi-trash"></span>
+                        </button>
+                    </td>
+                </tr>
+                @if (_testResults.TryGetValue(src.Id, out var testResult))
+                {
+                    <tr>
+                        <td colspan="8">
+                            <div class="alert @(testResult.StartsWith("✓") ? "alert-success" : "alert-warning") py-1 px-3 mb-0 small">
+                                @testResult
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+}
+
+<style>
+    .admin-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+
+    .admin-table thead th {
+        text-align: left;
+        padding: 0.6rem 0.75rem;
+        background: #f5f6fa;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 600;
+        color: #495057;
+        font-size: 0.85rem;
+    }
+
+    .admin-table tbody td {
+        padding: 0.55rem 0.75rem;
+        border-bottom: 1px solid #f0f0f0;
+        vertical-align: middle;
+    }
+
+    .admin-table tbody tr:hover { background: #f8f9ff; }
+</style>
+
+@code {
+    private List<PipSourceRow>? _sources;
+    private bool _showForm;
+    private string? _editingId;
+    private PipSourceForm _form = new();
+    private bool _saving;
+    private bool _deleting;
+    private bool _testing;
+    private string? _formError;
+    private string? _pageError;
+    private readonly Dictionary<string, string> _testResults = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSources();
+    }
+
+    private async Task LoadSources()
+    {
+        try
+        {
+            _sources = await Http.GetFromJsonAsync<List<PipSourceRow>>("api/v1/pip/sources");
+        }
+        catch (Exception ex)
+        {
+            _pageError = $"Failed to load PIP sources: {ex.Message}";
+            _sources = [];
+        }
+    }
+
+    private void ShowAddForm()
+    {
+        _showForm = true;
+        _editingId = null;
+        _form = new PipSourceForm { CacheEnabled = true, CacheTtlSeconds = 300, CacheMaxEntries = 1000 };
+        _formError = null;
+    }
+
+    private void EditSource(PipSourceRow src)
+    {
+        _showForm = true;
+        _editingId = src.Id;
+        _form = new PipSourceForm
+        {
+            Id = src.Id,
+            Name = src.Name,
+            SourceType = src.SourceType,
+            ConfigJson = src.ConfigJson,
+            ProvidesAttributes = src.ProvidesAttributes,
+            Priority = src.Priority,
+            IsRequired = src.IsRequired,
+            CacheEnabled = src.CacheEnabled,
+            CacheTtlSeconds = src.CacheTtlSeconds,
+            CacheMaxEntries = src.CacheMaxEntries
+        };
+        _formError = null;
+    }
+
+    private void CancelForm()
+    {
+        _showForm = false;
+        _editingId = null;
+        _formError = null;
+    }
+
+    private async Task SaveSource()
+    {
+        if (string.IsNullOrWhiteSpace(_form.Id))
+        {
+            _formError = "ID is required.";
+            return;
+        }
+
+        _saving = true;
+        _formError = null;
+        try
+        {
+            var payload = new
+            {
+                _form.Id,
+                _form.Name,
+                _form.SourceType,
+                _form.ConfigJson,
+                _form.ProvidesAttributes,
+                _form.Priority,
+                _form.IsRequired,
+                _form.CacheEnabled,
+                _form.CacheTtlSeconds,
+                _form.CacheMaxEntries
+            };
+
+            var response = await Http.PutAsJsonAsync($"api/v1/pip/sources/{_form.Id}", payload);
+            if (response.IsSuccessStatusCode)
+            {
+                _showForm = false;
+                _editingId = null;
+                await LoadSources();
+            }
+            else
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                _formError = $"Save failed: {body}";
+            }
+        }
+        catch (Exception ex)
+        {
+            _formError = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task DeleteSource(string id)
+    {
+        _deleting = true;
+        try
+        {
+            await Http.DeleteAsync($"api/v1/pip/sources/{id}");
+            await LoadSources();
+        }
+        catch (Exception ex)
+        {
+            _pageError = $"Delete failed: {ex.Message}";
+        }
+        finally
+        {
+            _deleting = false;
+        }
+    }
+
+    private async Task TestSource(string id)
+    {
+        _testing = true;
+        try
+        {
+            var response = await Http.PostAsync($"api/v1/pip/sources/{id}/test", null);
+            var body = await response.Content.ReadAsStringAsync();
+            _testResults[id] = response.IsSuccessStatusCode
+                ? $"✓ Test completed: {body}"
+                : $"✗ Test failed ({(int)response.StatusCode}): {body}";
+        }
+        catch (Exception ex)
+        {
+            _testResults[id] = $"✗ Error: {ex.Message}";
+        }
+        finally
+        {
+            _testing = false;
+        }
+    }
+
+    private sealed record PipSourceRow(
+        string Id, string Name, string SourceType, string ConfigJson,
+        string ProvidesAttributes, int Priority, bool IsRequired,
+        bool CacheEnabled, int CacheTtlSeconds, int CacheMaxEntries);
+
+    private sealed class PipSourceForm
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string SourceType { get; set; } = "";
+        public string ConfigJson { get; set; } = "{}";
+        public string ProvidesAttributes { get; set; } = "";
+        public int Priority { get; set; }
+        public bool IsRequired { get; set; }
+        public bool CacheEnabled { get; set; } = true;
+        public int CacheTtlSeconds { get; set; } = 300;
+        public int CacheMaxEntries { get; set; } = 1000;
+    }
+}

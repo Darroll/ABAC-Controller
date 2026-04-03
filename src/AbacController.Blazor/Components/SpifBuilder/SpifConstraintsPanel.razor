@@ -1,0 +1,137 @@
+@*
+    Component: SpifConstraintsPanel
+    Purpose: Category constraint editing panel. Manages mutual exclusion, co-requirement,
+             implication, and prohibition constraints between tag set entries.
+    Dependencies: ConstraintEntry, TagSetEntry, EventCallback.
+*@
+@using AbacController.Blazor.Components.SpifBuilder
+
+@if (Constraints.Count > 0 || ShowAddButton)
+{
+    <h6 class="small fw-bold mt-3 mb-1">Constraints</h6>
+    @for (var k = 0; k < Constraints.Count; k++)
+    {
+        var cIdx = k;
+        <div class="row mb-1 g-1 align-items-end">
+            <div class="col-md-2">
+                <select class="form-select form-select-sm" style="font-size:0.8rem;" value="@Constraints[cIdx].ConstraintType"
+                        @onchange="@(e => UpdateConstraint(cIdx, c => c with { ConstraintType = e.Value?.ToString() ?? "mutualExclusion" }))">
+                    <option value="mutualExclusion">Mutual Excl.</option>
+                    <option value="coRequirement">Co-Req.</option>
+                    <option value="implication">Implication</option>
+                    <option value="prohibition">Prohibition</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-0 text-muted" style="font-size:0.7rem;">Source</label>
+                <select class="form-select form-select-sm" style="font-size:0.8rem;" value="@FormatConstraintRef(Constraints[cIdx].SourceTagSetId, Constraints[cIdx].SourceTagLacv)"
+                        @onchange="@(e => OnSourceChanged(cIdx, e.Value?.ToString()))">
+                    @foreach (var ts in AllTagSets)
+                    {
+                        @foreach (var t in ts.Tags.Where(t => !string.IsNullOrWhiteSpace(t.TagName)))
+                        {
+                            var refVal = FormatConstraintRef(ts.TagSetId ?? ts.Name, t.LacvValue);
+                            <option value="@refVal">@ts.Name > @t.TagName</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-md-1 text-center">
+                @{
+                    var badge = Constraints[cIdx].ConstraintType switch
+                    {
+                        "mutualExclusion" => ("bg-danger", "X"),
+                        "prohibition" => ("bg-warning text-dark", "!"),
+                        "coRequirement" => ("bg-primary", "+"),
+                        "implication" => ("bg-secondary", "→"),
+                        _ => ("bg-secondary", "?")
+                    };
+                }
+                <span class="badge @badge.Item1" style="font-size:0.7rem;">@badge.Item2</span>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-0 text-muted" style="font-size:0.7rem;">Target</label>
+                <select class="form-select form-select-sm" style="font-size:0.8rem;" value="@FormatConstraintRef(Constraints[cIdx].TargetTagSetId, Constraints[cIdx].TargetTagLacv)"
+                        @onchange="@(e => OnTargetChanged(cIdx, e.Value?.ToString()))">
+                    @foreach (var ts in AllTagSets)
+                    {
+                        @foreach (var t in ts.Tags.Where(t => !string.IsNullOrWhiteSpace(t.TagName)))
+                        {
+                            var refVal = FormatConstraintRef(ts.TagSetId ?? ts.Name, t.LacvValue);
+                            <option value="@refVal">@ts.Name > @t.TagName</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-md-1">
+                <select class="form-select form-select-sm" style="font-size:0.8rem;" value="@Constraints[cIdx].Severity"
+                        @onchange="@(e => UpdateConstraint(cIdx, c => c with { Severity = e.Value?.ToString() ?? "error" }))">
+                    <option value="error">Error</option>
+                    <option value="warning">Warn</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <input type="text" class="form-control form-control-sm" style="font-size:0.8rem;" placeholder="Error message"
+                       value="@Constraints[cIdx].ErrorMessage"
+                       @onchange="@(e => UpdateConstraint(cIdx, c => c with { ErrorMessage = e.Value?.ToString() }))" />
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-sm btn-outline-danger p-0" style="width:22px;height:22px;line-height:1;" @onclick="() => RemoveConstraint(cIdx)">
+                    <span class="oi oi-x" style="font-size:0.6rem;"></span>
+                </button>
+            </div>
+        </div>
+    }
+    @if (ShowAddButton)
+    {
+        <button class="btn btn-sm btn-outline-primary py-0" style="font-size:0.8rem;" @onclick="AddConstraint">+ Constraint</button>
+    }
+}
+
+@code {
+    [Parameter] public required List<ConstraintEntry> Constraints { get; set; }
+    [Parameter] public required List<TagSetEntry> AllTagSets { get; set; }
+    [Parameter] public bool ShowAddButton { get; set; } = true;
+    [Parameter] public string? OwnerTagSetId { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private static string FormatConstraintRef(string? tagSetId, int lacv) => $"{tagSetId ?? "?"}|{lacv}";
+
+    private static (string? TagSetId, int Lacv) ParseConstraintRef(string? val)
+    {
+        if (string.IsNullOrEmpty(val)) return (null, 0);
+        var parts = val.Split('|');
+        if (parts.Length != 2) return (null, 0);
+        return (parts[0] == "?" ? null : parts[0], int.TryParse(parts[1], out var v) ? v : 0);
+    }
+
+    private void OnSourceChanged(int index, string? val)
+    {
+        var (tagSetId, lacv) = ParseConstraintRef(val);
+        UpdateConstraint(index, c => c with { SourceTagSetId = tagSetId, SourceTagLacv = lacv });
+    }
+
+    private void OnTargetChanged(int index, string? val)
+    {
+        var (tagSetId, lacv) = ParseConstraintRef(val);
+        UpdateConstraint(index, c => c with { TargetTagSetId = tagSetId, TargetTagLacv = lacv });
+    }
+
+    private void UpdateConstraint(int index, Func<ConstraintEntry, ConstraintEntry> transform)
+    {
+        Constraints[index] = transform(Constraints[index]);
+        OnChanged.InvokeAsync();
+    }
+
+    private void RemoveConstraint(int index)
+    {
+        Constraints.RemoveAt(index);
+        OnChanged.InvokeAsync();
+    }
+
+    private void AddConstraint()
+    {
+        Constraints.Add(new ConstraintEntry { SourceTagSetId = OwnerTagSetId, TargetTagSetId = OwnerTagSetId });
+        OnChanged.InvokeAsync();
+    }
+}

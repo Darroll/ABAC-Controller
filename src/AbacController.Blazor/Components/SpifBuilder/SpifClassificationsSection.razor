@@ -1,0 +1,150 @@
+@*
+    Component: SpifClassificationsSection
+    Purpose: Classifications section container. Displays classification levels as
+             expandable cards with banner previews and delegates detail editing to
+             SpifClassificationDetail. Supports add/remove operations.
+    Dependencies: SpifFormState (cascading parameter), SpifClassificationDetail,
+                  ClassificationEntry, EventCallback.
+*@
+@using AbacController.Blazor.Components.SpifBuilder
+
+<div class="spif-section @(_isActive ? "active" : "")"
+     data-form-section="classifications"
+     @onclick="@(() => OnSectionActivated.InvokeAsync("classifications"))"
+     @onfocusin="@(() => OnSectionActivated.InvokeAsync("classifications"))">
+    <div class="spif-section-label">Security Classification(s)</div>
+    <p class="text-muted small mb-2">
+        Each classification level is a separate entry with its own identity, marking data, and appearance.
+        Hierarchy order is determined by position.
+    </p>
+
+    @for (var i = 0; i < State.Classifications.Count; i++)
+    {
+        var idx = i;
+        var cls = State.Classifications[idx];
+        var fg = cls.ForegroundColor ?? "#000000";
+        var bg = cls.BackgroundColor ?? "#e0e0e0";
+        var displayText = cls.PhraseText ?? cls.Name;
+        var isExpanded = _expandedIndices.Contains(idx);
+
+        <div class="spif-cls-card @(isExpanded ? "expanded" : "")" data-spif-field="classification-@idx">
+            @* ── Card Header: banner preview + controls ── *@
+            <div class="spif-cls-card-header" @onclick="() => ToggleExpand(idx)" @onclick:stopPropagation="true">
+                <div class="d-flex align-items-center gap-2 flex-grow-1">
+                    <span class="spif-cls-chevron oi @(isExpanded ? "oi-chevron-bottom" : "oi-chevron-right")"></span>
+                    <span class="spif-cls-hierarchy">@(idx + 1)</span>
+                    <span class="badge spif-cls-banner"
+                          style="color:@fg; background-color:@bg;">
+                        @(string.IsNullOrWhiteSpace(displayText) ? "(unnamed)" : displayText)
+                    </span>
+                    @if (!string.IsNullOrWhiteSpace(cls.PortionAbbreviation) && cls.PortionAbbreviation != displayText)
+                    {
+                        <span class="text-muted small">(@cls.PortionAbbreviation)</span>
+                    }
+                    @if (cls.LacvValue > 0)
+                    {
+                        <span class="text-muted small ms-auto me-2">LACV @cls.LacvValue</span>
+                    }
+                </div>
+                <button class="btn btn-sm btn-outline-danger py-0 px-1 spif-cls-delete"
+                        @onclick="() => RemoveClassification(idx)"
+                        @onclick:stopPropagation="true"
+                        disabled="@(State.Classifications.Count <= 1)"
+                        title="Remove classification">
+                    <span class="oi oi-trash" style="font-size:0.65rem;"></span>
+                </button>
+            </div>
+
+            @* ── Expanded Card Body ── *@
+            @if (isExpanded)
+            {
+                <div class="spif-cls-card-body">
+                    <SpifClassificationDetail
+                        Index="idx"
+                        Classification="cls"
+                        OnClassificationChanged="OnClassificationUpdated" />
+                </div>
+            }
+        </div>
+    }
+
+    <button class="btn btn-sm btn-outline-primary mt-2" @onclick="AddClassification"
+            @onclick:stopPropagation="true">
+        <span class="oi oi-plus me-1" style="font-size:0.65rem;"></span> Add Classification
+    </button>
+</div>
+
+<style>
+    .spif-cls-card {
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        margin-bottom: 0.5rem;
+        overflow: hidden;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .spif-cls-card:hover { border-color: #adb5bd; }
+
+    .spif-cls-card.expanded {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 1px rgba(13, 110, 253, 0.15);
+    }
+
+    .spif-cls-card-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        cursor: pointer;
+        user-select: none;
+        background: #fafafa;
+    }
+
+    .spif-cls-card-header:hover { background: #f0f4ff; }
+    .spif-cls-card.expanded .spif-cls-card-header { background: #e8f0fe; }
+
+    .spif-cls-chevron { font-size: 0.7rem; color: #6c757d; flex-shrink: 0; }
+    .spif-cls-hierarchy { font-size: 0.72rem; color: #6c757d; font-weight: 600; min-width: 1rem; }
+    .spif-cls-banner { font-size: 0.8rem !important; padding: 0.25em 0.5em !important; }
+    .spif-cls-delete { line-height: 1; flex-shrink: 0; }
+    .spif-cls-card-body { padding: 0.5rem; border-top: 1px solid #dee2e6; background: #fff; }
+</style>
+
+@code {
+    [CascadingParameter] public required SpifFormState State { get; set; }
+    [Parameter] public EventCallback<string> OnSectionActivated { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public string? ActiveSection { get; set; }
+
+    private bool _isActive => ActiveSection == "classifications";
+    private readonly HashSet<int> _expandedIndices = [];
+
+    private void ToggleExpand(int idx)
+    {
+        if (!_expandedIndices.Remove(idx))
+            _expandedIndices.Add(idx);
+    }
+
+    private void AddClassification()
+    {
+        var nextLacv = State.Classifications.Count > 0 ? State.Classifications.Max(c => c.LacvValue) + 1 : 0;
+        State.Classifications.Add(new ClassificationEntry($"Level {State.Classifications.Count + 1}", nextLacv));
+        _expandedIndices.Add(State.Classifications.Count - 1);
+        OnChanged.InvokeAsync();
+    }
+
+    private void RemoveClassification(int idx)
+    {
+        if (State.Classifications.Count <= 1) return;
+        State.Classifications.RemoveAt(idx);
+        _expandedIndices.Remove(idx);
+        OnChanged.InvokeAsync();
+    }
+
+    private void OnClassificationUpdated((int Index, ClassificationEntry Updated) args)
+    {
+        if (args.Index < State.Classifications.Count)
+            State.Classifications[args.Index] = args.Updated;
+        OnChanged.InvokeAsync();
+    }
+}

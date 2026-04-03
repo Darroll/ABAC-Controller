@@ -1,0 +1,143 @@
+@*
+    Component: SpifClassificationDetail
+    Purpose: Classification level detail editor. Provides identity fields (name, LACV),
+             marking data (phrase, abbreviation, code), and visual appearance settings
+             (foreground/background color) with a live badge preview.
+    Dependencies: ClassificationEntry, EventCallback.
+*@
+@using AbacController.Blazor.Components.SpifBuilder
+
+<div class="spif-cls-detail-panel">
+    @* ── Identity ── *@
+    <div class="spif-detail-group mb-3">
+        <div class="spif-detail-group-label">Identity</div>
+        <div class="row g-2">
+            <div class="col-md-6">
+                <label class="form-label small mb-0">Name <span class="text-danger">*</span></label>
+                <input type="text" class="form-control form-control-sm" value="@Classification.Name"
+                       @onchange="@(e => Update(c => c with { Name = e.Value?.ToString() ?? "" }))" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small mb-0">LACV</label>
+                <input type="number" class="form-control form-control-sm" value="@Classification.LacvValue"
+                       @onchange="@(e => Update(c => c with { LacvValue = int.TryParse(e.Value?.ToString(), out var v) ? v : 0 }))" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small mb-0">Hierarchy</label>
+                <input type="text" class="form-control form-control-sm" value="@(Index + 1)" disabled />
+            </div>
+        </div>
+    </div>
+
+    @* ── Marking Data ── *@
+    <div class="spif-detail-group mb-3">
+        <div class="spif-detail-group-label">Marking Data</div>
+        <div class="row g-2 mb-2">
+            <div class="col-md-6">
+                <label class="form-label small mb-0">Phrase Text</label>
+                <input type="text" class="form-control form-control-sm" value="@Classification.PhraseText"
+                       placeholder="@Classification.Name"
+                       @onchange="@(e => Update(c => c with { PhraseText = e.Value?.ToString() }))" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small mb-0">Portion Abbrev</label>
+                <input type="text" class="form-control form-control-sm" value="@Classification.PortionAbbreviation"
+                       placeholder="@Classification.Name"
+                       @onchange="@(e => Update(c => c with { PortionAbbreviation = e.Value?.ToString() }))" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small mb-0">Marking Code</label>
+                <input type="text" class="form-control form-control-sm" value="@Classification.MarkingCode"
+                       placeholder="@Classification.Name"
+                       @onchange="@(e => Update(c => c with { MarkingCode = e.Value?.ToString() }))" />
+            </div>
+        </div>
+        <div class="row g-2">
+            <div class="col-md-3 d-flex align-items-end">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="pm-detail" checked="@Classification.IsPortionMarking"
+                           @onchange="@(e => Update(c => c with { IsPortionMarking = e.Value is true }))" />
+                    <label class="form-check-label small" for="pm-detail">Portion Marking</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Visual Appearance ── *@
+    <div class="spif-detail-group mb-3">
+        <div class="spif-detail-group-label">Appearance</div>
+        <div class="row g-2 mb-2">
+            <div class="col-md-6">
+                <label class="form-label small mb-0">Foreground Color</label>
+                <div class="d-flex gap-2 align-items-center">
+                    <input type="color" class="form-control form-control-color" style="width:48px;height:36px;padding:2px;"
+                           value="@(Classification.ForegroundColor ?? "#000000")"
+                           @onchange="@(e => Update(c => c with { ForegroundColor = e.Value?.ToString() }))" />
+                    <input type="text" class="form-control form-control-sm" style="width:100px;"
+                           value="@Classification.ForegroundColor" placeholder="#000000"
+                           @onchange="@(e => Update(c => c with { ForegroundColor = e.Value?.ToString() }))" />
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small mb-0">Background Color</label>
+                <div class="d-flex gap-2 align-items-center">
+                    <input type="color" class="form-control form-control-color" style="width:48px;height:36px;padding:2px;"
+                           value="@(Classification.BackgroundColor ?? "#ffffff")"
+                           @onchange="@(e => Update(c => c with { BackgroundColor = e.Value?.ToString() }))" />
+                    <input type="text" class="form-control form-control-sm" style="width:100px;"
+                           value="@Classification.BackgroundColor" placeholder="#ffffff"
+                           @onchange="@(e => Update(c => c with { BackgroundColor = e.Value?.ToString() }))" />
+                </div>
+            </div>
+        </div>
+
+        @* Live badge preview *@
+        <div class="mt-2">
+            <label class="form-label small text-muted mb-1">Preview</label>
+            <div>
+                @{
+                    var fg = Classification.ForegroundColor ?? "#000000";
+                    var bg = Classification.BackgroundColor ?? "#e0e0e0";
+                    var text = Classification.PhraseText ?? Classification.Name;
+                }
+                <span class="badge" style="color:@fg; background-color:@bg; font-size:1rem; padding:0.4em 0.8em; font-weight:600;">
+                    @(string.IsNullOrWhiteSpace(text) ? "(empty)" : text)
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .spif-cls-detail-panel {
+        padding: 0.5rem;
+    }
+
+    .spif-detail-group {
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        padding: 0.6rem 0.75rem;
+        background: #fff;
+    }
+
+    .spif-detail-group-label {
+        font-weight: 600;
+        font-size: 0.78rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 0.4rem;
+    }
+</style>
+
+@code {
+    [Parameter] public required int Index { get; set; }
+    [Parameter] public required ClassificationEntry Classification { get; set; }
+    [Parameter] public EventCallback<(int Index, ClassificationEntry Updated)> OnClassificationChanged { get; set; }
+
+    private async Task Update(Func<ClassificationEntry, ClassificationEntry> transform)
+    {
+        var updated = transform(Classification);
+        await OnClassificationChanged.InvokeAsync((Index, updated));
+    }
+}

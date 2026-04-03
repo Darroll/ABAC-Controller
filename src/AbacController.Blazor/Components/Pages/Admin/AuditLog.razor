@@ -1,0 +1,267 @@
+@*
+    Component: AuditLog
+    Purpose: Audit log viewer with event type filtering, date range selection,
+             pagination, and expandable event details.
+    Route: /audit
+    Dependencies: HttpClient.
+*@
+@page "/audit"
+@inject HttpClient Http
+
+<h2>Audit Log</h2>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label small">Event Type</label>
+                <select class="form-select form-select-sm" @bind="_filterEventType">
+                    <option value="">All Events</option>
+                    <option value="evaluation">Evaluation</option>
+                    <option value="policy_change">Policy Change</option>
+                    <option value="spif_import">SPIF Import</option>
+                    <option value="pip_config">PIP Config</option>
+                    <option value="system">System</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">From Date</label>
+                <input type="date" class="form-control form-control-sm" @bind="_filterFrom" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">To Date</label>
+                <input type="date" class="form-control form-control-sm" @bind="_filterTo" />
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button class="btn btn-primary btn-sm me-2" @onclick="ApplyFilters">
+                    <span class="oi oi-magnifying-glass"></span> Search
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="ClearFilters">Clear</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_events is null)
+{
+    <p><em>Loading audit events...</em></p>
+}
+else
+{
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Event Type</th>
+                <th>Subject</th>
+                <th>Resource</th>
+                <th>Decision</th>
+                <th>Eval (ms)</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (_events.Count == 0)
+            {
+                <tr><td colspan="7" class="text-center text-muted py-3"><em>No audit events found.</em></td></tr>
+            }
+            @foreach (var evt in _events)
+            {
+                <tr>
+                    <td style="white-space:nowrap; font-size:0.82rem;">@evt.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                    <td><span class="badge @GetEventBadgeClass(evt.EventType)" style="font-size:0.75rem;">@evt.EventType</span></td>
+                    <td>
+                        @if (!string.IsNullOrWhiteSpace(evt.SubjectId))
+                        {
+                            <small>@evt.SubjectId</small>
+                        }
+                    </td>
+                    <td>
+                        @if (!string.IsNullOrWhiteSpace(evt.ResourceId))
+                        {
+                            <small>@evt.ResourceId</small>
+                        }
+                    </td>
+                    <td>
+                        @if (!string.IsNullOrWhiteSpace(evt.Decision))
+                        {
+                            var decisionClass = evt.Decision?.ToUpperInvariant() switch
+                            {
+                                "PERMIT" => "bg-success",
+                                "DENY" => "bg-danger",
+                                "INDETERMINATE" => "bg-warning text-dark",
+                                _ => "bg-secondary"
+                            };
+                            <span class="badge @decisionClass" style="font-size:0.75rem;">@evt.Decision</span>
+                        }
+                    </td>
+                    <td>
+                        @if (evt.EvaluationTimeMs.HasValue)
+                        {
+                            <small>@evt.EvaluationTimeMs.Value.ToString("F1")</small>
+                        }
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-secondary py-0" @onclick="() => ToggleDetail(evt.Id)">
+                            @(_expandedId == evt.Id ? "Hide" : "Show")
+                        </button>
+                    </td>
+                </tr>
+                @if (_expandedId == evt.Id)
+                {
+                    <tr>
+                        <td colspan="7">
+                            <div class="audit-detail p-2 bg-light">
+                                <div class="row g-2" style="font-size:0.82rem;">
+                                    @if (!string.IsNullOrWhiteSpace(evt.RequestId))
+                                    {
+                                        <div class="col-md-4"><strong>Request ID:</strong> <code>@evt.RequestId</code></div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(evt.DecisionId))
+                                    {
+                                        <div class="col-md-4"><strong>Decision ID:</strong> <code>@evt.DecisionId</code></div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(evt.ActionName))
+                                    {
+                                        <div class="col-md-4"><strong>Action:</strong> @evt.ActionName</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(evt.SubjectType))
+                                    {
+                                        <div class="col-md-4"><strong>Subject Type:</strong> @evt.SubjectType</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(evt.ResourceType))
+                                    {
+                                        <div class="col-md-4"><strong>Resource Type:</strong> @evt.ResourceType</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(evt.PepId))
+                                    {
+                                        <div class="col-md-4"><strong>PEP ID:</strong> @evt.PepId</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(evt.AppliedPolicies))
+                                    {
+                                        <div class="col-12"><strong>Applied Policies:</strong> <code>@evt.AppliedPolicies</code></div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(evt.ActorIdentity))
+                                    {
+                                        <div class="col-md-6"><strong>Actor:</strong> @evt.ActorIdentity</div>
+                                    }
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+
+    <div class="d-flex align-items-center gap-3 mt-3">
+        <button class="btn btn-sm btn-outline-secondary" disabled="@(_currentPage <= 1)" @onclick="PreviousPage">← Previous</button>
+        <span class="text-muted small">Page @_currentPage of @_totalPages (@_totalCount events)</span>
+        <button class="btn btn-sm btn-outline-secondary" disabled="@(_currentPage >= _totalPages)" @onclick="NextPage">Next →</button>
+    </div>
+}
+
+<style>
+    .admin-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+
+    .admin-table thead th {
+        text-align: left;
+        padding: 0.6rem 0.75rem;
+        background: #f5f6fa;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 600;
+        color: #495057;
+        font-size: 0.82rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .admin-table tbody td {
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid #f0f0f0;
+        vertical-align: middle;
+    }
+
+    .admin-table tbody tr:hover { background: #f8f9ff; }
+
+    .audit-detail {
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+    }
+</style>
+
+@code {
+    private List<AuditEventRow>? _events;
+    private string _filterEventType = "";
+    private DateTime? _filterFrom;
+    private DateTime? _filterTo;
+    private int _currentPage = 1;
+    private int _totalCount;
+    private int _totalPages = 1;
+    private const int PageSize = 25;
+    private Guid? _expandedId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEventsAsync();
+    }
+
+    private async Task LoadEventsAsync()
+    {
+        try
+        {
+            var query = $"api/v1/system/audit?page={_currentPage}&pageSize={PageSize}";
+            if (!string.IsNullOrWhiteSpace(_filterEventType))
+                query += $"&eventType={Uri.EscapeDataString(_filterEventType)}";
+            if (_filterFrom.HasValue)
+                query += $"&from={_filterFrom.Value:yyyy-MM-dd}";
+            if (_filterTo.HasValue)
+                query += $"&to={_filterTo.Value:yyyy-MM-dd}";
+
+            var result = await Http.GetFromJsonAsync<AuditResult>(query);
+            if (result is not null)
+            {
+                _events = result.Events;
+                _totalCount = result.TotalCount;
+                _totalPages = Math.Max(1, (int)Math.Ceiling((double)result.TotalCount / PageSize));
+            }
+            else
+            {
+                _events = [];
+            }
+        }
+        catch
+        {
+            // Graceful fallback — audit endpoint may not be wired yet
+            _events = [];
+        }
+    }
+
+    private async Task ApplyFilters() { _currentPage = 1; await LoadEventsAsync(); }
+    private void ClearFilters() { _filterEventType = ""; _filterFrom = null; _filterTo = null; }
+    private async Task PreviousPage() { if (_currentPage > 1) { _currentPage--; await LoadEventsAsync(); } }
+    private async Task NextPage() { if (_currentPage < _totalPages) { _currentPage++; await LoadEventsAsync(); } }
+    private void ToggleDetail(Guid id) { _expandedId = _expandedId == id ? null : id; }
+
+    private static string GetEventBadgeClass(string eventType) => eventType switch
+    {
+        "evaluation" => "bg-primary",
+        "policy_change" or "spif_import" => "bg-success",
+        "pip_config" => "bg-info text-dark",
+        "system" => "bg-secondary",
+        _ => "bg-light text-dark border"
+    };
+
+    private sealed record AuditEventRow(
+        Guid Id, DateTimeOffset Timestamp, string EventType,
+        string? RequestId, string? DecisionId, string? SubjectType, string? SubjectId,
+        string? ActionName, string? ResourceType, string? ResourceId,
+        string? Decision, string? AppliedPolicies, double? EvaluationTimeMs,
+        string? PepId, string? ActorIdentity);
+
+    private sealed record AuditResult(List<AuditEventRow> Events, int TotalCount, int Page, int PageSize);
+}

@@ -1,0 +1,28 @@
+@*
+    Component: SpifBannerPreview
+    Purpose: Banner marking preview. Renders colored badge previews for each
+             classification level defined in the SPIF builder form.
+    Dependencies: ClassificationEntry.
+*@
+@using AbacController.Blazor.Components.SpifBuilder
+
+@if (Classifications.Any(c => !string.IsNullOrWhiteSpace(c.Name)))
+{
+    <div class="mt-2">
+        <label class="form-label small text-muted mb-1">Banner Preview</label>
+        <div class="d-flex gap-2 flex-wrap">
+            @foreach (var c in Classifications.Where(x => !string.IsNullOrWhiteSpace(x.Name)))
+            {
+                var fg = c.ForegroundColor ?? "#000000";
+                var bg = c.BackgroundColor ?? "#e0e0e0";
+                <span class="badge" style="color:@fg; background-color:@bg; font-size:0.8rem; padding:0.3em 0.6em; font-weight:600;">
+                    @(c.PhraseText ?? c.Name)
+                </span>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public required List<ClassificationEntry> Classifications { get; set; }
+}

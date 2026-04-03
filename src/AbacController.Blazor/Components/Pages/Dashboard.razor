@@ -1,40 +1,217 @@
 @page "/"
+@inject HttpClient Http
 
-<h1>Dashboard</h1>
+<h2>ABAC Controller — Dashboard</h2>
+<p class="text-muted" style="margin-top:-0.5rem; margin-bottom:1.5rem; font-size:0.95rem;">
+    Overview of the Policy Administration Point.
+</p>
 
-<div class="row" style="display: flex; gap: 1rem; margin-bottom: 2rem;">
-    <div class="card" style="flex: 1; padding: 1rem; border: 1px solid #dee2e6; border-radius: 8px;">
-        <h3>📜 SPIFs Loaded</h3>
-        <p style="font-size: 2rem; font-weight: bold;">@SpifCount</p>
+<div class="dashboard-metrics mb-4">
+    <div class="metric-card">
+        <h4>SPIFs Loaded</h4>
+        <p class="metric-value">@_spifCount</p>
     </div>
-    <div class="card" style="flex: 1; padding: 1rem; border: 1px solid #dee2e6; border-radius: 8px;">
-        <h3>📝 Active Policies</h3>
-        <p style="font-size: 2rem; font-weight: bold;">@PolicyCount</p>
+    <div class="metric-card">
+        <h4>Active SPIFs</h4>
+        <p class="metric-value">@_activeSpifCount</p>
     </div>
-    <div class="card" style="flex: 1; padding: 1rem; border: 1px solid #dee2e6; border-radius: 8px;">
-        <h3>🔌 PIP Sources</h3>
-        <p style="font-size: 2rem; font-weight: bold;">@PipSourceCount</p>
+    <div class="metric-card">
+        <h4>Policy Sets</h4>
+        <p class="metric-value">@_policySetCount</p>
+    </div>
+    <div class="metric-card">
+        <h4>PIP Sources</h4>
+        <p class="metric-value">@_pipSourceCount</p>
+    </div>
+    <div class="metric-card">
+        <h4>Enforcement Points</h4>
+        <p class="metric-value">@_pepCount</p>
     </div>
 </div>
 
-<h2>System Status</h2>
-<table style="width: 100%; border-collapse: collapse;">
-    <tr>
-        <td style="padding: 0.5rem; border-bottom: 1px solid #dee2e6;"><strong>Version</strong></td>
-        <td style="padding: 0.5rem; border-bottom: 1px solid #dee2e6;">1.0.0-dev</td>
-    </tr>
-    <tr>
-        <td style="padding: 0.5rem; border-bottom: 1px solid #dee2e6;"><strong>Database</strong></td>
-        <td style="padding: 0.5rem; border-bottom: 1px solid #dee2e6;">SQLite (WAL mode)</td>
-    </tr>
-    <tr>
-        <td style="padding: 0.5rem; border-bottom: 1px solid #dee2e6;"><strong>Label Codecs</strong></td>
-        <td style="padding: 0.5rem; border-bottom: 1px solid #dee2e6;">STANAG 4774 XML</td>
-    </tr>
-</table>
+@if (_statusReady.HasValue)
+{
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <strong>System Status</strong>
+            @if (_statusReady.Value)
+            {
+                <span class="badge bg-success">Ready</span>
+            }
+            else
+            {
+                <span class="badge bg-warning text-dark">Starting Up</span>
+            }
+        </div>
+        <div class="card-body">
+            <table class="info-table">
+                <tr>
+                    <td><strong>Runtime</strong></td>
+                    <td>@_runtime</td>
+                </tr>
+                @if (_registeredCodecs is { Count: > 0 })
+                {
+                    <tr>
+                        <td><strong>Label Codecs</strong></td>
+                        <td>
+                            @foreach (var codec in _registeredCodecs)
+                            {
+                                <span class="badge bg-secondary me-1">@codec</span>
+                            }
+                        </td>
+                    </tr>
+                }
+                @if (_registeredOids is { Count: > 0 })
+                {
+                    <tr>
+                        <td><strong>Registered SPIFs</strong></td>
+                        <td>
+                            @foreach (var oid in _registeredOids)
+                            {
+                                <code class="me-2" style="font-size:0.8rem;">@oid</code>
+                            }
+                        </td>
+                    </tr>
+                }
+            </table>
+        </div>
+    </div>
+}
+
+<div class="quick-links">
+    <h5>Quick Actions</h5>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="/spif/create" class="btn btn-outline-primary">
+            <span class="oi oi-plus me-1"></span> Create SPIF
+        </a>
+        <a href="/spif" class="btn btn-outline-secondary">
+            <span class="oi oi-document me-1"></span> Manage SPIFs
+        </a>
+        <a href="/pip" class="btn btn-outline-secondary">
+            <span class="oi oi-pulse me-1"></span> PIP Sources
+        </a>
+        <a href="/audit" class="btn btn-outline-secondary">
+            <span class="oi oi-list me-1"></span> Audit Log
+        </a>
+        <a href="/system" class="btn btn-outline-secondary">
+            <span class="oi oi-cog me-1"></span> System
+        </a>
+    </div>
+</div>
+
+<style>
+    .dashboard-metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 1rem;
+    }
+
+    .metric-card {
+        background: #f5f6fa;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        text-align: center;
+    }
+
+    .metric-card h4 {
+        margin: 0 0 0.5rem;
+        font-size: 0.78rem;
+        color: #6c757d;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .metric-card .metric-value {
+        margin: 0;
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1a1a2e;
+    }
+
+    .info-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+
+    .info-table td {
+        padding: 0.4rem 0.5rem;
+        border-bottom: 1px solid #f0f0f0;
+        vertical-align: top;
+    }
+
+    .info-table td:first-child {
+        width: 160px;
+        color: #6c757d;
+    }
+
+    .quick-links h5 {
+        margin-bottom: 0.75rem;
+        font-size: 0.95rem;
+        color: #495057;
+    }
+</style>
 
 @code {
-    private int SpifCount = 0;
-    private int PolicyCount = 0;
-    private int PipSourceCount = 0;
+    private int _spifCount;
+    private int _activeSpifCount;
+    private int _policySetCount;
+    private int _pipSourceCount;
+    private int _pepCount;
+    private bool? _statusReady;
+    private string? _runtime;
+    private List<string>? _registeredCodecs;
+    private List<string>? _registeredOids;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var spifsTask = Http.GetFromJsonAsync<List<SpifRow>>("api/v1/pap/spifs");
+            var policySetsTask = Http.GetFromJsonAsync<List<object>>("api/v1/pap/policy-sets");
+            var pipSourcesTask = Http.GetFromJsonAsync<List<object>>("api/v1/pip/sources");
+            var statusTask = Http.GetFromJsonAsync<StatusRow>("api/v1/system/status");
+            var pepTask = Http.GetFromJsonAsync<List<object>>("api/v1/system/enforcement-points");
+
+            await Task.WhenAll(
+                spifsTask.ContinueWith(_ => { }),
+                policySetsTask.ContinueWith(_ => { }),
+                pipSourcesTask.ContinueWith(_ => { }),
+                statusTask.ContinueWith(_ => { }),
+                pepTask.ContinueWith(_ => { }));
+
+            if (spifsTask.IsCompletedSuccessfully && spifsTask.Result is not null)
+            {
+                _spifCount = spifsTask.Result.Count;
+                _activeSpifCount = spifsTask.Result.Count(s => s.IsActive);
+            }
+
+            if (policySetsTask.IsCompletedSuccessfully && policySetsTask.Result is not null)
+                _policySetCount = policySetsTask.Result.Count;
+
+            if (pipSourcesTask.IsCompletedSuccessfully && pipSourcesTask.Result is not null)
+                _pipSourceCount = pipSourcesTask.Result.Count;
+
+            if (pepTask.IsCompletedSuccessfully && pepTask.Result is not null)
+                _pepCount = pepTask.Result.Count;
+
+            if (statusTask.IsCompletedSuccessfully && statusTask.Result is not null)
+            {
+                var status = statusTask.Result;
+                _statusReady = status.Ready;
+                _runtime = status.Runtime;
+                _registeredCodecs = status.RegisteredLabelCodecs;
+                _registeredOids = status.RegisteredPolicyOids;
+            }
+        }
+        catch
+        {
+            // Dashboard loads gracefully even if some endpoints are unavailable
+        }
+    }
+
+    private sealed record SpifRow(Guid Id, string PolicyOid, string Name, bool IsActive);
+    private sealed record StatusRow(bool Ready, string Runtime, List<string>? RegisteredLabelCodecs, List<string>? RegisteredPolicyOids);
 }

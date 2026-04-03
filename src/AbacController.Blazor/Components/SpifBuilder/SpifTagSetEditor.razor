@@ -1,0 +1,168 @@
+@*
+    Component: SpifTagSetEditor
+    Purpose: Tag set editing component. Manages tag set properties (name, OID, order),
+             individual tag entries (name, LACV, type, phrase, abbreviation, code),
+             and delegates to SpifConstraintsPanel for inter-tag constraints.
+    Dependencies: TagSetEntry, TagEntry, ClassificationEntry, SpifConstraintsPanel,
+                  EventCallback.
+*@
+@using AbacController.Blazor.Components.SpifBuilder
+
+<div class="card mb-2 border-start border-2" style="border-left-color: @BorderColor !important;" data-spif-field="tagset-@TagSetIndex">
+    <div class="card-header d-flex justify-content-between align-items-center py-1 px-2">
+        <div class="d-flex align-items-center gap-1">
+            <button class="btn btn-sm btn-link p-0" @onclick="ToggleExpand" @onclick:stopPropagation="true">
+                <span class="oi @(TagSet.Expanded ? "oi-chevron-bottom" : "oi-chevron-right")" style="font-size:0.7rem;"></span>
+            </button>
+            <strong class="small">@(string.IsNullOrWhiteSpace(TagSet.Name) ? $"Tag Set {TagSetIndex + 1}" : TagSet.Name)</strong>
+            <span class="badge bg-secondary" style="font-size:0.65rem;">@(TagSet.Tags.Count) tags</span>
+            @if (TagSet.MinLacv.HasValue)
+            {
+                var minName = Classifications.FirstOrDefault(c => c.LacvValue == TagSet.MinLacv.Value)?.Name ?? $"LACV {TagSet.MinLacv}";
+                <span class="badge bg-light text-dark border" style="font-size:0.6rem;">Min: @minName</span>
+            }
+        </div>
+        <button class="btn btn-sm btn-outline-danger py-0 px-1" @onclick="OnRemove" @onclick:stopPropagation="true">
+            <span class="oi oi-x" style="font-size:0.6rem;"></span>
+        </button>
+    </div>
+
+    @if (TagSet.Expanded)
+    {
+        <div class="card-body py-2 px-3">
+            @* ── Tag Set Properties ── *@
+            <div class="row mb-2 g-2">
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">Name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control form-control-sm" value="@TagSet.Name"
+                           @onchange="@(e => { TagSet.Name = e.Value?.ToString() ?? ""; NotifyChanged(); })" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">Display Name</label>
+                    <input type="text" class="form-control form-control-sm" value="@TagSet.DisplayName"
+                           @onchange="@(e => { TagSet.DisplayName = e.Value?.ToString(); NotifyChanged(); })" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-0">OID</label>
+                    <input type="text" class="form-control form-control-sm" value="@TagSet.TagSetId"
+                           placeholder="Auto" @onchange="@(e => { TagSet.TagSetId = e.Value?.ToString(); NotifyChanged(); })" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-0">Order</label>
+                    <input type="number" class="form-control form-control-sm" value="@TagSet.DisplayOrder"
+                           @onchange="@(e => { TagSet.DisplayOrder = int.TryParse(e.Value?.ToString(), out var v) ? v : 0; NotifyChanged(); })" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-0">Min LACV</label>
+                    <select class="form-select form-select-sm"
+                            value="@TagSet.MinLacv?.ToString()"
+                            @onchange="@(e => { TagSet.MinLacv = int.TryParse(e.Value?.ToString(), out var v) ? v : null; NotifyChanged(); })">
+                        <option value="">—</option>
+                        @foreach (var c in Classifications.Where(x => !string.IsNullOrWhiteSpace(x.Name)))
+                        {
+                            <option value="@c.LacvValue">@c.Name</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            @* ── Tags Table ── *@
+            <h6 class="small fw-bold mt-2 mb-1">Tags</h6>
+            <div class="table-responsive">
+                <table class="table table-sm table-borderless align-middle mb-1" style="font-size:0.82rem;">
+                    <thead>
+                        <tr class="text-muted">
+                            <th>Name</th>
+                            <th style="width:65px;">LACV</th>
+                            <th style="width:120px;">Type</th>
+                            <th>Phrase</th>
+                            <th style="width:90px;">Abbrev</th>
+                            <th style="width:90px;">Code</th>
+                            <th style="width:30px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (var j = 0; j < TagSet.Tags.Count; j++)
+                        {
+                            var tagIdx = j;
+                            <tr data-spif-field="tagset-@TagSetIndex-tag-@tagIdx">
+                                <td><input type="text" class="form-control form-control-sm" value="@TagSet.Tags[tagIdx].TagName"
+                                           @onchange="@(e => UpdateTag(tagIdx, t => t with { TagName = e.Value?.ToString() ?? "" }))" /></td>
+                                <td><input type="number" class="form-control form-control-sm" value="@TagSet.Tags[tagIdx].LacvValue"
+                                           @onchange="@(e => UpdateTag(tagIdx, t => t with { LacvValue = int.TryParse(e.Value?.ToString(), out var v) ? v : 0 }))" /></td>
+                                <td>
+                                    @{
+                                        var tagType = TagSet.Tags[tagIdx].TagType;
+                                        var typeColor = tagType switch { "restrictive" => "danger", "permissive" => "success", "informative" => "primary", _ => "secondary" };
+                                    }
+                                    <select class="form-select form-select-sm" value="@tagType"
+                                            @onchange="@(e => UpdateTag(tagIdx, t => t with { TagType = e.Value?.ToString() ?? "restrictive" }))">
+                                        <option value="restrictive">restrictive</option>
+                                        <option value="permissive">permissive</option>
+                                        <option value="informative">informative</option>
+                                    </select>
+                                </td>
+                                <td><input type="text" class="form-control form-control-sm" value="@TagSet.Tags[tagIdx].PhraseText"
+                                           @onchange="@(e => UpdateTag(tagIdx, t => t with { PhraseText = e.Value?.ToString() }))" /></td>
+                                <td><input type="text" class="form-control form-control-sm" value="@TagSet.Tags[tagIdx].PortionAbbreviation"
+                                           @onchange="@(e => UpdateTag(tagIdx, t => t with { PortionAbbreviation = e.Value?.ToString() }))" /></td>
+                                <td><input type="text" class="form-control form-control-sm" value="@TagSet.Tags[tagIdx].MarkingCode"
+                                           @onchange="@(e => UpdateTag(tagIdx, t => t with { MarkingCode = e.Value?.ToString() }))" /></td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-danger p-0" style="width:22px;height:22px;line-height:1;"
+                                            @onclick="() => RemoveTag(tagIdx)">
+                                        <span class="oi oi-x" style="font-size:0.6rem;"></span>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary py-0" style="font-size:0.8rem;" @onclick="AddTag">+ Add Tag</button>
+
+            <SpifConstraintsPanel
+                Constraints="TagSet.Constraints"
+                AllTagSets="AllTagSets"
+                OwnerTagSetId="@(TagSet.TagSetId ?? TagSet.Name)"
+                OnChanged="OnChanged" />
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public required int TagSetIndex { get; set; }
+    [Parameter] public required TagSetEntry TagSet { get; set; }
+    [Parameter] public required List<ClassificationEntry> Classifications { get; set; }
+    [Parameter] public required List<TagSetEntry> AllTagSets { get; set; }
+    [Parameter] public string BorderColor { get; set; } = "#6c757d";
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public EventCallback OnRemove { get; set; }
+
+    private void ToggleExpand()
+    {
+        TagSet.Expanded = !TagSet.Expanded;
+        NotifyChanged();
+    }
+
+    private void NotifyChanged() => OnChanged.InvokeAsync();
+
+    private void AddTag()
+    {
+        var nextLacv = TagSet.Tags.Count > 0 ? TagSet.Tags.Max(t => t.LacvValue) + 1 : 1;
+        TagSet.Tags.Add(new TagEntry { TagName = $"Tag{TagSet.Tags.Count + 1}", LacvValue = nextLacv });
+        NotifyChanged();
+    }
+
+    private void RemoveTag(int idx)
+    {
+        TagSet.Tags.RemoveAt(idx);
+        NotifyChanged();
+    }
+
+    private void UpdateTag(int idx, Func<TagEntry, TagEntry> transform)
+    {
+        TagSet.Tags[idx] = transform(TagSet.Tags[idx]);
+        NotifyChanged();
+    }
+}
