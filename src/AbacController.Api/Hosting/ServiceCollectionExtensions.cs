@@ -32,6 +32,7 @@ public static class ServiceCollectionExtensions
         AbacControllerOptions options)
     {
         services.AddMemoryCache();
+        services.AddSingleton(options);
         services.AddSingleton<AppRuntimeState>();
         services.AddSingleton<ApiMetrics>();
 
