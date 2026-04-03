@@ -119,10 +119,11 @@ public class AuthZenController : ControllerBase
         });
     }
 
-    [HttpGet("/access/v1/subjects")]
+    [HttpPost("/access/v1/subjects")]
     [Authorize(Policy = "Evaluate")]
-    public async Task<IActionResult> GetSubjects([FromQuery] string? q, CancellationToken ct)
+    public async Task<IActionResult> SearchSubjects([FromBody] AuthZenSearchRequest? request, CancellationToken ct)
     {
+        var q = request?.Query;
         var query = _dbContext.AuditEvents.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(q))
         {
@@ -140,10 +141,11 @@ public class AuthZenController : ControllerBase
         return Ok(new { subjects = items });
     }
 
-    [HttpGet("/access/v1/resources")]
+    [HttpPost("/access/v1/resources")]
     [Authorize(Policy = "Evaluate")]
-    public async Task<IActionResult> GetResources([FromQuery] string? q, CancellationToken ct)
+    public async Task<IActionResult> SearchResources([FromBody] AuthZenSearchRequest? request, CancellationToken ct)
     {
+        var q = request?.Query;
         var query = _dbContext.AuditEvents.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(q))
         {
@@ -161,10 +163,11 @@ public class AuthZenController : ControllerBase
         return Ok(new { resources = items });
     }
 
-    [HttpGet("/access/v1/actions")]
+    [HttpPost("/access/v1/actions")]
     [Authorize(Policy = "Evaluate")]
-    public async Task<IActionResult> GetActions([FromQuery] string? q, CancellationToken ct)
+    public async Task<IActionResult> SearchActions([FromBody] AuthZenSearchRequest? request, CancellationToken ct)
     {
+        var q = request?.Query;
         var query = _dbContext.AuditEvents.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(q))
         {
@@ -181,6 +184,8 @@ public class AuthZenController : ControllerBase
 
         return Ok(new { actions = items.Select(name => new { name }) });
     }
+
+    public sealed record AuthZenSearchRequest(string? Query = null, int? Limit = null);
 
     private static EvaluationRequest MapToInternal(AuthZenEvaluationRequest request) => new()
     {

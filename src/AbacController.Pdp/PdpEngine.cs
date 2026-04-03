@@ -213,14 +213,12 @@ public sealed class PdpEngine : IPdpEngine
             traceCollector?.AddStep(step.RuleId, step.Effect, step.Result, step.Reason);
         }
 
-        var finalDecision = policyOutcome.Decision switch
-        {
-            Decision.NotApplicable => Decision.Deny,
-            _ => policyOutcome.Decision
-        };
+        // Preserve full 4-valued semantics (Permit/Deny/NotApplicable/Indeterminate)
+        // per NIST 800-162 and XACML. Callers interpret NotApplicable as needed.
+        var finalDecision = policyOutcome.Decision;
 
         var message = policyOutcome.Decision == Decision.NotApplicable
-            ? "No applicable policy matched; default deny"
+            ? "No applicable policy matched"
             : policyOutcome.Message;
 
         var result = CreateResult(

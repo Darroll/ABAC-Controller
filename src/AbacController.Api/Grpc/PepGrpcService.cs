@@ -1,4 +1,5 @@
 using AbacController.Core.Interfaces;
+using AbacController.Core.Domain.Labels;
 using AbacController.Data;
 using Grpc.Core;
 using Microsoft.AspNetCore.Authorization;
@@ -14,19 +15,22 @@ public sealed class PepGrpcService : PepApi.PepApiBase
     private readonly ISpifRegistry _spifRegistry;
     private readonly AbacController.Pep.LabelValidator _labelValidator;
     private readonly IMarkingGenerator _markingGenerator;
+    private readonly IStanag4778MetadataBinder _metadataBinder;
 
     public PepGrpcService(
         AbacDbContext dbContext,
         ILabelCodecRegistry labelCodecRegistry,
         ISpifRegistry spifRegistry,
         AbacController.Pep.LabelValidator labelValidator,
-        IMarkingGenerator markingGenerator)
+        IMarkingGenerator markingGenerator,
+        IStanag4778MetadataBinder metadataBinder)
     {
         _dbContext = dbContext;
         _labelCodecRegistry = labelCodecRegistry;
         _spifRegistry = spifRegistry;
         _labelValidator = labelValidator;
         _markingGenerator = markingGenerator;
+        _metadataBinder = metadataBinder;
     }
 
     public override async Task<ListEnforcementPointsResponseMessage> ListEnforcementPoints(ListEnforcementPointsRequestMessage request, ServerCallContext context)
@@ -190,5 +194,56 @@ public sealed class PepGrpcService : PepApi.PepApiBase
 
         return _spifRegistry.GetDefault()
             ?? throw new RpcException(new Status(StatusCode.FailedPrecondition, "No SPIF is currently registered."));
+    }
+
+    [Authorize(Policy = "PepLabel")]
+    public override Task<BindMetadataResponseMessage> BindMetadata(BindMetadataRequestMessage request, ServerCallContext context)
+    {
+        try
+        {
+            var envelope = new MetadataBindingEnvelope
+            {
+                LabelXml = request.LabelXml,
+                Payload = Convert.FromBase64String(request.PayloadBase64),
+                MediaType = string.IsNullOrWhiteSpace(request.ContentType) ? null : request.ContentType
+            };
+            var boundXml = _metadataBinder.Bind(envelope);
+            return Task.FromResult(new BindMetadataResponseMessage
+            {
+                Success = true,
+                BoundDocument = boundXml
+            });
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult(new BindMetadataResponseMessage { Success = false, Error = ex.Message });
+        }
+    }
+
+    [Authorize(Policy = "PepLabel")]
+    public override Task<UnbindMetadataResponseMessage> UnbindMetadata(UnbindMetadataRequestMessage request, ServerCallContext context)
+    {
+        try
+        {
+            var result = _metadataBinder.Unbind(request.BoundDocument);
+            return Task.FromResult(new UnbindMetadataResponseMessage
+            {
+                Success = true,
+                LabelXml = result.Envelope.LabelXml,
+                PayloadBase64 = Convert.ToBase64String(result.Envelope.Payload),
+                ContentType = result.Envelope.MediaType ?? string.Empty
+            });
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult(new UnbindMetadataResponseMessage { Success = false, Error = ex.Message });
+        }
+    }
+
+    public override Task<ListCodecsResponseMessage> ListCodecs(ListCodecsRequestMessage request, ServerCallContext context)
+    {
+        var response = new ListCodecsResponseMessage();
+        response.CodecIds.AddRange(_labelCodecRegistry.GetRegisteredCodecIds());
+        return Task.FromResult(response);
     }
 }

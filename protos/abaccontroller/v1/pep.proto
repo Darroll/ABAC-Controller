@@ -42,6 +42,24 @@ service PepApi {
       body: "*"
     };
   }
+
+  rpc BindMetadata(BindMetadataRequestMessage) returns (BindMetadataResponseMessage) {
+    option (google.api.http) = {
+      post: "/api/v1/pep/metadata/bind"
+      body: "*"
+    };
+  }
+
+  rpc UnbindMetadata(UnbindMetadataRequestMessage) returns (UnbindMetadataResponseMessage) {
+    option (google.api.http) = {
+      post: "/api/v1/pep/metadata/unbind"
+      body: "*"
+    };
+  }
+
+  rpc ListCodecs(ListCodecsRequestMessage) returns (ListCodecsResponseMessage) {
+    option (google.api.http) = { get: "/api/v1/pep/metadata/codecs" };
+  }
 }
 
 message ListEnforcementPointsRequestMessage {}
@@ -92,4 +110,35 @@ message ValidateLabelResponseMessage {
   bool is_valid = 1;
   repeated string errors = 2;
   string marking = 3;
+}
+
+message BindMetadataRequestMessage {
+  string codec_id = 1;
+  string label_xml = 2;
+  string payload_base64 = 3;
+  string content_type = 4;
+}
+
+message BindMetadataResponseMessage {
+  bool success = 1;
+  string error = 2;
+  string bound_document = 3;
+}
+
+message UnbindMetadataRequestMessage {
+  string bound_document = 1;
+}
+
+message UnbindMetadataResponseMessage {
+  bool success = 1;
+  string error = 2;
+  string label_xml = 3;
+  string payload_base64 = 4;
+  string content_type = 5;
+}
+
+message ListCodecsRequestMessage {}
+
+message ListCodecsResponseMessage {
+  repeated string codec_ids = 1;
 }

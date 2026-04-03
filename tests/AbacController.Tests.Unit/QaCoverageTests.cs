@@ -39,7 +39,7 @@ public sealed class QaCoverageTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_DefaultDeny_Converts_NotApplicable_To_Deny()
+    public async Task EvaluateAsync_Returns_NotApplicable_When_No_Policy_Matches()
     {
         var spif = BuildSpif();
         var engine = new PdpEngine(
@@ -69,8 +69,8 @@ public sealed class QaCoverageTests
             ["securityClearance"] = BuildClearance()
         }));
 
-        Assert.Equal(Decision.Deny, result.Decision);
-        Assert.Equal("No applicable policy matched; default deny", result.Status?.Message);
+        Assert.Equal(Decision.NotApplicable, result.Decision);
+        Assert.Equal("No applicable policy matched", result.Status?.Message);
     }
 
     [Fact]
