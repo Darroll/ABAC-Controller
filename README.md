@@ -1,94 +1,86 @@
 # ABAC Controller
 
-A standalone, vendor-agnostic Attribute-Based Access Control (ABAC) authoring and enforcement system. Single-container application providing the complete ABAC stack — PDP, PAP, PIP, and PEP — built on .NET 10 LTS.
+A standalone, vendor-agnostic Attribute-Based Access Control (ABAC) authoring and enforcement system. The current baseline is a single-container .NET 10 application that hosts the core ABAC stack — PDP, PAP, PIP, PEP, persistence, and audit processing — behind HTTP APIs plus an embedded Blazor administration UI.
 
 ## Overview
 
-The ABAC Controller is the first production-ready implementation of the full ACDF (Access Control Decision Function) against XML Security Policy Information Files (SPIF). It provides standards-compliant policy evaluation, administration, attribute resolution, and enforcement in a single deployable container.
+This repository contains the current implementation baseline for the ABAC Controller. It focuses on:
 
-### Components
+- policy evaluation through the PDP
+- policy administration and SPIF ingestion
+- pluggable attribute resolution through the PIP
+- AuthZEN-style REST evaluation endpoints for the PEP/API surface
+- durable audit capture with bounded buffering and explicit backpressure
+
+Some architecture targets remain future work. In particular, the repository does **not** yet implement the planned gRPC service surface or STANAG 4778 metadata binding. See `docs/standards-gaps.md` and `docs/runtime-baseline.md` for the current truth.
+
+## Components
 
 | Component | Purpose |
 |-----------|---------|
-| **PDP** (Policy Decision Point) | Real-time policy evaluation engine implementing the full ACDF with XACML 4-valued semantics (Permit/Deny/NotApplicable/Indeterminate) |
-| **PAP** (Policy Administration Point) | Policy authoring, SPIF import/export, versioning, validation — Blazor UI + API |
-| **PIP** (Policy Information Point) | Pluggable attribute retrieval from external sources (LDAP, OIDC, REST, DB) with caching and TTL management |
-| **PEP** (Policy Enforcement Point) | Enforcement gateway with AuthZEN 1.0 interface, security label generation/parsing (STANAG 4774/4778) |
+| **PDP** (Policy Decision Point) | Evaluates authorization requests using ACDF-style policy logic and decision caching |
+| **PAP** (Policy Administration Point) | Imports, validates, stores, and manages SPIF/policy data |
+| **PIP** (Policy Information Point) | Resolves external attributes and applies cache/TTL behavior |
+| **PEP / API** (Policy Enforcement Point surface) | Exposes AuthZEN 1.0 evaluation endpoints and label handling helpers |
+| **Audit** | Buffers and persists authorization audit events with batch database writes |
 
-## Standards Compliance
+## Standards posture
 
-- **NIST SP 800-162** — ABAC architecture and definitions
-- **NIST SP 800-53** — Security controls (AC-3, AC-4, AC-16, AC-24, AU-2, AU-3, SC-16)
-- **xmlspif.org v3.0** — XML Security Policy Information File (v2.1 fallback)
-- **AuthZEN 1.0** — OpenID Foundation authorization evaluation API
-- **STANAG 4774/4778** — NATO security labels and metadata binding
+Implemented or partially implemented:
 
-## Architecture
+- **NIST SP 800-162** — ABAC concepts and architecture alignment
+- **NIST SP 800-53** — control-oriented implementation focus for access control and auditing
+- **xmlspif.org v3.0** — primary SPIF parsing target with semantic validation
+- **AuthZEN 1.0** — evaluation and discovery REST endpoints
+- **STANAG 4774** — XML label encode/decode for the internal `SecurityLabel` model
 
-```
-┌─────────────────────────────────────────────┐
-│           ABAC Controller Container          │
-│                                              │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  │
-│  │   PAP    │  │   PDP    │  │   PEP    │  │
-│  │ (Author) │  │ (Decide) │  │(Enforce) │  │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  │
-│       │              │              │        │
-│       └──────┐  ┌────┘              │        │
-│              ▼  ▼                   │        │
-│         ┌──────────┐               │        │
-│         │   PIP    │◄──────────────┘        │
-│         │ (Lookup) │                         │
-│         └────┬─────┘                         │
-│              ▼                               │
-│       ┌────────────┐                         │
-│       │  Data Layer │  SQLite / PostgreSQL   │
-│       └────────────┘                         │
-└─────────────────────────────────────────────┘
-```
+Known gaps / limits:
 
-## Tech Stack
+- **STANAG 4778** metadata binding is not yet implemented
+- **XML-DSig verification** for SPIF trust is not yet implemented
+- **gRPC / transcoding API surface** is not yet present in this codebase
 
-- **.NET 10 LTS** with ReadyToRun compilation
-- **Blazor Server** — embedded PAP administration UI
-- **gRPC** — primary protocol (high-performance authorization decisions)
-- **REST** — via grpc-gateway transcoding
-- **SQLite** — embedded data store (default)
-- **PostgreSQL** — optional external data store
-- **EF Core** — data access with migrations
-- **OAuth 2.0** — API authentication with scoped access
+## Runtime baseline
 
-## Project Structure
+- **Target framework:** .NET 10 (`net10.0` across src and tests)
+- **Hosting model:** ASP.NET Core + embedded Blazor Server UI
+- **Primary external API today:** HTTP/JSON controllers, including AuthZEN endpoints
+- **Persistence:** SQLite by default, PostgreSQL planned/optional by architecture but not wired as the active runtime baseline in this branch
+- **Audit ingestion:** bounded in-memory channel with explicit backpressure when saturated
 
-```
+## Project structure
+
+```text
 AbacController/
 ├── src/
 │   ├── AbacController.Core/       # Domain models, interfaces, constants
-│   ├── AbacController.Pdp/        # ACDF engine, decision cache, PDP service
+│   ├── AbacController.Pdp/        # ACDF engine, decision cache, PDP service logic
 │   ├── AbacController.Pap/        # SPIF parser, registry, policy management
-│   ├── AbacController.Pep/        # Label codecs, marking generator, enforcement
+│   ├── AbacController.Pep/        # Label codecs, marking generator, enforcement helpers
 │   ├── AbacController.Pip/        # Attribute connectors, caching, resolution
 │   ├── AbacController.Data/       # EF Core DbContext, entities, repositories
-│   ├── AbacController.Audit/      # Audit pipeline, batch writer
-│   ├── AbacController.Api/        # gRPC services, REST, AuthZEN endpoints
-│   └── AbacController.Blazor/     # Blazor Server PAP UI
+│   ├── AbacController.Audit/      # Audit pipeline and batch writer
+│   ├── AbacController.Api/        # HTTP API, AuthZEN endpoints, runtime wiring
+│   └── AbacController.Blazor/     # Embedded PAP administration UI
 ├── tests/
 │   ├── AbacController.Tests.Unit/
 │   └── AbacController.Tests.Integration/
-└── protos/                        # gRPC protocol buffer definitions
+└── docs/
+    ├── runtime-baseline.md
+    ├── standards-gaps.md
+    └── dependency-baseline.md
 ```
 
-## Getting Started
+## Getting started
 
 ### Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- SQLite (bundled) or PostgreSQL 15+ (optional)
 
 ### Build
 
 ```bash
-dotnet build
+dotnet build AbacController.slnx
 ```
 
 ### Run
@@ -100,38 +92,32 @@ dotnet run --project src/AbacController.Api
 ### Test
 
 ```bash
-dotnet test
+dotnet test AbacController.slnx
 ```
 
-## Key Features
+## Current API surface
 
-- **Full ACDF Implementation** — Classification dominance, category membership, and constraint evaluation per xmlspif.org specification
-- **Multi-SPIF Support** — Load multiple security policies; resolution via label-embedded policy OID with caller override
-- **Pluggable Label Codecs** — XML/STANAG 4774 built-in, extensible for BER/DER and future formats
-- **Default-Deny** — Every decision requires an explicit permit policy match (NIST requirement)
-- **Complete Audit Trail** — Every authorization decision logged with full context (subject, resource, action, decision, attributes, policy applied)
-- **Vendor-Agnostic** — Standards-based APIs, works with any system
+### AuthZEN 1.0 evaluation
 
-## API
-
-### Authorization Decision (AuthZEN 1.0)
-```
+```text
 POST /access/v1/evaluation
+POST /access/v1/evaluations
+GET  /.well-known/authzen-configuration
 ```
 
-### Policy Management (PAP)
-```
-POST   /api/v1/policies/spif/import
-GET    /api/v1/policies
-GET    /api/v1/policies/{id}
-DELETE /api/v1/policies/{id}
+### Health and observability
+
+```text
+GET /health/live
+GET /health/ready
+GET /health/startup
+GET /metrics
 ```
 
-### gRPC Services
-- `AbacController.Pdp.v1.PdpService` — Authorization evaluation
-- `AbacController.Pap.v1.PapService` — Policy management
-- `AbacController.Pip.v1.PipService` — Attribute management
-- `AbacController.Pep.v1.PepService` — Label operations
+## Development notes
+
+- Audit writes no longer discard the oldest buffered events when the queue is full. The writer now blocks briefly and then fails explicitly if the system cannot accept more audit records.
+- The repository documents aspirational architecture separately from implemented baseline behavior so runtime claims stay accurate.
 
 ## License
 
@@ -139,4 +125,4 @@ Proprietary — © archTIS Limited. All rights reserved.
 
 ## Status
 
-🚧 **Under active development** — Not yet ready for production use.
+🚧 Under active development.

@@ -8,18 +8,35 @@ using Microsoft.Extensions.DependencyInjection;
 namespace AbacController.Audit;
 
 /// <summary>
-/// Buffered audit writer using Channel&lt;T&gt; for non-blocking enqueue.
-/// Events are flushed by the AuditBatchWriterService background service.
+/// Buffered audit writer backed by a bounded channel.
+/// When the channel is full, callers experience explicit backpressure instead of
+/// silently dropping older audit records.
 /// </summary>
 public sealed class AuditWriter : IAuditWriter
 {
+    internal const int DefaultCapacity = 10_000;
+    internal static readonly TimeSpan DefaultEnqueueTimeout = TimeSpan.FromSeconds(5);
+
     private readonly Channel<AuditEvent> _channel;
+    private readonly TimeSpan _enqueueTimeout;
 
     public AuditWriter()
+        : this(DefaultCapacity, DefaultEnqueueTimeout)
     {
-        _channel = Channel.CreateBounded<AuditEvent>(new BoundedChannelOptions(10_000)
+    }
+
+    public AuditWriter(int capacity, TimeSpan enqueueTimeout)
+    {
+        if (capacity <= 0)
+            throw new ArgumentOutOfRangeException(nameof(capacity));
+
+        if (enqueueTimeout <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(enqueueTimeout));
+
+        _enqueueTimeout = enqueueTimeout;
+        _channel = Channel.CreateBounded<AuditEvent>(new BoundedChannelOptions(capacity)
         {
-            FullMode = BoundedChannelFullMode.DropOldest,
+            FullMode = BoundedChannelFullMode.Wait,
             SingleReader = true,
             SingleWriter = false
         });
@@ -31,15 +48,44 @@ public sealed class AuditWriter : IAuditWriter
     /// <inheritdoc />
     public void Write(AuditEvent auditEvent)
     {
-        // Non-blocking write. If channel is full, oldest events are dropped.
-        _channel.Writer.TryWrite(auditEvent);
+        ArgumentNullException.ThrowIfNull(auditEvent);
+
+        if (_channel.Writer.TryWrite(auditEvent))
+            return;
+
+        using var cts = new CancellationTokenSource(_enqueueTimeout);
+
+        try
+        {
+            while (true)
+            {
+                var canWrite = _channel.Writer
+                    .WaitToWriteAsync(cts.Token)
+                    .AsTask()
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (!canWrite)
+                {
+                    throw new InvalidOperationException("The audit writer is closed and cannot accept new events.");
+                }
+
+                if (_channel.Writer.TryWrite(auditEvent))
+                    return;
+            }
+        }
+        catch (OperationCanceledException ex)
+        {
+            throw new TimeoutException(
+                $"Timed out after {_enqueueTimeout.TotalSeconds:0.#} seconds waiting to enqueue an audit event.",
+                ex);
+        }
     }
 
     /// <inheritdoc />
     public async Task FlushAsync(CancellationToken ct = default)
     {
-        _channel.Writer.Complete();
-        // Wait for reader to drain
+        _channel.Writer.TryComplete();
         await _channel.Reader.Completion.WaitAsync(ct);
     }
 }
@@ -68,7 +114,6 @@ public sealed class AuditBatchWriterService : Microsoft.Extensions.Hosting.Backg
         {
             try
             {
-                // Wait for events or timeout
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
                 cts.CancelAfter(FlushInterval);
 
@@ -86,7 +131,7 @@ public sealed class AuditBatchWriterService : Microsoft.Extensions.Hosting.Backg
                 }
                 catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
                 {
-                    // Timeout — flush what we have
+                    // Flush what we have on interval expiry.
                 }
 
                 if (batch.Count > 0)
@@ -101,13 +146,11 @@ public sealed class AuditBatchWriterService : Microsoft.Extensions.Hosting.Backg
             }
             catch
             {
-                // Don't let errors kill the background service
                 batch.Clear();
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
         }
 
-        // Final drain on shutdown
         while (_writer.Reader.TryRead(out var finalEvent))
             batch.Add(MapToEntity(finalEvent));
 
