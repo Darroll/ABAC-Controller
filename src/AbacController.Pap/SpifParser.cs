@@ -27,6 +27,13 @@ public sealed class SpifParser : ISpifParser
 
     private static readonly Regex OidPattern = new("^[0-2](\\.[0-9]+)+$", RegexOptions.Compiled);
 
+    private readonly IXmlSignatureVerifier _signatureVerifier;
+
+    public SpifParser(IXmlSignatureVerifier? signatureVerifier = null)
+    {
+        _signatureVerifier = signatureVerifier ?? new RejectingXmlSignatureVerifier();
+    }
+
     /// <inheritdoc />
     public SpifParseResult Parse(string xmlContent)
     {
@@ -137,6 +144,18 @@ public sealed class SpifParser : ISpifParser
         {
             errors.AddRange(schemaValidation.Errors);
             return SpifParseResult.Failed(errors, warnings);
+        }
+
+        var signatureVerification = _signatureVerifier.Verify(document, root.Attribute("keyIdentifier")?.Value?.Trim());
+        if (!signatureVerification.IsSuccess)
+        {
+            errors.Add(new SpifParseError(signatureVerification.Message ?? "XML-DSig verification failed", GetLineNumber(root)));
+            return SpifParseResult.Failed(errors, warnings);
+        }
+
+        if (!string.IsNullOrWhiteSpace(signatureVerification.Message))
+        {
+            warnings.Add(new SpifParseWarning(signatureVerification.Message!, GetLineNumber(root)));
         }
 
         var schemaVersion = root.Attribute("schemaVersion")?.Value?.Trim();
@@ -749,11 +768,6 @@ public sealed class SpifParser : ISpifParser
 
         ValidateOptionalOid(spif.PrivilegeId, "privilegeId", errors);
         ValidateOptionalOid(spif.RbacId, "rbacId", errors);
-
-        if (spif.KeyIdentifier is not null)
-        {
-            warnings.Add(new SpifParseWarning("SPIF declares keyIdentifier but XML-DSig verification is not implemented"));
-        }
 
         if (spif.Classifications.Count == 0)
         {
