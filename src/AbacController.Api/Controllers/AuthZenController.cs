@@ -3,9 +3,11 @@ using AbacController.Api.Observability;
 using AbacController.Core.Constants;
 using AbacController.Core.Domain.Decisions;
 using AbacController.Core.Interfaces;
+using AbacController.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 
 namespace AbacController.Api.Controllers;
 
@@ -17,11 +19,13 @@ public class AuthZenController : ControllerBase
 {
     private readonly IPdpEngine _pdp;
     private readonly ApiMetrics _metrics;
+    private readonly AbacDbContext _dbContext;
 
-    public AuthZenController(IPdpEngine pdp, ApiMetrics metrics)
+    public AuthZenController(IPdpEngine pdp, ApiMetrics metrics, AbacDbContext dbContext)
     {
         _pdp = pdp;
         _metrics = metrics;
+        _dbContext = dbContext;
     }
 
     /// <summary>
@@ -107,9 +111,75 @@ public class AuthZenController : ControllerBase
             issuer = $"{Request.Scheme}://{Request.Host}",
             evaluation_endpoint = "/access/v1/evaluation",
             evaluations_endpoint = "/access/v1/evaluations",
+            subjects_endpoint = "/access/v1/subjects",
+            resources_endpoint = "/access/v1/resources",
+            actions_endpoint = "/access/v1/actions",
             authentication_methods = new[] { "bearer" },
             api_version = "1.0"
         });
+    }
+
+    [HttpGet("/access/v1/subjects")]
+    [Authorize(Policy = "Evaluate")]
+    public async Task<IActionResult> GetSubjects([FromQuery] string? q, CancellationToken ct)
+    {
+        var query = _dbContext.AuditEvents.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            query = query.Where(e => (e.SubjectId ?? string.Empty).Contains(q) || (e.SubjectType ?? string.Empty).Contains(q));
+        }
+
+        var items = await query
+            .Where(e => e.SubjectId != null)
+            .OrderByDescending(e => e.Timestamp)
+            .Select(e => new { id = e.SubjectId!, type = e.SubjectType ?? "subject" })
+            .Distinct()
+            .Take(100)
+            .ToListAsync(ct);
+
+        return Ok(new { subjects = items });
+    }
+
+    [HttpGet("/access/v1/resources")]
+    [Authorize(Policy = "Evaluate")]
+    public async Task<IActionResult> GetResources([FromQuery] string? q, CancellationToken ct)
+    {
+        var query = _dbContext.AuditEvents.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            query = query.Where(e => (e.ResourceId ?? string.Empty).Contains(q) || (e.ResourceType ?? string.Empty).Contains(q));
+        }
+
+        var items = await query
+            .Where(e => e.ResourceId != null)
+            .OrderByDescending(e => e.Timestamp)
+            .Select(e => new { id = e.ResourceId!, type = e.ResourceType ?? "resource" })
+            .Distinct()
+            .Take(100)
+            .ToListAsync(ct);
+
+        return Ok(new { resources = items });
+    }
+
+    [HttpGet("/access/v1/actions")]
+    [Authorize(Policy = "Evaluate")]
+    public async Task<IActionResult> GetActions([FromQuery] string? q, CancellationToken ct)
+    {
+        var query = _dbContext.AuditEvents.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            query = query.Where(e => (e.ActionName ?? string.Empty).Contains(q));
+        }
+
+        var items = await query
+            .Where(e => e.ActionName != null)
+            .OrderByDescending(e => e.Timestamp)
+            .Select(e => e.ActionName!)
+            .Distinct()
+            .Take(100)
+            .ToListAsync(ct);
+
+        return Ok(new { actions = items.Select(name => new { name }) });
     }
 
     private static EvaluationRequest MapToInternal(AuthZenEvaluationRequest request) => new()

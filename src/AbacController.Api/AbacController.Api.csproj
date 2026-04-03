@@ -18,7 +18,24 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Google.Api.CommonProtos" Version="2.16.0" />
+    <PackageReference Include="Google.Protobuf" Version="3.32.0" />
+    <PackageReference Include="Grpc.AspNetCore" Version="2.76.0" />
+    <PackageReference Include="Grpc.Tools" Version="2.76.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.5" />
+    <PackageReference Include="Microsoft.AspNetCore.Grpc.JsonTranscoding" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Protobuf Include="..\..\protos\abaccontroller\v1\common.proto" ProtoRoot="..\..\protos" GrpcServices="None" />
+    <Protobuf Include="..\..\protos\abaccontroller\v1\pdp.proto" ProtoRoot="..\..\protos" GrpcServices="Server" />
+    <Protobuf Include="..\..\protos\abaccontroller\v1\pap.proto" ProtoRoot="..\..\protos" GrpcServices="Server" />
+    <Protobuf Include="..\..\protos\abaccontroller\v1\pip.proto" ProtoRoot="..\..\protos" GrpcServices="Server" />
+    <Protobuf Include="..\..\protos\abaccontroller\v1\pep.proto" ProtoRoot="..\..\protos" GrpcServices="Server" />
+    <Protobuf Include="..\..\protos\abaccontroller\v1\system.proto" ProtoRoot="..\..\protos" GrpcServices="Server" />
   </ItemGroup>
 
 </Project>

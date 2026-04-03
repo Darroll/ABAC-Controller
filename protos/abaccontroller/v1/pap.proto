@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package abaccontroller.v1;
+option csharp_namespace = "AbacController.Api.Grpc";
+
+import "abaccontroller/v1/common.proto";
+import "google/api/annotations.proto";
+
+service PapApi {
+  rpc ListPolicySets(ListPolicySetsRequestMessage) returns (ListPolicySetsResponseMessage) {
+    option (google.api.http) = { get: "/api/v1/pap/policy-sets" };
+  }
+
+  rpc GetPolicySet(GetPolicySetRequestMessage) returns (GetPolicySetResponseMessage) {
+    option (google.api.http) = { get: "/api/v1/pap/policy-sets/{id}" };
+  }
+
+  rpc UpsertPolicySet(UpsertPolicySetRequestMessage) returns (PolicySetSummaryMessage) {
+    option (google.api.http) = {
+      put: "/api/v1/pap/policy-sets/{policy_set.id}"
+      body: "policy_set"
+    };
+  }
+
+  rpc ListPolicyVersions(ListPolicyVersionsRequestMessage) returns (ListPolicyVersionsResponseMessage) {
+    option (google.api.http) = { get: "/api/v1/pap/policies/{policy_id}/versions" };
+  }
+
+  rpc ListSpifs(ListSpifsRequestMessage) returns (ListSpifsResponseMessage) {
+    option (google.api.http) = { get: "/api/v1/pap/spifs" };
+  }
+}
+
+message ListPolicySetsRequestMessage {}
+
+message ListPolicySetsResponseMessage {
+  repeated PolicySetSummaryMessage policy_sets = 1;
+}
+
+message GetPolicySetRequestMessage {
+  string id = 1;
+}
+
+message GetPolicySetResponseMessage {
+  PolicySetSummaryMessage policy_set = 1;
+  repeated PolicyVersionSummaryMessage active_versions = 2;
+}
+
+message UpsertPolicySetRequestMessage {
+  PolicySetSummaryMessage policy_set = 1;
+}
+
+message ListPolicyVersionsRequestMessage {
+  string policy_id = 1;
+}
+
+message ListPolicyVersionsResponseMessage {
+  repeated PolicyVersionSummaryMessage versions = 1;
+}
+
+message ListSpifsRequestMessage {}
+
+message ListSpifsResponseMessage {
+  repeated SpifRegistrationMessage spifs = 1;
+}

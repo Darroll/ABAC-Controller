@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package abaccontroller.v1;
+option csharp_namespace = "AbacController.Api.Grpc";
+
+import "abaccontroller/v1/common.proto";
+import "google/api/annotations.proto";
+import "google/protobuf/struct.proto";
+
+service PipApi {
+  rpc ListSources(ListSourcesRequestMessage) returns (ListSourcesResponseMessage) {
+    option (google.api.http) = { get: "/api/v1/pip/sources" };
+  }
+
+  rpc UpsertSource(UpsertSourceRequestMessage) returns (PipSourceMessage) {
+    option (google.api.http) = {
+      put: "/api/v1/pip/sources/{source.id}"
+      body: "source"
+    };
+  }
+
+  rpc DeleteSource(DeleteSourceRequestMessage) returns (OperationStatusMessage) {
+    option (google.api.http) = { delete: "/api/v1/pip/sources/{id}" };
+  }
+
+  rpc Resolve(ResolveAttributesRequestMessage) returns (ResolveAttributesResponseMessage) {
+    option (google.api.http) = {
+      post: "/api/v1/pip/resolve"
+      body: "*"
+    };
+  }
+}
+
+message ListSourcesRequestMessage {}
+
+message ListSourcesResponseMessage {
+  repeated PipSourceMessage sources = 1;
+}
+
+message UpsertSourceRequestMessage {
+  PipSourceMessage source = 1;
+}
+
+message DeleteSourceRequestMessage {
+  string id = 1;
+}
+
+message ResolveAttributesRequestMessage {
+  string subject_id = 1;
+  string subject_type = 2;
+  repeated string requested_attributes = 3;
+  google.protobuf.Struct context = 4;
+}
+
+message ResolvedAttributeMessage {
+  string name = 1;
+  AttributeCategoryMessage category = 2;
+  google.protobuf.Value value = 3;
+  string source_id = 4;
+  string source_type = 5;
+}
+
+message ResolveAttributesResponseMessage {
+  bool success = 1;
+  repeated ResolvedAttributeMessage values = 2;
+  repeated string missing = 3;
+  string error = 4;
+}

@@ -59,6 +59,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPolicyRepository, PolicyRepository>();
         services.AddScoped<IAuditReader, AuditRepository>();
 
+        services.AddGrpc().AddJsonTranscoding();
         services.AddControllers();
         services.AddEndpointsApiExplorer();
         services.AddRazorComponents().AddInteractiveServerComponents();
