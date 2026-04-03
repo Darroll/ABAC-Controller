@@ -24,6 +24,7 @@
     <ProjectReference Include="..\..\src\AbacController.Pdp\AbacController.Pdp.csproj" />
     <ProjectReference Include="..\..\src\AbacController.Pap\AbacController.Pap.csproj" />
     <ProjectReference Include="..\..\src\AbacController.Pep\AbacController.Pep.csproj" />
+    <ProjectReference Include="..\..\src\AbacController.Pip\AbacController.Pip.csproj" />
   </ItemGroup>
 
 </Project>
