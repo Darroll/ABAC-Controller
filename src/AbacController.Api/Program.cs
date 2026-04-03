@@ -1,4 +1,5 @@
 using AbacController.Api.Configuration;
+using AbacController.Api.Grpc;
 using AbacController.Api.Hosting;
 using AbacController.Api.Observability;
 using AbacController.Api.Runtime;
@@ -24,6 +25,11 @@ RegisterLabelCodecs(app);
 
 app.UseRateLimiter();
 app.UseAbacControllerHost();
+app.MapGrpcService<PdpGrpcService>();
+app.MapGrpcService<PapGrpcService>();
+app.MapGrpcService<PipGrpcService>();
+app.MapGrpcService<PepGrpcService>();
+app.MapGrpcService<SystemGrpcService>();
 app.MapControllers();
 app.MapGet("/metrics", (ApiMetrics metrics, AppRuntimeState runtimeState) =>
 {

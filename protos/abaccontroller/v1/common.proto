@@ -1,0 +1,243 @@
+syntax = "proto3";
+
+package abaccontroller.v1;
+option csharp_namespace = "AbacController.Api.Grpc";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+enum DecisionMessage {
+  DECISION_MESSAGE_UNSPECIFIED = 0;
+  DECISION_MESSAGE_PERMIT = 1;
+  DECISION_MESSAGE_DENY = 2;
+  DECISION_MESSAGE_NOT_APPLICABLE = 3;
+  DECISION_MESSAGE_INDETERMINATE = 4;
+}
+
+enum TagTypeMessage {
+  TAG_TYPE_MESSAGE_UNSPECIFIED = 0;
+  TAG_TYPE_MESSAGE_RESTRICTIVE = 1;
+  TAG_TYPE_MESSAGE_PERMISSIVE = 2;
+  TAG_TYPE_MESSAGE_ENUMERATED = 3;
+  TAG_TYPE_MESSAGE_TAG_TYPE7 = 4;
+  TAG_TYPE_MESSAGE_NOT_APPLICABLE = 5;
+}
+
+enum EnumTypeMessage {
+  ENUM_TYPE_MESSAGE_UNSPECIFIED = 0;
+  ENUM_TYPE_MESSAGE_RESTRICTIVE = 1;
+  ENUM_TYPE_MESSAGE_PERMISSIVE = 2;
+}
+
+enum AttributeCategoryMessage {
+  ATTRIBUTE_CATEGORY_MESSAGE_UNSPECIFIED = 0;
+  ATTRIBUTE_CATEGORY_MESSAGE_SUBJECT = 1;
+  ATTRIBUTE_CATEGORY_MESSAGE_RESOURCE = 2;
+  ATTRIBUTE_CATEGORY_MESSAGE_ACTION = 3;
+  ATTRIBUTE_CATEGORY_MESSAGE_ENVIRONMENT = 4;
+}
+
+message SubjectMessage {
+  string type = 1;
+  string id = 2;
+  google.protobuf.Struct properties = 3;
+  SecurityClearanceMessage security_clearance = 4;
+}
+
+message ActionMessage {
+  string name = 1;
+  google.protobuf.Struct properties = 2;
+}
+
+message ResourceMessage {
+  string type = 1;
+  string id = 2;
+  google.protobuf.Struct properties = 3;
+  SecurityLabelMessage security_label = 4;
+}
+
+message ContextMessage {
+  google.protobuf.Struct environment = 1;
+}
+
+message EvaluateOptionsMessage {
+  bool return_obligations = 1;
+  bool return_advice = 2;
+  string policy_set_id = 3;
+  string policy_version = 4;
+  bool bypass_cache = 5;
+  string policy_id_override = 6;
+}
+
+message StatusMessage {
+  string code = 1;
+  string message = 2;
+}
+
+message ObligationMessage {
+  string id = 1;
+  google.protobuf.Struct attributes = 2;
+}
+
+message AdviceMessage {
+  string id = 1;
+  google.protobuf.Struct attributes = 2;
+}
+
+message AttributeProvenanceMessage {
+  string attribute_name = 1;
+  string source = 2;
+  google.protobuf.Timestamp fetched_at = 3;
+  google.protobuf.Duration source_ttl = 4;
+}
+
+message TraceStepMessage {
+  string rule_id = 1;
+  string effect = 2;
+  bool result = 3;
+  string reason = 4;
+}
+
+message EvaluationTraceMessage {
+  string policy_set_id = 1;
+  string policy_version = 2;
+  string matched_policy = 3;
+  repeated TraceStepMessage steps = 4;
+}
+
+message SecurityLabelMessage {
+  string policy_oid = 1;
+  string policy_name = 2;
+  int32 classification_lacv = 3;
+  string classification_name = 4;
+  repeated LabelCategoryTagSetMessage category_tag_sets = 5;
+  repeated string privacy_marks = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message LabelCategoryTagSetMessage {
+  string tag_set_oid = 1;
+  repeated LabelCategoryTagMessage tags = 2;
+}
+
+message LabelCategoryTagMessage {
+  string name = 1;
+  TagTypeMessage tag_type = 2;
+  EnumTypeMessage enum_type = 3;
+  string tag_oid = 4;
+  repeated int32 bits = 5;
+  repeated int32 enumerated_values = 6;
+  repeated LabelCategoryMessage categories = 7;
+}
+
+message LabelCategoryMessage {
+  string name = 1;
+  int32 lacv = 2;
+  google.protobuf.Timestamp not_before = 3;
+  google.protobuf.Timestamp not_after = 4;
+}
+
+message SecurityClearanceMessage {
+  string policy_oid = 1;
+  repeated int32 classification_lacvs = 2;
+  repeated ClearanceCategoryTagSetMessage category_tag_sets = 3;
+}
+
+message ClearanceCategoryTagSetMessage {
+  string tag_set_oid = 1;
+  repeated ClearanceCategoryTagMessage tags = 2;
+}
+
+message ClearanceCategoryTagMessage {
+  string tag_oid = 1;
+  TagTypeMessage tag_type = 2;
+  repeated int32 bits = 3;
+  repeated int32 enumerated_values = 4;
+}
+
+message PolicySetSummaryMessage {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string spif_id = 4;
+  string combining_algorithm = 5;
+  bool is_active = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+  int32 policy_count = 9;
+}
+
+message PolicyVersionSummaryMessage {
+  string id = 1;
+  string policy_id = 2;
+  int32 version_number = 3;
+  string hash = 4;
+  string created_by = 5;
+  google.protobuf.Timestamp created_at = 6;
+  bool is_active = 7;
+  string content = 8;
+}
+
+message PipSourceMessage {
+  string id = 1;
+  string name = 2;
+  string source_type = 3;
+  string config_json = 4;
+  repeated string provides_attributes = 5;
+  int32 priority = 6;
+  bool is_required = 7;
+  bool cache_enabled = 8;
+  int32 cache_ttl_seconds = 9;
+  int32 cache_max_entries = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+message EnforcementPointMessage {
+  string id = 1;
+  string name = 2;
+  string type = 3;
+  string endpoint = 4;
+  string enforcement_mode = 5;
+  repeated string policy_set_bindings = 6;
+  string spif_id = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+message SpifRegistrationMessage {
+  string policy_oid = 1;
+  string name = 2;
+  string schema_version = 3;
+  bool is_active = 4;
+  google.protobuf.Timestamp imported_at = 5;
+  int32 classification_count = 6;
+  int32 category_count = 7;
+}
+
+message AuditEventMessage {
+  string id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  string event_type = 3;
+  string request_id = 4;
+  string decision_id = 5;
+  string subject_type = 6;
+  string subject_id = 7;
+  string action_name = 8;
+  string resource_type = 9;
+  string resource_id = 10;
+  string decision = 11;
+  string applied_policies = 12;
+  string obligations_json = 13;
+  string attributes_used_json = 14;
+  double evaluation_time_ms = 15;
+  string pep_id = 16;
+  string actor_identity = 17;
+  string detail_json = 18;
+}
+
+message OperationStatusMessage {
+  bool success = 1;
+  string message = 2;
+}

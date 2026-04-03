@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package abaccontroller.v1;
+option csharp_namespace = "AbacController.Api.Grpc";
+
+import "abaccontroller/v1/common.proto";
+import "google/api/annotations.proto";
+import "google/protobuf/duration.proto";
+
+service PdpApi {
+  rpc Evaluate(EvaluateRequestMessage) returns (EvaluateResponseMessage) {
+    option (google.api.http) = {
+      post: "/api/v1/pdp/evaluate"
+      body: "*"
+    };
+  }
+
+  rpc EvaluateBatch(EvaluateBatchRequestMessage) returns (EvaluateBatchResponseMessage) {
+    option (google.api.http) = {
+      post: "/api/v1/pdp/evaluate/batch"
+      body: "*"
+    };
+  }
+
+  rpc EvaluateExplain(EvaluateRequestMessage) returns (ExplainedEvaluateResponseMessage) {
+    option (google.api.http) = {
+      post: "/api/v1/pdp/evaluate/explain"
+      body: "*"
+    };
+  }
+}
+
+message EvaluateRequestMessage {
+  string request_id = 1;
+  SubjectMessage subject = 2;
+  ActionMessage action = 3;
+  ResourceMessage resource = 4;
+  ContextMessage context = 5;
+  EvaluateOptionsMessage options = 6;
+}
+
+message EvaluateResponseMessage {
+  string request_id = 1;
+  string decision_id = 2;
+  DecisionMessage decision = 3;
+  StatusMessage status = 4;
+  repeated ObligationMessage obligations = 5;
+  repeated AdviceMessage advice = 6;
+  repeated string applied_policies = 7;
+  google.protobuf.Duration evaluation_time = 8;
+  string cache_status = 9;
+  repeated AttributeProvenanceMessage attribute_provenance = 10;
+}
+
+message EvaluateBatchRequestMessage {
+  string request_id = 1;
+  SubjectMessage subject = 2;
+  ContextMessage context = 3;
+  repeated BatchEvaluationMessage evaluations = 4;
+  EvaluateOptionsMessage options = 5;
+}
+
+message BatchEvaluationMessage {
+  string evaluation_id = 1;
+  ActionMessage action = 2;
+  ResourceMessage resource = 3;
+}
+
+message EvaluateBatchResponseMessage {
+  string request_id = 1;
+  string batch_decision_id = 2;
+  repeated EvaluateResponseMessage evaluations = 3;
+}
+
+message ExplainedEvaluateResponseMessage {
+  EvaluateResponseMessage result = 1;
+  EvaluationTraceMessage trace = 2;
+}

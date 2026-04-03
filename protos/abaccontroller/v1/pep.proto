@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package abaccontroller.v1;
+option csharp_namespace = "AbacController.Api.Grpc";
+
+import "abaccontroller/v1/common.proto";
+import "google/api/annotations.proto";
+
+service PepApi {
+  rpc ListEnforcementPoints(ListEnforcementPointsRequestMessage) returns (ListEnforcementPointsResponseMessage) {
+    option (google.api.http) = { get: "/api/v1/pep/enforcement-points" };
+  }
+
+  rpc UpsertEnforcementPoint(UpsertEnforcementPointRequestMessage) returns (EnforcementPointMessage) {
+    option (google.api.http) = {
+      put: "/api/v1/pep/enforcement-points/{enforcement_point.id}"
+      body: "enforcement_point"
+    };
+  }
+
+  rpc DeleteEnforcementPoint(DeleteEnforcementPointRequestMessage) returns (OperationStatusMessage) {
+    option (google.api.http) = { delete: "/api/v1/pep/enforcement-points/{id}" };
+  }
+
+  rpc DecodeLabel(DecodeLabelRequestMessage) returns (DecodeLabelResponseMessage) {
+    option (google.api.http) = {
+      post: "/api/v1/pep/labels/decode"
+      body: "*"
+    };
+  }
+
+  rpc EncodeLabel(EncodeLabelRequestMessage) returns (EncodeLabelResponseMessage) {
+    option (google.api.http) = {
+      post: "/api/v1/pep/labels/encode"
+      body: "*"
+    };
+  }
+
+  rpc ValidateLabel(ValidateLabelRequestMessage) returns (ValidateLabelResponseMessage) {
+    option (google.api.http) = {
+      post: "/api/v1/pep/labels/validate"
+      body: "*"
+    };
+  }
+}
+
+message ListEnforcementPointsRequestMessage {}
+
+message ListEnforcementPointsResponseMessage {
+  repeated EnforcementPointMessage enforcement_points = 1;
+}
+
+message UpsertEnforcementPointRequestMessage {
+  EnforcementPointMessage enforcement_point = 1;
+}
+
+message DeleteEnforcementPointRequestMessage {
+  string id = 1;
+}
+
+message DecodeLabelRequestMessage {
+  string codec_id = 1;
+  string content = 2;
+}
+
+message DecodeLabelResponseMessage {
+  bool success = 1;
+  string error = 2;
+  SecurityLabelMessage label = 3;
+}
+
+message EncodeLabelRequestMessage {
+  string codec_id = 1;
+  string policy_oid = 2;
+  SecurityLabelMessage label = 3;
+}
+
+message EncodeLabelResponseMessage {
+  bool success = 1;
+  string error = 2;
+  string content = 3;
+  string content_type = 4;
+  string marking = 5;
+}
+
+message ValidateLabelRequestMessage {
+  string policy_oid = 1;
+  SecurityLabelMessage label = 2;
+}
+
+message ValidateLabelResponseMessage {
+  bool is_valid = 1;
+  repeated string errors = 2;
+  string marking = 3;
+}
