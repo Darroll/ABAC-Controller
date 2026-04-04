@@ -318,6 +318,10 @@ public class AuthZenController : ControllerBase
         return Ok(AbacController.Pdp.XacmlJsonMapper.MapToXacmlJsonResponse(result));
     }
 
+    /// <summary>
+    /// Search subjects from audit history.
+    /// POST /access/v1/subjects
+    /// </summary>
     [HttpPost("/access/v1/subjects")]
     [Authorize(Policy = "Evaluate")]
     public async Task<IActionResult> SearchSubjects([FromBody] AuthZenSearchRequest? request, CancellationToken ct)
@@ -340,6 +344,10 @@ public class AuthZenController : ControllerBase
         return Ok(new { subjects = items });
     }
 
+    /// <summary>
+    /// Search resources from audit history.
+    /// POST /access/v1/resources
+    /// </summary>
     [HttpPost("/access/v1/resources")]
     [Authorize(Policy = "Evaluate")]
     public async Task<IActionResult> SearchResources([FromBody] AuthZenSearchRequest? request, CancellationToken ct)
@@ -362,6 +370,10 @@ public class AuthZenController : ControllerBase
         return Ok(new { resources = items });
     }
 
+    /// <summary>
+    /// Search actions from audit history.
+    /// POST /access/v1/actions
+    /// </summary>
     [HttpPost("/access/v1/actions")]
     [Authorize(Policy = "Evaluate")]
     public async Task<IActionResult> SearchActions([FromBody] AuthZenSearchRequest? request, CancellationToken ct)
@@ -384,8 +396,12 @@ public class AuthZenController : ControllerBase
         return Ok(new { actions = items.Select(name => new { name }) });
     }
 
+    /// <summary>Search query for AuthZEN entity endpoints.</summary>
+    /// <param name="Query">Optional text filter.</param>
+    /// <param name="Limit">Maximum results to return.</param>
     public sealed record AuthZenSearchRequest(string? Query = null, int? Limit = null);
 
+    /// <summary>Maps an AuthZEN evaluation request to the internal domain model.</summary>
     private static EvaluationRequest MapToInternal(AuthZenEvaluationRequest request)
     {
         var subjectProperties = request.Subject?.Properties is null
@@ -433,6 +449,7 @@ public class AuthZenController : ControllerBase
         };
     }
 
+    /// <summary>Attempts to parse a <see cref="SecurityClearance"/> from subject properties.</summary>
     private static bool TryParseSecurityClearance(
         IReadOnlyDictionary<string, object?> properties,
         out SecurityClearance clearance)
@@ -501,6 +518,7 @@ public class AuthZenController : ControllerBase
         return true;
     }
 
+    /// <summary>Attempts to parse a <see cref="SecurityLabel"/> from resource properties.</summary>
     private static bool TryParseSecurityLabel(
         IReadOnlyDictionary<string, object?> properties,
         out SecurityLabel label)
@@ -593,6 +611,7 @@ public class AuthZenController : ControllerBase
         return true;
     }
 
+    /// <summary>Parses an array of LACV integers from a JSON property.</summary>
     private static ImmutableHashSet<LacvValue> ParseLacvSet(JsonElement element, string propertyName)
     {
         if (!element.TryGetProperty(propertyName, out var valuesElement) || valuesElement.ValueKind != JsonValueKind.Array)
@@ -606,6 +625,7 @@ public class AuthZenController : ControllerBase
             .ToImmutableHashSet();
     }
 
+    /// <summary>Parses an optional ISO 8601 date-time from a JSON property.</summary>
     private static DateTimeOffset? ParseOptionalDateTimeOffset(JsonElement element, string propertyName)
         => element.TryGetProperty(propertyName, out var propertyElement)
             && propertyElement.ValueKind == JsonValueKind.String
@@ -613,16 +633,19 @@ public class AuthZenController : ControllerBase
                 ? parsed
                 : null;
 
+    /// <summary>Parses a tag type string, defaulting to <see cref="TagType.Restrictive"/>.</summary>
     private static TagType ParseTagType(string? value)
         => Enum.TryParse<TagType>(value, ignoreCase: true, out var parsed)
             ? parsed
             : TagType.Restrictive;
 
+    /// <summary>Parses an optional enum type string.</summary>
     private static EnumType? ParseOptionalEnumType(string? value)
         => Enum.TryParse<EnumType>(value, ignoreCase: true, out var parsed)
             ? parsed
             : null;
 
+    /// <summary>Converts an arbitrary object to a <see cref="JsonElement"/>.</summary>
     private static JsonElement ToJsonElement(object raw)
     {
         if (raw is JsonElement element)
@@ -637,42 +660,72 @@ public class AuthZenController : ControllerBase
 
 // ── AuthZEN DTOs ──
 
+/// <summary>AuthZEN 1.0 evaluation request.</summary>
 public class AuthZenEvaluationRequest
 {
+    /// <summary>Caller-provided request correlation ID.</summary>
     public string? RequestId { get; set; }
+
+    /// <summary>Subject of the access request.</summary>
     public AuthZenSubject? Subject { get; set; }
+
+    /// <summary>Action being requested.</summary>
     public AuthZenAction? Action { get; set; }
+
+    /// <summary>Resource being accessed.</summary>
     public AuthZenResource? Resource { get; set; }
 }
 
+/// <summary>Subject entity in an AuthZEN request.</summary>
 public class AuthZenSubject
 {
+    /// <summary>Subject type (e.g. "user", "service").</summary>
     public string Type { get; set; } = "user";
+
+    /// <summary>Subject identifier.</summary>
     public string Id { get; set; } = "";
+
+    /// <summary>Additional subject attributes.</summary>
     public Dictionary<string, object?> Properties { get; set; } = new();
 }
 
+/// <summary>Action entity in an AuthZEN request.</summary>
 public class AuthZenAction
 {
+    /// <summary>Action name (e.g. "read", "write", "delete").</summary>
     public string Name { get; set; } = "";
+
+    /// <summary>Additional action attributes.</summary>
     public Dictionary<string, object?> Properties { get; set; } = new();
 }
 
+/// <summary>Resource entity in an AuthZEN request.</summary>
 public class AuthZenResource
 {
+    /// <summary>Resource type.</summary>
     public string Type { get; set; } = "";
+
+    /// <summary>Resource identifier.</summary>
     public string Id { get; set; } = "";
+
+    /// <summary>Additional resource attributes (may include securityLabel).</summary>
     public Dictionary<string, object?> Properties { get; set; } = new();
 }
 
+/// <summary>AuthZEN 1.0 evaluation response.</summary>
 public class AuthZenEvaluationResponse
 {
+    /// <summary>Whether access is permitted.</summary>
     public bool Decision { get; set; }
+
+    /// <summary>Additional context (decision ID, reason, etc.).</summary>
     public Dictionary<string, object> Context { get; set; } = new();
 }
 
+/// <summary>AuthZEN 1.0 batch evaluation request.</summary>
 public class AuthZenBatchRequest
 {
+    /// <summary>Individual evaluation requests in this batch.</summary>
     public List<AuthZenEvaluationRequest> Evaluations { get; set; } = [];
 }
 

@@ -19,10 +19,16 @@ public interface IXmlSignatureVerifier
 /// </summary>
 public sealed record SignatureVerificationResult
 {
+    /// <summary>Whether verification succeeded or was not required.</summary>
     public required bool IsSuccess { get; init; }
+
+    /// <summary>Whether a verification attempt was actually made.</summary>
     public required bool WasAttempted { get; init; }
+
+    /// <summary>Human-readable message describing the result.</summary>
     public string? Message { get; init; }
 
+    /// <summary>Creates a successful verification result.</summary>
     public static SignatureVerificationResult Valid(string? message = null) => new()
     {
         IsSuccess = true,
@@ -30,6 +36,7 @@ public sealed record SignatureVerificationResult
         Message = message
     };
 
+    /// <summary>Creates a result indicating verification was skipped (no signature present).</summary>
     public static SignatureVerificationResult Skipped(string? message = null) => new()
     {
         IsSuccess = true,
@@ -37,6 +44,7 @@ public sealed record SignatureVerificationResult
         Message = message
     };
 
+    /// <summary>Creates a failed verification result.</summary>
     public static SignatureVerificationResult Invalid(string message) => new()
     {
         IsSuccess = false,

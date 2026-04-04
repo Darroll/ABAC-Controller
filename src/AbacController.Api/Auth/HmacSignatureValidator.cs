@@ -9,8 +9,13 @@ namespace AbacController.Api.Auth;
 /// </summary>
 public static class HmacSignatureValidator
 {
+    /// <summary>HTTP header containing the HMAC signature.</summary>
     public const string SignatureHeader = "X-ABAC-Signature";
+
+    /// <summary>HTTP header containing the request timestamp.</summary>
     public const string TimestampHeader = "X-ABAC-Timestamp";
+
+    /// <summary>HTTP header containing the request nonce.</summary>
     public const string NonceHeader = "X-ABAC-Nonce";
 
     /// <summary>Maximum age of a signed request (5 minutes).</summary>
@@ -66,8 +71,14 @@ public static class HmacSignatureValidator
     }
 }
 
+/// <summary>Result of HMAC signature validation.</summary>
+/// <param name="IsValid">Whether the signature is valid.</param>
+/// <param name="Error">Error message if validation failed.</param>
 public sealed record SignatureValidationResult(bool IsValid, string? Error = null)
 {
+    /// <summary>Creates a successful validation result.</summary>
     public static SignatureValidationResult Valid() => new(true);
+
+    /// <summary>Creates a failed validation result.</summary>
     public static SignatureValidationResult Failed(string error) => new(false, error);
 }

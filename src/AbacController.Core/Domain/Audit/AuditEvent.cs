@@ -69,13 +69,28 @@ public sealed record AuditEvent
 /// </summary>
 public sealed record AuditQuery
 {
+    /// <summary>Start of the time range filter (inclusive).</summary>
     public DateTimeOffset? From { get; init; }
+
+    /// <summary>End of the time range filter (inclusive).</summary>
     public DateTimeOffset? To { get; init; }
+
+    /// <summary>Filter by subject identifier.</summary>
     public string? SubjectId { get; init; }
+
+    /// <summary>Filter by resource identifier.</summary>
     public string? ResourceId { get; init; }
+
+    /// <summary>Filter by event type.</summary>
     public string? EventType { get; init; }
+
+    /// <summary>Filter by decision outcome.</summary>
     public string? Decision { get; init; }
+
+    /// <summary>Maximum number of events per page.</summary>
     public int PageSize { get; init; } = 50;
+
+    /// <summary>One-based page number.</summary>
     public int Page { get; init; } = 1;
 }
 
@@ -84,9 +99,18 @@ public sealed record AuditQuery
 /// </summary>
 public sealed record AuditQueryResult
 {
+    /// <summary>Audit events on this page.</summary>
     public required List<AuditEvent> Events { get; init; }
+
+    /// <summary>Total number of matching events across all pages.</summary>
     public required int TotalCount { get; init; }
+
+    /// <summary>Current page number (one-based).</summary>
     public required int Page { get; init; }
+
+    /// <summary>Page size used for this query.</summary>
     public required int PageSize { get; init; }
+
+    /// <summary>Total number of pages.</summary>
     public int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
 }

@@ -45,11 +45,13 @@ public sealed class PapAdminController : ControllerBase
         _tenantContext = tenantContext;
     }
 
+    /// <summary>Extracts the actor identity from the current JWT claims.</summary>
     private string GetActorIdentity()
         => User.FindFirst("sub")?.Value
            ?? User.FindFirst("client_id")?.Value
            ?? "anonymous";
 
+    /// <summary>Records a policy change audit event.</summary>
     private void AuditPolicyChange(string action, string resourceType, string resourceId, object? detail = null)
     {
         _auditWriter.Write(new AuditEvent
@@ -64,11 +66,13 @@ public sealed class PapAdminController : ControllerBase
         });
     }
 
+    /// <summary>List all policy sets for the current tenant.</summary>
     [HttpGet("policy-sets")]
     [Authorize(Policy = "PolicyRead")]
     public Task<List<Core.Domain.Policy.PolicySet>> ListPolicySets(CancellationToken ct)
         => _policyRepository.GetPolicySetsAsync(ct);
 
+    /// <summary>Get a policy set by ID.</summary>
     [HttpGet("policy-sets/{id}")]
     [Authorize(Policy = "PolicyRead")]
     public async Task<ActionResult<Core.Domain.Policy.PolicySet>> GetPolicySet(string id, CancellationToken ct)
@@ -77,6 +81,7 @@ public sealed class PapAdminController : ControllerBase
         return item is null ? NotFound() : Ok(item);
     }
 
+    /// <summary>Create or update a policy set.</summary>
     [HttpPut("policy-sets/{id}")]
     [Authorize(Policy = "PolicyWrite")]
     public async Task<ActionResult<Core.Domain.Policy.PolicySet>> UpsertPolicySet(string id, [FromBody] Core.Domain.Policy.PolicySet policySet, CancellationToken ct)
@@ -98,6 +103,7 @@ public sealed class PapAdminController : ControllerBase
         return Ok(saved);
     }
 
+    /// <summary>Delete a policy set.</summary>
     [HttpDelete("policy-sets/{id}")]
     [Authorize(Policy = "PolicyAdmin")]
     public async Task<IActionResult> DeletePolicySet(string id, CancellationToken ct)
@@ -107,6 +113,7 @@ public sealed class PapAdminController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Get a policy by ID.</summary>
     [HttpGet("policies/{id}")]
     [Authorize(Policy = "PolicyRead")]
     public async Task<ActionResult<Core.Domain.Policy.Policy>> GetPolicy(string id, CancellationToken ct)
@@ -115,6 +122,7 @@ public sealed class PapAdminController : ControllerBase
         return item is null ? NotFound() : Ok(item);
     }
 
+    /// <summary>Create or update a policy.</summary>
     [HttpPut("policies/{id}")]
     [Authorize(Policy = "PolicyWrite")]
     public async Task<ActionResult<Core.Domain.Policy.Policy>> UpsertPolicy(string id, [FromBody] Core.Domain.Policy.Policy policy, CancellationToken ct)
@@ -136,6 +144,7 @@ public sealed class PapAdminController : ControllerBase
         return Ok(saved);
     }
 
+    /// <summary>Delete a policy.</summary>
     [HttpDelete("policies/{id}")]
     [Authorize(Policy = "PolicyAdmin")]
     public async Task<IActionResult> DeletePolicy(string id, CancellationToken ct)
@@ -145,13 +154,19 @@ public sealed class PapAdminController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>List all versions of a policy.</summary>
     [HttpGet("policies/{id}/versions")]
     [Authorize(Policy = "PolicyRead")]
     public async Task<ActionResult<List<PolicyVersion>>> ListPolicyVersions(string id, CancellationToken ct)
         => Ok(await _policyRepository.GetVersionsAsync(id, ct));
 
+    /// <summary>Request to create a new policy version.</summary>
+    /// <param name="Content">Policy content.</param>
+    /// <param name="CreatedBy">Identity of the creator.</param>
+    /// <param name="Activate">Whether to activate the new version immediately.</param>
     public sealed record CreatePolicyVersionRequest(string Content, string? CreatedBy = null, bool Activate = true);
 
+    /// <summary>Create a new version of a policy.</summary>
     [HttpPost("policies/{id}/versions")]
     [Authorize(Policy = "PolicyWrite")]
     public async Task<ActionResult<PolicyVersion>> CreatePolicyVersion(string id, [FromBody] CreatePolicyVersionRequest request, CancellationToken ct)
@@ -188,6 +203,7 @@ public sealed class PapAdminController : ControllerBase
         return Ok(await _policyRepository.GetVersionAsync(saved.Id, ct));
     }
 
+    /// <summary>Activate a specific policy version.</summary>
     [HttpPost("policies/{id}/versions/{versionId:guid}/activate")]
     [Authorize(Policy = "PolicyWrite")]
     public async Task<IActionResult> ActivatePolicyVersion(string id, Guid versionId, CancellationToken ct)
@@ -206,6 +222,7 @@ public sealed class PapAdminController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Compare two policy versions and return a diff.</summary>
     [HttpGet("policies/{id}/versions/{leftVersionId:guid}/diff/{rightVersionId:guid}")]
     [Authorize(Policy = "PolicyRead")]
     public async Task<ActionResult<PolicyDiffResult>> DiffPolicyVersions(string id, Guid leftVersionId, Guid rightVersionId, CancellationToken ct)
@@ -221,8 +238,12 @@ public sealed class PapAdminController : ControllerBase
         return Ok(PolicyVersionDiff.Compare(left.Content, right.Content));
     }
 
+    /// <summary>Request to rollback to a previous policy version.</summary>
+    /// <param name="CreatedBy">Identity of the person performing the rollback.</param>
+    /// <param name="Reason">Reason for the rollback.</param>
     public sealed record RollbackPolicyVersionRequest(string? CreatedBy = null, string? Reason = null);
 
+    /// <summary>Rollback a policy to a previous version by creating a new version with the old content.</summary>
     [HttpPost("policies/{id}/versions/{versionId:guid}/rollback")]
     [Authorize(Policy = "PolicyWrite")]
     public async Task<ActionResult<PolicyVersion>> RollbackPolicyVersion(string id, Guid versionId, [FromBody] RollbackPolicyVersionRequest? request, CancellationToken ct)
@@ -265,6 +286,7 @@ public sealed class PapAdminController : ControllerBase
         return Ok(await _policyRepository.GetVersionAsync(saved.Id, ct));
     }
 
+    /// <summary>List all SPIFs for the current tenant.</summary>
     [HttpGet("spifs")]
     [Authorize(Policy = "PolicyRead")]
     public async Task<ActionResult<List<SpifEntity>>> ListSpifs(CancellationToken ct)
@@ -277,8 +299,14 @@ public sealed class PapAdminController : ControllerBase
         return Ok(spifs);
     }
 
+    /// <summary>Request to import a SPIF from XML.</summary>
+    /// <param name="Xml">Raw SPIF XML content.</param>
+    /// <param name="Activate">Whether to activate the SPIF immediately.</param>
+    /// <param name="SetAsDefault">Whether to set this as the default SPIF.</param>
+    /// <param name="ImportedBy">Identity of the importer.</param>
     public sealed record SpifImportRequest(string Xml, bool Activate = true, bool SetAsDefault = false, string? ImportedBy = null);
 
+    /// <summary>Import a SPIF from XML, parse it, register it, and persist to database.</summary>
     [HttpPost("spifs/import")]
     [Authorize(Policy = "PolicyWrite")]
     public async Task<ActionResult<object>> ImportSpif([FromBody] SpifImportRequest request, CancellationToken ct)
@@ -365,6 +393,8 @@ public sealed class PapAdminController : ControllerBase
         return Content(entity.RawXml, "application/xml");
     }
 
+    /// <summary>Request to check a candidate policy for conflicts.</summary>
+    /// <param name="Content">The candidate policy content to check.</param>
     public sealed record ConflictCheckRequest(string Content);    
 
     /// <summary>

@@ -6,9 +6,13 @@ using Microsoft.Extensions.Options;
 
 namespace AbacController.Api.Auth;
 
+/// <summary>Default values for API key authentication.</summary>
 public static class ApiKeyAuthenticationDefaults
 {
+    /// <summary>Authentication scheme name.</summary>
     public const string SchemeName = "ApiKey";
+
+    /// <summary>HTTP header used to pass the API key.</summary>
     public const string HeaderName = "X-API-Key";
 }
 
@@ -20,6 +24,7 @@ public sealed class ApiKeyAuthHandler : AuthenticationHandler<AuthenticationSche
 {
     private readonly AbacControllerOptions _options;
 
+    /// <summary>Initializes a new instance of the <see cref="ApiKeyAuthHandler"/> class.</summary>
     public ApiKeyAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
@@ -30,6 +35,7 @@ public sealed class ApiKeyAuthHandler : AuthenticationHandler<AuthenticationSche
         _options = abacOptions;
     }
 
+    /// <inheritdoc />
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         if (!Request.Headers.TryGetValue(ApiKeyAuthenticationDefaults.HeaderName, out var apiKeyValues))

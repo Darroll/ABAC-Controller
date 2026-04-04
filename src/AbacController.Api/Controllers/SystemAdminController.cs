@@ -47,7 +47,6 @@ public sealed class SystemAdminController : ControllerBase
     /// Get system status information.
     /// </summary>
     [HttpGet("info")]
-    [HttpGet("status")]
     [Authorize(Policy = "SysRead")]
     public ActionResult<object> GetStatus()
         => Ok(new
@@ -59,6 +58,7 @@ public sealed class SystemAdminController : ControllerBase
             registeredPolicyOids = _spifRegistry.GetRegisteredPolicyOids()
         });
 
+    /// <summary>Get system configuration (non-sensitive values only).</summary>
     [HttpGet("config")]
     [Authorize(Policy = "SysAdmin")]
     public ActionResult<object> GetConfig()

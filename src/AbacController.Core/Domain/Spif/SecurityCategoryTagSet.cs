@@ -97,10 +97,21 @@ public sealed record TagCategory
 /// </summary>
 public sealed record EquivalentCategoryTag
 {
+    /// <summary>OID of the equivalent policy.</summary>
     public required string PolicyRef { get; init; }
+
+    /// <summary>Tag set identifier in the equivalent policy.</summary>
     public required string TagSetId { get; init; }
+
+    /// <summary>Tag type in the equivalent policy.</summary>
     public required TagType TagType { get; init; }
+
+    /// <summary>LACV in the equivalent policy.</summary>
     public required LacvValue Lacv { get; init; }
+
+    /// <summary>Direction of the equivalency mapping.</summary>
     public required EquivalencyDirection Applied { get; init; }
+
+    /// <summary>Optional action qualifier for the equivalence.</summary>
     public string? Action { get; init; }
 }

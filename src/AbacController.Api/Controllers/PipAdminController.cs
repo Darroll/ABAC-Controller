@@ -18,17 +18,20 @@ public sealed class PipAdminController : ControllerBase
     private readonly AbacDbContext _dbContext;
     private readonly PipHealthMonitor _healthMonitor;
 
+    /// <summary>Initializes a new instance of the <see cref="PipAdminController"/> class.</summary>
     public PipAdminController(AbacDbContext dbContext, PipHealthMonitor healthMonitor)
     {
         _dbContext = dbContext;
         _healthMonitor = healthMonitor;
     }
 
+    /// <summary>List all registered PIP sources.</summary>
     [HttpGet("sources")]
     [Authorize(Policy = "PipRead")]
     public async Task<ActionResult<List<PipSourceEntity>>> ListSources(CancellationToken ct)
         => Ok(await _dbContext.PipSources.AsNoTracking().OrderBy(x => x.Id).ToListAsync(ct));
 
+    /// <summary>Get a PIP source by ID.</summary>
     [HttpGet("sources/{id}")]
     [Authorize(Policy = "PipRead")]
     public async Task<ActionResult<PipSourceEntity>> GetSource(string id, CancellationToken ct)
@@ -37,6 +40,7 @@ public sealed class PipAdminController : ControllerBase
         return source is null ? NotFound() : Ok(source);
     }
 
+    /// <summary>Create or update a PIP source configuration.</summary>
     [HttpPut("sources/{id}")]
     [Authorize(Policy = "PipAdmin")]
     public async Task<ActionResult<PipSourceEntity>> UpsertSource(string id, [FromBody] PipSourceEntity source, CancellationToken ct)
@@ -68,6 +72,7 @@ public sealed class PipAdminController : ControllerBase
         return Ok(existing);
     }
 
+    /// <summary>Delete a PIP source.</summary>
     [HttpDelete("sources/{id}")]
     [Authorize(Policy = "PipAdmin")]
     public async Task<IActionResult> DeleteSource(string id, CancellationToken ct)
@@ -81,6 +86,7 @@ public sealed class PipAdminController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Test connectivity to a PIP source.</summary>
     [HttpPost("sources/{id}/test")]
     [Authorize(Policy = "PipAdmin")]
     public async Task<ActionResult<object>> TestSource(string id, CancellationToken ct)

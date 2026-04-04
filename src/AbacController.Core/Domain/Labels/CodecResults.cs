@@ -122,10 +122,16 @@ public sealed record SpifParseError(string Message, int? LineNumber = null);
 /// </summary>
 public sealed record ValidationResult
 {
+    /// <summary>Whether validation passed.</summary>
     public required bool IsValid { get; init; }
+
+    /// <summary>Validation errors (empty when valid).</summary>
     public IReadOnlyList<SpifParseError> Errors { get; init; } = [];
 
+    /// <summary>Create a passing validation result.</summary>
     public static ValidationResult Valid() => new() { IsValid = true };
+
+    /// <summary>Create a failing validation result with errors.</summary>
     public static ValidationResult Invalid(IReadOnlyList<SpifParseError> errors) => new()
     {
         IsValid = false,

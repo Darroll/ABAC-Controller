@@ -5,8 +5,10 @@ using Microsoft.Extensions.Options;
 
 namespace AbacController.Api.Auth;
 
+/// <summary>Default values for development authentication.</summary>
 public static class DevelopmentAuthenticationDefaults
 {
+    /// <summary>Authentication scheme name.</summary>
     public const string SchemeName = "Development";
 }
 
@@ -16,6 +18,7 @@ public static class DevelopmentAuthenticationDefaults
 /// </summary>
 public sealed class DevelopmentAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
+    /// <summary>Initializes a new instance of the <see cref="DevelopmentAuthHandler"/> class.</summary>
     public DevelopmentAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
@@ -24,6 +27,7 @@ public sealed class DevelopmentAuthHandler : AuthenticationHandler<Authenticatio
     {
     }
 
+    /// <inheritdoc />
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         var identity = new ClaimsIdentity(DevelopmentAuthenticationDefaults.SchemeName);

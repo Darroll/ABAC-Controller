@@ -70,7 +70,10 @@ public sealed record ExplainedEvaluationResult
 /// </summary>
 public sealed record StatusInfo
 {
+    /// <summary>Status code (e.g. "ok", "missing-attribute", "processing-error").</summary>
     public required string Code { get; init; }
+
+    /// <summary>Human-readable status message.</summary>
     public string? Message { get; init; }
 }
 
@@ -79,7 +82,10 @@ public sealed record StatusInfo
 /// </summary>
 public sealed record Obligation
 {
+    /// <summary>Obligation identifier.</summary>
     public required string Id { get; init; }
+
+    /// <summary>Obligation attributes the PEP must apply.</summary>
     public Dictionary<string, object?> Attributes { get; init; } = new();
 }
 
@@ -88,7 +94,10 @@ public sealed record Obligation
 /// </summary>
 public sealed record Advice
 {
+    /// <summary>Advice identifier.</summary>
     public required string Id { get; init; }
+
+    /// <summary>Advice attributes the PEP may optionally apply.</summary>
     public Dictionary<string, object?> Attributes { get; init; } = new();
 }
 
@@ -115,9 +124,16 @@ public sealed record AttributeProvenance
 /// </summary>
 public sealed record EvaluationTrace
 {
+    /// <summary>Policy set that was evaluated.</summary>
     public string? PolicySetId { get; init; }
+
+    /// <summary>Version of the evaluated policy.</summary>
     public string? PolicyVersion { get; init; }
+
+    /// <summary>Specific policy rule that matched.</summary>
     public string? MatchedPolicy { get; init; }
+
+    /// <summary>Ordered trace steps showing rule-by-rule evaluation.</summary>
     public List<TraceStep> Steps { get; init; } = [];
 }
 
@@ -126,8 +142,15 @@ public sealed record EvaluationTrace
 /// </summary>
 public sealed record TraceStep
 {
+    /// <summary>Identifier of the evaluated rule.</summary>
     public required string RuleId { get; init; }
+
+    /// <summary>Effect of the rule (Permit or Deny).</summary>
     public required string Effect { get; init; }
+
+    /// <summary>Whether the rule condition matched.</summary>
     public required bool Result { get; init; }
+
+    /// <summary>Human-readable explanation of this evaluation step.</summary>
     public required string Reason { get; init; }
 }
