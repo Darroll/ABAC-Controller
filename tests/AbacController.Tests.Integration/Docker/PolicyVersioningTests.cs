@@ -27,14 +27,14 @@ public sealed class PolicyVersioningTests
         var v1 = await CreateVersionAsync(policyId, "Permit", "v1");
         var v2 = await CreateVersionAsync(policyId, "Deny", "v2");
 
-        var diffResponse = await _http.GetAsync($"/api/v1/pap/policies/{policyId}/versions/{v1.GetProperty("id").GetGuid()}/diff/{v2.GetProperty("id").GetGuid()}");
+        var diffResponse = await _http.GetAsync($"/pap/api/policies/{policyId}/versions/{v1.GetProperty("id").GetGuid()}/diff/{v2.GetProperty("id").GetGuid()}");
         Assert.Equal(HttpStatusCode.OK, diffResponse.StatusCode);
         var diff = await diffResponse.Content.ReadFromJsonAsync<JsonDocument>();
         Assert.NotNull(diff);
         Assert.True(diff.RootElement.GetProperty("hasChanges").GetBoolean());
 
         var rollbackResponse = await _http.PostAsJsonAsync(
-            $"/api/v1/pap/policies/{policyId}/versions/{v1.GetProperty("id").GetGuid()}/rollback",
+            $"/pap/api/policies/{policyId}/versions/{v1.GetProperty("id").GetGuid()}/rollback",
             new { createdBy = "docker-test", reason = "restore permit policy" });
         Assert.Equal(HttpStatusCode.OK, rollbackResponse.StatusCode);
         var rollbackVersion = await rollbackResponse.Content.ReadFromJsonAsync<JsonDocument>();
@@ -42,7 +42,7 @@ public sealed class PolicyVersioningTests
         Assert.True(rollbackVersion.RootElement.GetProperty("isActive").GetBoolean());
         Assert.Equal(3, rollbackVersion.RootElement.GetProperty("versionNumber").GetInt32());
 
-        var versionsResponse = await _http.GetAsync($"/api/v1/pap/policies/{policyId}/versions");
+        var versionsResponse = await _http.GetAsync($"/pap/api/policies/{policyId}/versions");
         Assert.Equal(HttpStatusCode.OK, versionsResponse.StatusCode);
         var versions = await versionsResponse.Content.ReadFromJsonAsync<JsonElement[]>();
         Assert.NotNull(versions);
@@ -53,7 +53,7 @@ public sealed class PolicyVersioningTests
 
     private async Task CreatePolicySetAsync(string policySetId)
     {
-        var response = await _http.PutAsJsonAsync($"/api/v1/pap/policy-sets/{policySetId}", new
+        var response = await _http.PutAsJsonAsync($"/pap/api/policy-sets/{policySetId}", new
         {
             id = policySetId,
             name = "Versioning Test Policy Set",
@@ -67,7 +67,7 @@ public sealed class PolicyVersioningTests
 
     private async Task CreatePolicyAsync(string policyId, string policySetId)
     {
-        var response = await _http.PutAsJsonAsync($"/api/v1/pap/policies/{policyId}", new
+        var response = await _http.PutAsJsonAsync($"/pap/api/policies/{policyId}", new
         {
             id = policyId,
             policySetId,
@@ -88,7 +88,7 @@ public sealed class PolicyVersioningTests
             conditions = Array.Empty<object>()
         });
 
-        var response = await _http.PostAsJsonAsync($"/api/v1/pap/policies/{policyId}/versions", new
+        var response = await _http.PostAsJsonAsync($"/pap/api/policies/{policyId}/versions", new
         {
             content = policyDocument,
             createdBy,

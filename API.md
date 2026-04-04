@@ -11,40 +11,47 @@
 - `POST /access/v1/resources`
 - `POST /access/v1/actions`
 
+### PDP extended endpoints
+
+- `POST /pdp/api/evaluate/explain`
+- `POST /pdp/api/evaluate/simulate`
+- `POST /pdp/api/evaluate/async`
+- `GET /pdp/api/evaluate/async/{evaluationId}/status`
+
 ### PAP endpoints
 
-- `GET /api/v1/pap/policy-sets`
-- `GET /api/v1/pap/policy-sets/{id}`
-- `PUT /api/v1/pap/policy-sets/{id}`
-- `DELETE /api/v1/pap/policy-sets/{id}`
-- `GET /api/v1/pap/policies/{id}`
-- `PUT /api/v1/pap/policies/{id}`
-- `DELETE /api/v1/pap/policies/{id}`
-- `GET /api/v1/pap/policies/{id}/versions`
-- `POST /api/v1/pap/policies/{id}/versions`
-- `POST /api/v1/pap/policies/{id}/versions/{versionId}/activate`
-- `GET /api/v1/pap/spifs`
-- `POST /api/v1/pap/spifs/import`
+- `GET /pap/api/policy-sets`
+- `GET /pap/api/policy-sets/{id}`
+- `PUT /pap/api/policy-sets/{id}`
+- `DELETE /pap/api/policy-sets/{id}`
+- `GET /pap/api/policies/{id}`
+- `PUT /pap/api/policies/{id}`
+- `DELETE /pap/api/policies/{id}`
+- `GET /pap/api/policies/{id}/versions`
+- `POST /pap/api/policies/{id}/versions`
+- `POST /pap/api/policies/{id}/versions/{versionId}/activate`
+- `GET /pap/api/spifs`
+- `POST /pap/api/spifs/import`
 
 ### PIP endpoints
 
-- `GET /api/v1/pip/sources`
-- `GET /api/v1/pip/sources/{id}`
-- `PUT /api/v1/pip/sources/{id}`
-- `DELETE /api/v1/pip/sources/{id}`
-- `POST /api/v1/pip/sources/{id}/test`
+- `GET /pip/api/sources`
+- `GET /pip/api/sources/{id}`
+- `PUT /pip/api/sources/{id}`
+- `DELETE /pip/api/sources/{id}`
+- `POST /pip/api/sources/{id}/test`
 
 ### PEP metadata endpoints
 
-- `POST /api/v1/pep/metadata/bind`
-- `POST /api/v1/pep/metadata/unbind`
-- `GET /api/v1/pep/metadata/codecs`
+- `POST /pep/api/metadata/bind`
+- `POST /pep/api/metadata/unbind`
+- `GET /pep/api/metadata/codecs`
 
 ### System endpoints
 
-- `GET /api/v1/system/info`
-- `GET /api/v1/system/config`
-- `GET /api/v1/system/enforcement-points`
+- `GET /system/api/info`
+- `GET /system/api/config`
+- `GET /system/api/enforcement-points`
 
 ### Health and metrics
 
@@ -60,6 +67,16 @@
 - `PipApi`
 - `PepApi`
 - `SystemApi`
+
+Representative HTTP transcoding routes:
+
+- `POST /pdp/grpc/evaluate`
+- `POST /pdp/grpc/evaluate/batch`
+- `POST /pdp/grpc/evaluate/explain`
+- `GET /pap/grpc/policy-sets`
+- `GET /pip/grpc/sources`
+- `GET /pep/grpc/enforcement-points`
+- `GET /system/grpc/status`
 
 See `protos/` for source contracts.
 

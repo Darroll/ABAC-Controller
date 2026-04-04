@@ -12,7 +12,7 @@
 - Supported shape:
   - bind an inline STANAG 4774 XML label plus opaque payload bytes/text into a simple STANAG 4778-style XML envelope
   - unbind the envelope and recover the embedded label and payload
-  - invoke that path through `POST /api/v1/pep/metadata/bind` and `POST /api/v1/pep/metadata/unbind`
+  - invoke that path through `POST /pep/api/metadata/bind` and `POST /pep/api/metadata/unbind`
 - Current limits:
   - payload is carried **inline** in the XML envelope as base64
   - no detached/reference-based binding model yet

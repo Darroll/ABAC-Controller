@@ -18,7 +18,7 @@ namespace AbacController.Api.Controllers;
 /// PAP (Policy Administration Point) endpoints for managing policy sets, policies, versions, and SPIFs.
 /// </summary>
 [ApiController]
-[Route("api/v1/pap")]
+[Route("pap/api")]
 public sealed class PapAdminController : ControllerBase
 {
     private readonly IPolicyRepository _policyRepository;
@@ -399,7 +399,7 @@ public sealed class PapAdminController : ControllerBase
 
     /// <summary>
     /// Check a candidate policy for conflicts with existing policies.
-    /// POST /api/v1/pap/policies/check-conflicts
+    /// POST /pap/api/policies/check-conflicts
     /// </summary>
     [HttpPost("policies/check-conflicts")]
     [Authorize(Policy = "PolicyWrite")]

@@ -46,7 +46,7 @@ public sealed class MultiTenantIsolationTests
 
     private async Task PutPolicySetAsync(string? tenantId, string id, string name)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Put, $"/api/v1/pap/policy-sets/{id}")
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"/pap/api/policy-sets/{id}")
         {
             Content = JsonContent.Create(new
             {
@@ -68,7 +68,7 @@ public sealed class MultiTenantIsolationTests
 
     private async Task<List<string>> GetPolicySetIdsAsync(string? tenantId)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/pap/policy-sets");
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/pap/api/policy-sets");
         if (!string.IsNullOrWhiteSpace(tenantId))
         {
             request.Headers.Add("X-Tenant-Id", tenantId);

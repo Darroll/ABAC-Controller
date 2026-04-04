@@ -31,6 +31,9 @@ public sealed class AuthZenDiscoveryTests
         Assert.Equal("/access/v1/subjects", root.GetProperty("subjects_endpoint").GetString());
         Assert.Equal("/access/v1/resources", root.GetProperty("resources_endpoint").GetString());
         Assert.Equal("/access/v1/actions", root.GetProperty("actions_endpoint").GetString());
+        Assert.Equal("/pdp/api/evaluate/explain", root.GetProperty("evaluation_explain_endpoint").GetString());
+        Assert.Equal("/pdp/api/evaluate/simulate", root.GetProperty("evaluation_simulate_endpoint").GetString());
+        Assert.Equal("/pdp/api/evaluate/async", root.GetProperty("evaluation_async_endpoint").GetString());
         Assert.Equal("1.0", root.GetProperty("api_version").GetString());
 
         // Authentication methods should include bearer

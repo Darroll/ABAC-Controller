@@ -18,7 +18,7 @@ public sealed class AuthZenEvaluationTests
     [Fact]
     public async Task BatchEvaluation_ReturnsOneResultPerRequest()
     {
-        var policySetResponse = await _fixture.HttpClient.PutAsJsonAsync("/api/v1/pap/policy-sets/test-batch-ps", new
+        var policySetResponse = await _fixture.HttpClient.PutAsJsonAsync("/pap/api/policy-sets/test-batch-ps", new
         {
             id = "test-batch-ps",
             name = "Batch Policy Set",
@@ -27,7 +27,7 @@ public sealed class AuthZenEvaluationTests
         });
         policySetResponse.EnsureSuccessStatusCode();
 
-        var policyResponse = await _fixture.HttpClient.PutAsJsonAsync("/api/v1/pap/policies/test-batch-policy", new
+        var policyResponse = await _fixture.HttpClient.PutAsJsonAsync("/pap/api/policies/test-batch-policy", new
         {
             id = "test-batch-policy",
             policySetId = "test-batch-ps",
@@ -36,7 +36,7 @@ public sealed class AuthZenEvaluationTests
         });
         policyResponse.EnsureSuccessStatusCode();
 
-        var versionResponse = await _fixture.HttpClient.PostAsJsonAsync("/api/v1/pap/policies/test-batch-policy/versions", new
+        var versionResponse = await _fixture.HttpClient.PostAsJsonAsync("/pap/api/policies/test-batch-policy/versions", new
         {
             content = "allow if subject.id == 'alice' and action.name == 'read'",
             activate = true
@@ -89,7 +89,7 @@ public sealed class AuthZenEvaluationTests
     public async Task AsyncEvaluation_QueuesAndCompletes()
     {
         var callbackUrl = "http://127.0.0.1:9/callback";
-        var enqueueResponse = await _fixture.HttpClient.PostAsJsonAsync("/access/v1/evaluation/async", new
+        var enqueueResponse = await _fixture.HttpClient.PostAsJsonAsync("/pdp/api/evaluate/async", new
         {
             callbackUrl,
             subject = new { type = "user", id = "alice", properties = new { } },
@@ -107,7 +107,7 @@ public sealed class AuthZenEvaluationTests
         for (var i = 0; i < 20; i++)
         {
             await Task.Delay(250);
-            var statusResponse = await _fixture.HttpClient.GetAsync($"/access/v1/evaluation/async/{evaluationId}");
+            var statusResponse = await _fixture.HttpClient.GetAsync($"/pdp/api/evaluate/async/{evaluationId}/status");
             statusResponse.EnsureSuccessStatusCode();
             statusPayload = await statusResponse.Content.ReadFromJsonAsync<JsonElement>();
             if (string.Equals(statusPayload.GetProperty("status").GetString(), "completed", StringComparison.Ordinal))

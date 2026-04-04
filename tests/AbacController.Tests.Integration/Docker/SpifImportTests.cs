@@ -26,7 +26,7 @@ public sealed class SpifImportTests
             importedBy = "integration-test"
         };
 
-        var response = await _http.PostAsJsonAsync("/api/v1/pap/spifs/import", body);
+        var response = await _http.PostAsJsonAsync("/pap/api/spifs/import", body);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var doc = await response.Content.ReadFromJsonAsync<JsonDocument>();
@@ -47,7 +47,7 @@ public sealed class SpifImportTests
             activate = true
         };
 
-        var response = await _http.PostAsJsonAsync("/api/v1/pap/spifs/import", body);
+        var response = await _http.PostAsJsonAsync("/pap/api/spifs/import", body);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
@@ -62,11 +62,11 @@ public sealed class SpifImportTests
             setAsDefault = false,
             importedBy = "integration-test-list"
         };
-        var importResponse = await _http.PostAsJsonAsync("/api/v1/pap/spifs/import", importBody);
+        var importResponse = await _http.PostAsJsonAsync("/pap/api/spifs/import", importBody);
         importResponse.EnsureSuccessStatusCode();
 
         // List
-        var listResponse = await _http.GetAsync("/api/v1/pap/spifs");
+        var listResponse = await _http.GetAsync("/pap/api/spifs");
         Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
 
         var spifs = await listResponse.Content.ReadFromJsonAsync<JsonElement[]>();
@@ -78,7 +78,7 @@ public sealed class SpifImportTests
     [Fact]
     public async Task DeleteSpif_RemovesImportedSpif()
     {
-        var importResponse = await _http.PostAsJsonAsync("/api/v1/pap/spifs/import", new
+        var importResponse = await _http.PostAsJsonAsync("/pap/api/spifs/import", new
         {
             xml = TestSpifSamples.BasicPolicy,
             activate = true,
@@ -87,7 +87,7 @@ public sealed class SpifImportTests
         });
         importResponse.EnsureSuccessStatusCode();
 
-        var spifsBeforeDelete = await _http.GetFromJsonAsync<JsonElement[]>("/api/v1/pap/spifs");
+        var spifsBeforeDelete = await _http.GetFromJsonAsync<JsonElement[]>("/pap/api/spifs");
         Assert.NotNull(spifsBeforeDelete);
         var importedSpif = spifsBeforeDelete
             .Where(s => s.TryGetProperty("policyOid", out var oid) && oid.GetString() == "1.2.3.4")
@@ -95,10 +95,10 @@ public sealed class SpifImportTests
             .First();
         var spifId = importedSpif.GetProperty("id").GetGuid();
 
-        var deleteResponse = await _http.DeleteAsync($"/api/v1/pap/spifs/{spifId}");
+        var deleteResponse = await _http.DeleteAsync($"/pap/api/spifs/{spifId}");
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
 
-        var spifsAfterDelete = await _http.GetFromJsonAsync<JsonElement[]>("/api/v1/pap/spifs");
+        var spifsAfterDelete = await _http.GetFromJsonAsync<JsonElement[]>("/pap/api/spifs");
         Assert.NotNull(spifsAfterDelete);
         Assert.DoesNotContain(spifsAfterDelete, s => s.GetProperty("id").GetGuid() == spifId);
     }

@@ -12,7 +12,7 @@ namespace AbacController.Api.Controllers;
 /// PIP (Policy Information Point) administration endpoints for managing attribute sources.
 /// </summary>
 [ApiController]
-[Route("api/v1/pip")]
+[Route("pip/api")]
 public sealed class PipAdminController : ControllerBase
 {
     private readonly AbacDbContext _dbContext;

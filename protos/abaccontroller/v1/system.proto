@@ -8,16 +8,16 @@ import "google/api/annotations.proto";
 
 service SystemApi {
   rpc GetStatus(GetStatusRequestMessage) returns (GetStatusResponseMessage) {
-    option (google.api.http) = { get: "/api/v1/grpc/system/status" };
+    option (google.api.http) = { get: "/system/grpc/status" };
   }
 
   rpc ListRegisteredSpifs(ListRegisteredSpifsRequestMessage) returns (ListRegisteredSpifsResponseMessage) {
-    option (google.api.http) = { get: "/api/v1/grpc/system/spifs/registered" };
+    option (google.api.http) = { get: "/system/grpc/spifs/registered" };
   }
 
   rpc QueryAudit(QueryAuditRequestMessage) returns (QueryAuditResponseMessage) {
     option (google.api.http) = {
-      post: "/api/v1/grpc/system/audit/query"
+      post: "/system/grpc/audit/query"
       body: "*"
     };
   }

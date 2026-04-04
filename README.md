@@ -131,9 +131,9 @@ AbacController/
 Representative protobuf-backed REST paths include:
 
 ```text
-POST /api/v1/pdp/evaluate
-POST /api/v1/pdp/evaluate/batch
-POST /api/v1/pdp/evaluate/explain
+POST /pdp/grpc/evaluate
+POST /pdp/grpc/evaluate/batch
+POST /pdp/grpc/evaluate/explain
 ```
 
 Additional component endpoints are defined in `protos/abaccontroller/v1/*.proto`.
@@ -143,10 +143,13 @@ Additional component endpoints are defined in `protos/abaccontroller/v1/*.proto`
 ```text
 POST /access/v1/evaluation
 POST /access/v1/evaluations
+POST /pdp/api/evaluate/explain
+POST /pdp/api/evaluate/simulate
+POST /pdp/api/evaluate/async
 GET  /.well-known/authzen-configuration
-POST /api/v1/pep/metadata/bind
-POST /api/v1/pep/metadata/unbind
-GET  /api/v1/pep/metadata/codecs
+POST /pep/api/metadata/bind
+POST /pep/api/metadata/unbind
+GET  /pep/api/metadata/codecs
 ```
 
 ### Health and observability

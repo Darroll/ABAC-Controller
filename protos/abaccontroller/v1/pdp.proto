@@ -10,21 +10,21 @@ import "google/protobuf/duration.proto";
 service PdpApi {
   rpc Evaluate(EvaluateRequestMessage) returns (EvaluateResponseMessage) {
     option (google.api.http) = {
-      post: "/api/v1/grpc/pdp/evaluate"
+      post: "/pdp/grpc/evaluate"
       body: "*"
     };
   }
 
   rpc EvaluateBatch(EvaluateBatchRequestMessage) returns (EvaluateBatchResponseMessage) {
     option (google.api.http) = {
-      post: "/api/v1/grpc/pdp/evaluate/batch"
+      post: "/pdp/grpc/evaluate/batch"
       body: "*"
     };
   }
 
   rpc EvaluateExplain(EvaluateRequestMessage) returns (ExplainedEvaluateResponseMessage) {
     option (google.api.http) = {
-      post: "/api/v1/grpc/pdp/evaluate/explain"
+      post: "/pdp/grpc/evaluate/explain"
       body: "*"
     };
   }

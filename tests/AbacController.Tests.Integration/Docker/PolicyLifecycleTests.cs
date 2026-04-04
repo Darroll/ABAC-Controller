@@ -36,7 +36,7 @@ public sealed class PolicyLifecycleTests
         Assert.Equal(1, version.GetProperty("versionNumber").GetInt32());
         Assert.True(version.GetProperty("isActive").GetBoolean());
 
-        var versionsResponse = await _http.GetAsync($"/api/v1/pap/policies/{policyId}/versions");
+        var versionsResponse = await _http.GetAsync($"/pap/api/policies/{policyId}/versions");
         Assert.Equal(HttpStatusCode.OK, versionsResponse.StatusCode);
         var versions = await versionsResponse.Content.ReadFromJsonAsync<JsonElement[]>();
         Assert.NotNull(versions);
@@ -72,7 +72,7 @@ public sealed class PolicyLifecycleTests
         Assert.True(encodedLabel.Success, encodedLabel.Error);
         Assert.Contains("<", encodedLabel.Content);
 
-        var bindResponse = await _http.PostAsJsonAsync("/api/v1/pep/metadata/bind", new
+        var bindResponse = await _http.PostAsJsonAsync("/pep/api/metadata/bind", new
         {
             bindingId = "bind-001",
             labelXml = encodedLabel.Content,
@@ -85,7 +85,7 @@ public sealed class PolicyLifecycleTests
         var envelopeXml = boundDoc.RootElement.GetProperty("envelopeXml").GetString();
         Assert.False(string.IsNullOrWhiteSpace(envelopeXml));
 
-        var unbindResponse = await _http.PostAsJsonAsync("/api/v1/pep/metadata/unbind", new
+        var unbindResponse = await _http.PostAsJsonAsync("/pep/api/metadata/unbind", new
         {
             envelopeXml
         });
@@ -104,7 +104,7 @@ public sealed class PolicyLifecycleTests
 
     private async Task ImportSpifAsync()
     {
-        var response = await _http.PostAsJsonAsync("/api/v1/pap/spifs/import", new
+        var response = await _http.PostAsJsonAsync("/pap/api/spifs/import", new
         {
             xml = TestSpifSamples.BasicPolicy,
             activate = true,
@@ -117,7 +117,7 @@ public sealed class PolicyLifecycleTests
 
     private async Task CreatePolicySetAsync(string policySetId)
     {
-        var response = await _http.PutAsJsonAsync($"/api/v1/pap/policy-sets/{policySetId}", new
+        var response = await _http.PutAsJsonAsync($"/pap/api/policy-sets/{policySetId}", new
         {
             id = policySetId,
             name = "Docker Integration Policy Set",
@@ -132,7 +132,7 @@ public sealed class PolicyLifecycleTests
 
     private async Task CreatePolicyAsync(string policyId, string policySetId)
     {
-        var response = await _http.PutAsJsonAsync($"/api/v1/pap/policies/{policyId}", new
+        var response = await _http.PutAsJsonAsync($"/pap/api/policies/{policyId}", new
         {
             id = policyId,
             policySetId,
@@ -162,7 +162,7 @@ public sealed class PolicyLifecycleTests
             }
         });
 
-        var response = await _http.PostAsJsonAsync($"/api/v1/pap/policies/{policyId}/versions", new
+        var response = await _http.PostAsJsonAsync($"/pap/api/policies/{policyId}/versions", new
         {
             content = policyDocument,
             createdBy = "docker-integration",

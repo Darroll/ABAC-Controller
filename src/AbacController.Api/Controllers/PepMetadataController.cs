@@ -11,7 +11,7 @@ namespace AbacController.Api.Controllers;
 /// labels in a STANAG 4778-style envelope.
 /// </summary>
 [ApiController]
-[Route("api/v1/pep/metadata")]
+[Route("pep/api/metadata")]
 public sealed class PepMetadataController : ControllerBase
 {
     private readonly IStanag4778MetadataBinder _binder;

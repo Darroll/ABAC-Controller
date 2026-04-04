@@ -14,7 +14,7 @@ namespace AbacController.Api.Controllers;
 /// System administration endpoints for status, configuration, and enforcement point management.
 /// </summary>
 [ApiController]
-[Route("api/v1/system")]
+[Route("system/api")]
 public sealed class SystemAdminController : ControllerBase
 {
     private readonly AppRuntimeState _runtimeState;

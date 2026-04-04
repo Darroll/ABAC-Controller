@@ -117,9 +117,9 @@ public class AuthZenController : ControllerBase
     /// <summary>
     /// Simulation/dry-run endpoint. Evaluates as normal but marks result as simulated.
     /// Does not affect metrics, audit, or caching.
-    /// POST /access/v1/evaluation/simulate
+    /// POST /pdp/api/evaluate/simulate
     /// </summary>
-    [HttpPost("/access/v1/evaluation/simulate")]
+    [HttpPost("/pdp/api/evaluate/simulate")]
     [Authorize(Policy = "EvaluateExplain")]
     public async Task<IActionResult> Simulate(
         [FromBody] AuthZenEvaluationRequest request, CancellationToken ct)
@@ -166,9 +166,9 @@ public class AuthZenController : ControllerBase
 
     /// <summary>
     /// Decision explanation endpoint. Returns full evaluation trace.
-    /// POST /access/v1/evaluation/explain
+    /// POST /pdp/api/evaluate/explain
     /// </summary>
-    [HttpPost("/access/v1/evaluation/explain")]
+    [HttpPost("/pdp/api/evaluate/explain")]
     [Authorize(Policy = "EvaluateExplain")]
     public async Task<IActionResult> Explain(
         [FromBody] AuthZenEvaluationRequest request, CancellationToken ct)
@@ -209,9 +209,9 @@ public class AuthZenController : ControllerBase
     /// <summary>
     /// Async evaluation — queues an evaluation for background processing and
     /// delivers the result via webhook callback.
-    /// POST /access/v1/evaluation/async
+    /// POST /pdp/api/evaluate/async
     /// </summary>
-    [HttpPost("/access/v1/evaluation/async")]
+    [HttpPost("/pdp/api/evaluate/async")]
     [Authorize(Policy = "Evaluate")]
     [EnableRateLimiting("pdp")]
     public IActionResult EvaluateAsync(
@@ -242,9 +242,9 @@ public class AuthZenController : ControllerBase
 
     /// <summary>
     /// Check the status of an async evaluation.
-    /// GET /access/v1/evaluation/async/{evaluationId}
+    /// GET /pdp/api/evaluate/async/{evaluationId}/status
     /// </summary>
-    [HttpGet("/access/v1/evaluation/async/{evaluationId}")]
+    [HttpGet("/pdp/api/evaluate/async/{evaluationId}/status")]
     [Authorize(Policy = "Evaluate")]
     public IActionResult GetAsyncEvaluationStatus(string evaluationId)
     {
@@ -287,9 +287,9 @@ public class AuthZenController : ControllerBase
             issuer = $"{Request.Scheme}://{Request.Host}",
             evaluation_endpoint = "/access/v1/evaluation",
             evaluations_endpoint = "/access/v1/evaluations",
-            evaluation_explain_endpoint = "/access/v1/evaluation/explain",
-            evaluation_simulate_endpoint = "/access/v1/evaluation/simulate",
-            evaluation_async_endpoint = "/access/v1/evaluation/async",
+            evaluation_explain_endpoint = "/pdp/api/evaluate/explain",
+            evaluation_simulate_endpoint = "/pdp/api/evaluate/simulate",
+            evaluation_async_endpoint = "/pdp/api/evaluate/async",
             subjects_endpoint = "/access/v1/subjects",
             resources_endpoint = "/access/v1/resources",
             actions_endpoint = "/access/v1/actions",

@@ -34,7 +34,8 @@ public sealed class OpenApiTests
         var paths = root.GetProperty("paths");
         Assert.True(paths.TryGetProperty("/access/v1/evaluation", out _));
         Assert.True(paths.TryGetProperty("/.well-known/authzen-configuration", out _));
-        Assert.True(paths.TryGetProperty("/api/v1/pap/policy-sets", out _));
+        Assert.True(paths.TryGetProperty("/pdp/api/evaluate/explain", out _));
+        Assert.True(paths.TryGetProperty("/pap/api/policy-sets", out _));
     }
 
 }

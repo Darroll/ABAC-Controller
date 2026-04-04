@@ -8,57 +8,57 @@ import "google/api/annotations.proto";
 
 service PepApi {
   rpc ListEnforcementPoints(ListEnforcementPointsRequestMessage) returns (ListEnforcementPointsResponseMessage) {
-    option (google.api.http) = { get: "/api/v1/grpc/pep/enforcement-points" };
+    option (google.api.http) = { get: "/pep/grpc/enforcement-points" };
   }
 
   rpc UpsertEnforcementPoint(UpsertEnforcementPointRequestMessage) returns (EnforcementPointMessage) {
     option (google.api.http) = {
-      put: "/api/v1/grpc/pep/enforcement-points/{enforcement_point.id}"
+      put: "/pep/grpc/enforcement-points/{enforcement_point.id}"
       body: "enforcement_point"
     };
   }
 
   rpc DeleteEnforcementPoint(DeleteEnforcementPointRequestMessage) returns (OperationStatusMessage) {
-    option (google.api.http) = { delete: "/api/v1/grpc/pep/enforcement-points/{id}" };
+    option (google.api.http) = { delete: "/pep/grpc/enforcement-points/{id}" };
   }
 
   rpc DecodeLabel(DecodeLabelRequestMessage) returns (DecodeLabelResponseMessage) {
     option (google.api.http) = {
-      post: "/api/v1/grpc/pep/labels/decode"
+      post: "/pep/grpc/labels/decode"
       body: "*"
     };
   }
 
   rpc EncodeLabel(EncodeLabelRequestMessage) returns (EncodeLabelResponseMessage) {
     option (google.api.http) = {
-      post: "/api/v1/grpc/pep/labels/encode"
+      post: "/pep/grpc/labels/encode"
       body: "*"
     };
   }
 
   rpc ValidateLabel(ValidateLabelRequestMessage) returns (ValidateLabelResponseMessage) {
     option (google.api.http) = {
-      post: "/api/v1/grpc/pep/labels/validate"
+      post: "/pep/grpc/labels/validate"
       body: "*"
     };
   }
 
   rpc BindMetadata(BindMetadataRequestMessage) returns (BindMetadataResponseMessage) {
     option (google.api.http) = {
-      post: "/api/v1/grpc/pep/metadata/bind"
+      post: "/pep/grpc/metadata/bind"
       body: "*"
     };
   }
 
   rpc UnbindMetadata(UnbindMetadataRequestMessage) returns (UnbindMetadataResponseMessage) {
     option (google.api.http) = {
-      post: "/api/v1/grpc/pep/metadata/unbind"
+      post: "/pep/grpc/metadata/unbind"
       body: "*"
     };
   }
 
   rpc ListCodecs(ListCodecsRequestMessage) returns (ListCodecsResponseMessage) {
-    option (google.api.http) = { get: "/api/v1/grpc/pep/metadata/codecs" };
+    option (google.api.http) = { get: "/pep/grpc/metadata/codecs" };
   }
 }
 

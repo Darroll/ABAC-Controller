@@ -12,7 +12,7 @@
 ## Import a SPIF
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/pap/spifs/import \
+curl -X POST http://localhost:8080/pap/api/spifs/import \
   -H 'Content-Type: application/json' \
   -d @- <<'JSON'
 {
@@ -27,7 +27,7 @@ JSON
 ## Create a policy set
 
 ```bash
-curl -X PUT http://localhost:8080/api/v1/pap/policy-sets/ps1 \
+curl -X PUT http://localhost:8080/pap/api/policy-sets/ps1 \
   -H 'Content-Type: application/json' \
   -d '{
     "id": "ps1",
@@ -42,7 +42,7 @@ curl -X PUT http://localhost:8080/api/v1/pap/policy-sets/ps1 \
 ## Create a policy
 
 ```bash
-curl -X PUT http://localhost:8080/api/v1/pap/policies/policy1 \
+curl -X PUT http://localhost:8080/pap/api/policies/policy1 \
   -H 'Content-Type: application/json' \
   -d '{
     "id": "policy1",
@@ -56,7 +56,7 @@ curl -X PUT http://localhost:8080/api/v1/pap/policies/policy1 \
 ## Create a policy version
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/pap/policies/policy1/versions \
+curl -X POST http://localhost:8080/pap/api/policies/policy1/versions \
   -H 'Content-Type: application/json' \
   -d '{
     "content": "{\"id\":\"rule1\",\"effect\":\"Permit\",\"conditions\":[{\"path\":\"subject.department\",\"equals\":\"engineering\",\"caseInsensitive\":true},{\"path\":\"action.name\",\"equals\":\"read\",\"caseInsensitive\":true},{\"path\":\"resource.type\",\"equals\":\"document\",\"caseInsensitive\":true}]}",
@@ -105,7 +105,7 @@ curl -X POST http://localhost:8080/access/v1/evaluation \
 Bind:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/pep/metadata/bind \
+curl -X POST http://localhost:8080/pep/api/metadata/bind \
   -H 'Content-Type: application/json' \
   -d '{
     "bindingId": "bind-1",
@@ -118,7 +118,7 @@ curl -X POST http://localhost:8080/api/v1/pep/metadata/bind \
 Unbind:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/pep/metadata/unbind \
+curl -X POST http://localhost:8080/pep/api/metadata/unbind \
   -H 'Content-Type: application/json' \
   -d '{ "envelopeXml": "..." }'
 ```
@@ -126,6 +126,6 @@ curl -X POST http://localhost:8080/api/v1/pep/metadata/unbind \
 ## Discovery and system endpoints
 
 - `GET /.well-known/authzen-configuration`
-- `GET /api/v1/system/info`
-- `GET /api/v1/system/config`
-- `GET /api/v1/system/enforcement-points`
+- `GET /system/api/info`
+- `GET /system/api/config`
+- `GET /system/api/enforcement-points`

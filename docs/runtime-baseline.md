@@ -58,9 +58,9 @@ Additional controller-based endpoints remain part of the runtime baseline:
 
 - AuthZEN 1.0 evaluation endpoints in `AuthZenController`
 - metadata helper endpoints in `PepMetadataController`
-  - `POST /api/v1/pep/metadata/bind`
-  - `POST /api/v1/pep/metadata/unbind`
-  - `GET /api/v1/pep/metadata/codecs`
+  - `POST /pep/api/metadata/bind`
+  - `POST /pep/api/metadata/unbind`
+  - `GET /pep/api/metadata/codecs`
 - health endpoints (`/health/live`, `/health/ready`, `/health/startup`)
 - metrics endpoint (`/metrics`)
 

@@ -9,23 +9,23 @@ import "google/protobuf/struct.proto";
 
 service PipApi {
   rpc ListSources(ListSourcesRequestMessage) returns (ListSourcesResponseMessage) {
-    option (google.api.http) = { get: "/api/v1/grpc/pip/sources" };
+    option (google.api.http) = { get: "/pip/grpc/sources" };
   }
 
   rpc UpsertSource(UpsertSourceRequestMessage) returns (PipSourceMessage) {
     option (google.api.http) = {
-      put: "/api/v1/grpc/pip/sources/{source.id}"
+      put: "/pip/grpc/sources/{source.id}"
       body: "source"
     };
   }
 
   rpc DeleteSource(DeleteSourceRequestMessage) returns (OperationStatusMessage) {
-    option (google.api.http) = { delete: "/api/v1/grpc/pip/sources/{id}" };
+    option (google.api.http) = { delete: "/pip/grpc/sources/{id}" };
   }
 
   rpc Resolve(ResolveAttributesRequestMessage) returns (ResolveAttributesResponseMessage) {
     option (google.api.http) = {
-      post: "/api/v1/grpc/pip/resolve"
+      post: "/pip/grpc/resolve"
       body: "*"
     };
   }
