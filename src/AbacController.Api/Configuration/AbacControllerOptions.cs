@@ -5,28 +5,58 @@ namespace AbacController.Api.Configuration;
 /// </summary>
 public sealed class AbacControllerOptions
 {
+    /// <summary>Database configuration.</summary>
     public DatabaseOptions Database { get; set; } = new();
+
+    /// <summary>Authentication and authorization options.</summary>
     public AuthOptions Auth { get; set; } = new();
+
+    /// <summary>PDP engine configuration.</summary>
     public PdpOptions Pdp { get; set; } = new();
+
+    /// <summary>Rate limiting configuration.</summary>
     public RateLimitingOptions RateLimiting { get; set; } = new();
 }
 
+/// <summary>
+/// Database provider and connection string configuration.
+/// </summary>
 public sealed class DatabaseOptions
 {
+    /// <summary>Database provider: "sqlite", "postgres", or "sqlserver".</summary>
     public string Provider { get; set; } = "sqlite";
+
+    /// <summary>Provider-specific connection string.</summary>
     public string? ConnectionString { get; set; }
 }
 
+/// <summary>
+/// Authentication configuration for the ABAC Controller API.
+/// </summary>
 public sealed class AuthOptions
 {
+    /// <summary>OAuth 2.0 / OpenID Connect authority URL.</summary>
     public string Authority { get; set; } = "";
+
+    /// <summary>Expected JWT audience claim.</summary>
     public string Audience { get; set; } = "abac-controller";
+
+    /// <summary>Whether to require HTTPS for metadata discovery.</summary>
     public bool RequireHttpsMetadata { get; set; } = true;
+
+    /// <summary>Path to a local JWKS file for offline token validation.</summary>
     public string? JwksFile { get; set; }
+
+    /// <summary>Enable development authentication handler (bypasses real auth).</summary>
     public bool EnableDevelopmentAuth { get; set; }
+
+    /// <summary>Configured API keys for machine-to-machine authentication.</summary>
     public List<ApiKeyConfig> ApiKeys { get; set; } = [];
 }
 
+/// <summary>
+/// Static API key configuration for machine-to-machine callers.
+/// </summary>
 public sealed class ApiKeyConfig
 {
     /// <summary>The API key value (secret).</summary>
@@ -42,9 +72,15 @@ public sealed class ApiKeyConfig
     public string? Description { get; set; }
 }
 
+/// <summary>
+/// PDP engine configuration options.
+/// </summary>
 public sealed class PdpOptions
 {
+    /// <summary>Decision cache TTL in seconds (default 300).</summary>
     public int DecisionCacheTtlSeconds { get; set; } = 300;
+
+    /// <summary>Whether PDP decision caching is enabled.</summary>
     public bool DecisionCacheEnabled { get; set; } = true;
 }
 
