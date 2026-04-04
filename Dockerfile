@@ -1,11 +1,12 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY AbacController.sln ./
+COPY AbacController.slnx ./
 COPY src/ ./src/
 COPY tests/ ./tests/
+COPY protos/ ./protos/
 
-RUN dotnet restore AbacController.sln
+RUN dotnet restore AbacController.slnx
 RUN dotnet publish src/AbacController.Api/AbacController.Api.csproj \
     -c Release \
     -o /app/publish \
@@ -14,7 +15,7 @@ RUN dotnet publish src/AbacController.Api/AbacController.Api.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
-RUN adduser --disabled-password --gecos "" abac \
+RUN useradd --no-create-home --shell /bin/false abac \
     && mkdir -p /data \
     && chown -R abac:abac /app /data
 

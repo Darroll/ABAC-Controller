@@ -32,7 +32,7 @@ public sealed class SystemAdminController : ControllerBase
         _options = options;
     }
 
-    [HttpGet("status")]
+    [HttpGet("info")]
     [Authorize(Policy = "SysRead")]
     public ActionResult<object> GetStatus()
         => Ok(new
