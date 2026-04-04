@@ -200,6 +200,8 @@ internal static class NativePolicyEvaluator
             "permit-overrides" => CombinePermitOverrides(outcomes, scope),
             "first-applicable" => CombineFirstApplicable(outcomes, scope),
             "only-one-applicable" => CombineOnlyOneApplicable(outcomes, scope),
+            "deny-unless-permit" => CombineDenyUnlessPermit(outcomes, scope),
+            "permit-unless-deny" => CombinePermitUnlessDeny(outcomes, scope),
             _ => CombineDenyOverrides(outcomes, scope)
         };
     }
@@ -278,6 +280,45 @@ internal static class NativePolicyEvaluator
             1 => applicable[0] with { Name = scope, Message = $"{scope} resolved by only-one-applicable" },
             _ => new NamedDecision(scope, Decision.Indeterminate, [], [], [], $"{scope} matched more than one applicable rule")
         };
+    }
+
+    private static NamedDecision CombineDenyUnlessPermit(IReadOnlyList<NamedDecision> outcomes, string scope)
+    {
+        // Per XACML spec: if any rule evaluates to Permit, the result is Permit.
+        // Otherwise the result is always Deny (never NotApplicable or Indeterminate).
+        var permits = outcomes.Where(static o => o.Decision == Decision.Permit).ToList();
+        if (permits.Count > 0)
+        {
+            return Merge(scope, Decision.Permit, permits, $"{scope} permitted by deny-unless-permit");
+        }
+
+        // Collect obligations/advice from deny outcomes if any exist
+        var denies = outcomes.Where(static o => o.Decision == Decision.Deny).ToList();
+        if (denies.Count > 0)
+        {
+            return Merge(scope, Decision.Deny, denies, $"{scope} denied by deny-unless-permit (no permit found)");
+        }
+
+        return new NamedDecision(scope, Decision.Deny, [], [], [], $"{scope} denied by deny-unless-permit (default)");
+    }
+
+    private static NamedDecision CombinePermitUnlessDeny(IReadOnlyList<NamedDecision> outcomes, string scope)
+    {
+        // Per XACML spec: if any rule evaluates to Deny, the result is Deny.
+        // Otherwise the result is always Permit (never NotApplicable or Indeterminate).
+        var denies = outcomes.Where(static o => o.Decision == Decision.Deny).ToList();
+        if (denies.Count > 0)
+        {
+            return Merge(scope, Decision.Deny, denies, $"{scope} denied by permit-unless-deny");
+        }
+
+        var permits = outcomes.Where(static o => o.Decision == Decision.Permit).ToList();
+        if (permits.Count > 0)
+        {
+            return Merge(scope, Decision.Permit, permits, $"{scope} permitted by permit-unless-deny (no deny found)");
+        }
+
+        return new NamedDecision(scope, Decision.Permit, [], [], [], $"{scope} permitted by permit-unless-deny (default)");
     }
 
     private static NamedDecision Merge(string scope, Decision decision, IReadOnlyList<NamedDecision> outcomes, string message)

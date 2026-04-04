@@ -169,6 +169,322 @@ public sealed class PdpReworkTests
     }
 
     [Fact]
+    public async Task EvaluateAsync_CombinesPoliciesUsingFirstApplicable()
+    {
+        var spif = BuildSpif();
+        var engine = new PdpEngine(
+            new AcdfEvaluator(),
+            new StubSpifRegistry(spif),
+            new CapturingDecisionCache(),
+            new StubPolicyRepository(
+                new PolicySet
+                {
+                    Id = "ops",
+                    Name = "Operations",
+                    CombiningAlgorithm = "first-applicable",
+                    Policies =
+                    [
+                        BuildPolicy("deny-writes", "{" +
+                            "\"effect\":\"Deny\"," +
+                            "\"conditions\":[{" +
+                            "\"path\":\"action.name\"," +
+                            "\"equals\":\"write\"}]}"),
+                        BuildPolicy("permit-readers", "{" +
+                            "\"effect\":\"Permit\"," +
+                            "\"conditions\":[{" +
+                            "\"path\":\"subject.department\"," +
+                            "\"equals\":\"ENG\"}]}"),
+                    ]
+                }),
+            new StubPipResolver(AttributeResolutionResult.Succeeded([])),
+            new NullAuditWriter());
+
+        var result = await engine.EvaluateAsync(BuildRequest(subjectProperties: new Dictionary<string, object?>
+        {
+            ["department"] = "ENG",
+            ["securityClearance"] = BuildClearance()
+        }));
+
+        // First applicable is the deny-writes rule (action=write matches)
+        Assert.Equal(Decision.Deny, result.Decision);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_CombinesPoliciesUsingOnlyOneApplicable_SingleMatch()
+    {
+        var spif = BuildSpif();
+        var engine = new PdpEngine(
+            new AcdfEvaluator(),
+            new StubSpifRegistry(spif),
+            new CapturingDecisionCache(),
+            new StubPolicyRepository(
+                new PolicySet
+                {
+                    Id = "ops",
+                    Name = "Operations",
+                    CombiningAlgorithm = "only-one-applicable",
+                    Policies =
+                    [
+                        BuildPolicy("permit-readers", "{" +
+                            "\"effect\":\"Permit\"," +
+                            "\"conditions\":[{" +
+                            "\"path\":\"subject.department\"," +
+                            "\"equals\":\"ENG\"}]}"),
+                        BuildPolicy("deny-sales", "{" +
+                            "\"effect\":\"Deny\"," +
+                            "\"conditions\":[{" +
+                            "\"path\":\"subject.department\"," +
+                            "\"equals\":\"SALES\"}]}"),
+                    ]
+                }),
+            new StubPipResolver(AttributeResolutionResult.Succeeded([])),
+            new NullAuditWriter());
+
+        var result = await engine.EvaluateAsync(BuildRequest(subjectProperties: new Dictionary<string, object?>
+        {
+            ["department"] = "ENG",
+            ["securityClearance"] = BuildClearance()
+        }));
+
+        Assert.Equal(Decision.Permit, result.Decision);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_CombinesPoliciesUsingOnlyOneApplicable_MultipleMatch_ReturnsIndeterminate()
+    {
+        var spif = BuildSpif();
+        var engine = new PdpEngine(
+            new AcdfEvaluator(),
+            new StubSpifRegistry(spif),
+            new CapturingDecisionCache(),
+            new StubPolicyRepository(
+                new PolicySet
+                {
+                    Id = "ops",
+                    Name = "Operations",
+                    CombiningAlgorithm = "only-one-applicable",
+                    Policies =
+                    [
+                        BuildPolicy("permit-readers", "{" +
+                            "\"effect\":\"Permit\"," +
+                            "\"conditions\":[{" +
+                            "\"path\":\"subject.department\"," +
+                            "\"equals\":\"ENG\"}]}"),
+                        BuildPolicy("deny-writes", "{" +
+                            "\"effect\":\"Deny\"," +
+                            "\"conditions\":[{" +
+                            "\"path\":\"action.name\"," +
+                            "\"equals\":\"write\"}]}"),
+                    ]
+                }),
+            new StubPipResolver(AttributeResolutionResult.Succeeded([])),
+            new NullAuditWriter());
+
+        var result = await engine.EvaluateAsync(BuildRequest(subjectProperties: new Dictionary<string, object?>
+        {
+            ["department"] = "ENG",
+            ["securityClearance"] = BuildClearance()
+        }));
+
+        // Both rules match, so only-one-applicable returns Indeterminate
+        Assert.Equal(Decision.Indeterminate, result.Decision);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_CombinesPoliciesUsingDenyUnlessPermit()
+    {
+        var spif = BuildSpif();
+        var engine = new PdpEngine(
+            new AcdfEvaluator(),
+            new StubSpifRegistry(spif),
+            new CapturingDecisionCache(),
+            new StubPolicyRepository(
+                new PolicySet
+                {
+                    Id = "ops",
+                    Name = "Operations",
+                    CombiningAlgorithm = "deny-unless-permit",
+                    Policies =
+                    [
+                        BuildPolicy("permit-readers", "{" +
+                            "\"effect\":\"Permit\"," +
+                            "\"conditions\":[{" +
+                            "\"path\":\"subject.department\"," +
+                            "\"equals\":\"ENG\"}]}"),
+                    ]
+                }),
+            new StubPipResolver(AttributeResolutionResult.Succeeded([])),
+            new NullAuditWriter());
+
+        // Matches permit rule
+        var result = await engine.EvaluateAsync(BuildRequest(subjectProperties: new Dictionary<string, object?>
+        {
+            ["department"] = "ENG",
+            ["securityClearance"] = BuildClearance()
+        }) with { Options = new EvaluateOptions { BypassCache = true } });
+        Assert.Equal(Decision.Permit, result.Decision);
+
+        // Does not match permit rule → deny (not NotApplicable)
+        var result2 = await engine.EvaluateAsync(BuildRequest(subjectProperties: new Dictionary<string, object?>
+        {
+            ["department"] = "SALES",
+            ["securityClearance"] = BuildClearance()
+        }) with { Options = new EvaluateOptions { BypassCache = true } });
+        Assert.Equal(Decision.Deny, result2.Decision);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_CombinesPoliciesUsingPermitUnlessDeny()
+    {
+        var spif = BuildSpif();
+        var engine = new PdpEngine(
+            new AcdfEvaluator(),
+            new StubSpifRegistry(spif),
+            new CapturingDecisionCache(),
+            new StubPolicyRepository(
+                new PolicySet
+                {
+                    Id = "ops",
+                    Name = "Operations",
+                    CombiningAlgorithm = "permit-unless-deny",
+                    Policies =
+                    [
+                        BuildPolicy("deny-sales", "{" +
+                            "\"effect\":\"Deny\"," +
+                            "\"conditions\":[{" +
+                            "\"path\":\"subject.department\"," +
+                            "\"equals\":\"SALES\"}]}"),
+                    ]
+                }),
+            new StubPipResolver(AttributeResolutionResult.Succeeded([])),
+            new NullAuditWriter());
+
+        // Does not match deny rule → permit (not NotApplicable)
+        var result = await engine.EvaluateAsync(BuildRequest(subjectProperties: new Dictionary<string, object?>
+        {
+            ["department"] = "ENG",
+            ["securityClearance"] = BuildClearance()
+        }) with { Options = new EvaluateOptions { BypassCache = true } });
+        Assert.Equal(Decision.Permit, result.Decision);
+
+        // Matches deny rule
+        var result2 = await engine.EvaluateAsync(BuildRequest(subjectProperties: new Dictionary<string, object?>
+        {
+            ["department"] = "SALES",
+            ["securityClearance"] = BuildClearance()
+        }) with { Options = new EvaluateOptions { BypassCache = true } });
+        Assert.Equal(Decision.Deny, result2.Decision);
+    }
+
+    [Fact]
+    public async Task EvaluateExplainAsync_ReturnsDetailedTrace()
+    {
+        var spif = BuildSpif();
+        var engine = new PdpEngine(
+            new AcdfEvaluator(),
+            new StubSpifRegistry(spif),
+            new CapturingDecisionCache(),
+            new StubPolicyRepository(
+                BuildPolicySet(
+                    "ops",
+                    "deny-overrides",
+                    "permit-readers",
+                    "{" +
+                    "\"rules\":[{" +
+                    "\"id\":\"permit-eng\"," +
+                    "\"effect\":\"Permit\"," +
+                    "\"conditions\":[{" +
+                    "\"path\":\"subject.department\"," +
+                    "\"equals\":\"ENG\"}]}]}")),
+            new StubPipResolver(AttributeResolutionResult.Succeeded([])),
+            new NullAuditWriter());
+
+        var request = BuildRequest(subjectProperties: new Dictionary<string, object?>
+        {
+            ["department"] = "ENG",
+            ["securityClearance"] = BuildClearance()
+        });
+
+        var explained = await engine.EvaluateExplainAsync(request with
+        {
+            Options = new EvaluateOptions { PolicySetId = "ops" }
+        });
+
+        Assert.Equal(Decision.Permit, explained.Result.Decision);
+        Assert.NotNull(explained.Trace);
+        Assert.NotEmpty(explained.Trace.Steps);
+        Assert.Contains(explained.Trace.Steps, s => s.RuleId.Contains("spif-resolution"));
+        Assert.Contains(explained.Trace.Steps, s => s.RuleId == "permit-eng");
+    }
+
+    [Fact]
+    public async Task EvaluateBatchAsync_EvaluatesMultipleRequests()
+    {
+        var spif = BuildSpif();
+        var engine = new PdpEngine(
+            new AcdfEvaluator(),
+            new StubSpifRegistry(spif),
+            new CapturingDecisionCache(),
+            new StubPolicyRepository(
+                BuildPolicySet(
+                    "ops",
+                    "deny-overrides",
+                    "permit-readers",
+                    "{\"effect\":\"Permit\"}")),
+            new StubPipResolver(AttributeResolutionResult.Succeeded([])),
+            new NullAuditWriter());
+
+        var batchRequest = new BatchEvaluationRequest
+        {
+            RequestId = "batch-1",
+            Subject = new SubjectInfo
+            {
+                Type = "user",
+                Id = "alice",
+                Properties = new Dictionary<string, object?>
+                {
+                    ["securityClearance"] = BuildClearance()
+                }
+            },
+            Evaluations =
+            [
+                new BatchEvaluation
+                {
+                    EvaluationId = "eval-1",
+                    Action = new ActionInfo { Name = "read" },
+                    Resource = new ResourceInfo
+                    {
+                        Type = "document", Id = "doc-1",
+                        Properties = new Dictionary<string, object?>
+                        {
+                            ["securityLabel"] = BuildLabel()
+                        }
+                    }
+                },
+                new BatchEvaluation
+                {
+                    EvaluationId = "eval-2",
+                    Action = new ActionInfo { Name = "write" },
+                    Resource = new ResourceInfo
+                    {
+                        Type = "document", Id = "doc-2",
+                        Properties = new Dictionary<string, object?>
+                        {
+                            ["securityLabel"] = BuildLabel()
+                        }
+                    }
+                }
+            ]
+        };
+
+        var batchResult = await engine.EvaluateBatchAsync(batchRequest);
+
+        Assert.Equal("batch-1", batchResult.RequestId);
+        Assert.Equal(2, batchResult.Evaluations.Count);
+        Assert.All(batchResult.Evaluations, e => Assert.NotNull(e.DecisionId));
+    }
+
+    [Fact]
     public void DecisionCache_UsesArchitectureKeyShapeAndInvalidatesByPolicySet()
     {
         var cache = new DecisionCache(new MemoryCache(new MemoryCacheOptions()));
