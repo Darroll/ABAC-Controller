@@ -1,5 +1,7 @@
+using AbacController.Core.Interfaces;
 using AbacController.Data;
 using AbacController.Data.Entities;
+using AbacController.Pip;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,10 +16,12 @@ namespace AbacController.Api.Controllers;
 public sealed class PipAdminController : ControllerBase
 {
     private readonly AbacDbContext _dbContext;
+    private readonly PipHealthMonitor _healthMonitor;
 
-    public PipAdminController(AbacDbContext dbContext)
+    public PipAdminController(AbacDbContext dbContext, PipHealthMonitor healthMonitor)
     {
         _dbContext = dbContext;
+        _healthMonitor = healthMonitor;
     }
 
     [HttpGet("sources")]
@@ -92,5 +96,63 @@ public sealed class PipAdminController : ControllerBase
             healthy = false,
             message = "Connectivity test endpoint present; runtime connector-specific active test not wired for persisted sources yet."
         });
+    }
+
+    /// <summary>
+    /// Check health of all registered PIP sources.
+    /// </summary>
+    [HttpGet("health")]
+    [Authorize(Policy = "PipRead")]
+    public async Task<ActionResult<object>> CheckHealth(CancellationToken ct)
+    {
+        var statuses = await _healthMonitor.CheckAllAsync(ct);
+        var allHealthy = statuses.All(static s => s.Healthy);
+
+        return Ok(new
+        {
+            allHealthy,
+            sourceCount = statuses.Count,
+            sources = statuses
+        });
+    }
+
+    /// <summary>
+    /// Get last known health status without re-checking.
+    /// </summary>
+    [HttpGet("health/cached")]
+    [Authorize(Policy = "PipRead")]
+    public ActionResult<object> GetCachedHealth()
+    {
+        var statuses = _healthMonitor.GetStatuses();
+        var allHealthy = statuses.All(static s => s.Healthy);
+
+        return Ok(new
+        {
+            allHealthy,
+            sourceCount = statuses.Count,
+            sources = statuses
+        });
+    }
+
+    /// <summary>
+    /// Invalidate the PIP attribute cache for a specific subject.
+    /// </summary>
+    [HttpPost("cache/invalidate/{subjectId}")]
+    [Authorize(Policy = "PipAdmin")]
+    public ActionResult InvalidateCache(string subjectId, [FromServices] IPipCacheManager cacheManager)
+    {
+        cacheManager.Invalidate(subjectId);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Invalidate the entire PIP attribute cache.
+    /// </summary>
+    [HttpPost("cache/invalidate-all")]
+    [Authorize(Policy = "PipAdmin")]
+    public ActionResult InvalidateAllCache([FromServices] IPipCacheManager cacheManager)
+    {
+        cacheManager.InvalidateAll();
+        return NoContent();
     }
 }

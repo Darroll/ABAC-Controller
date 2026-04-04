@@ -57,6 +57,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISpifRegistry, SpifRegistry>();
         services.AddSingleton<IPipResolver, PipResolver>();
         services.AddSingleton<IPipCacheManager, PipCacheManager>();
+        services.AddSingleton<PipHealthMonitor>();
         services.AddSingleton<LabelValidator>();
         services.AddSingleton<IStanag4778MetadataBinder, Stanag4778MetadataBinder>();
         services.AddSingleton<AuditWriter>();
