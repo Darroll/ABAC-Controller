@@ -6,6 +6,7 @@ using AbacController.Core.Domain.Policy;
 using AbacController.Core.Interfaces;
 using AbacController.Data;
 using AbacController.Data.Entities;
+using AbacController.Pap;
 using AbacController.Pdp;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -198,6 +199,65 @@ public sealed class PapAdminController : ControllerBase
         AuditPolicyChange("activate_policy_version", "policy_version", id,
             new { versionId, versionNumber = version.VersionNumber });
         return NoContent();
+    }
+
+    [HttpGet("policies/{id}/versions/{leftVersionId:guid}/diff/{rightVersionId:guid}")]
+    [Authorize(Policy = "PolicyRead")]
+    public async Task<ActionResult<PolicyDiffResult>> DiffPolicyVersions(string id, Guid leftVersionId, Guid rightVersionId, CancellationToken ct)
+    {
+        var left = await _policyRepository.GetVersionAsync(leftVersionId, ct);
+        var right = await _policyRepository.GetVersionAsync(rightVersionId, ct);
+
+        if (left is null || right is null || !string.Equals(left.PolicyId, id, StringComparison.Ordinal) || !string.Equals(right.PolicyId, id, StringComparison.Ordinal))
+        {
+            return NotFound();
+        }
+
+        return Ok(PolicyVersionDiff.Compare(left.Content, right.Content));
+    }
+
+    public sealed record RollbackPolicyVersionRequest(string? CreatedBy = null, string? Reason = null);
+
+    [HttpPost("policies/{id}/versions/{versionId:guid}/rollback")]
+    [Authorize(Policy = "PolicyWrite")]
+    public async Task<ActionResult<PolicyVersion>> RollbackPolicyVersion(string id, Guid versionId, [FromBody] RollbackPolicyVersionRequest? request, CancellationToken ct)
+    {
+        var policy = await _policyRepository.GetPolicyAsync(id, ct);
+        if (policy is null)
+            return NotFound();
+
+        var targetVersion = await _policyRepository.GetVersionAsync(versionId, ct);
+        if (targetVersion is null || !string.Equals(targetVersion.PolicyId, id, StringComparison.Ordinal))
+            return NotFound();
+
+        var existingVersions = await _policyRepository.GetVersionsAsync(id, ct);
+        var nextVersionNumber = existingVersions.Count == 0 ? 1 : existingVersions.Max(v => v.VersionNumber) + 1;
+
+        var rollbackVersion = new PolicyVersion
+        {
+            PolicyId = id,
+            VersionNumber = nextVersionNumber,
+            Content = targetVersion.Content,
+            Hash = targetVersion.Hash,
+            CreatedBy = request?.CreatedBy,
+            IsActive = true
+        };
+
+        var saved = await _policyRepository.CreateVersionAsync(rollbackVersion, ct);
+        await _policyRepository.ActivateVersionAsync(id, saved.Id, ct);
+
+        AuditPolicyChange("rollback_policy_version", "policy_version", id,
+            new
+            {
+                rolledBackFromVersionId = versionId,
+                rolledBackFromVersionNumber = targetVersion.VersionNumber,
+                newVersionId = saved.Id,
+                newVersionNumber = saved.VersionNumber,
+                request?.CreatedBy,
+                request?.Reason
+            });
+
+        return Ok(await _policyRepository.GetVersionAsync(saved.Id, ct));
     }
 
     [HttpGet("spifs")]
