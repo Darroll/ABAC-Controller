@@ -19,6 +19,9 @@ public class SpifEntity
     public int CategoryCount { get; set; }
     public SignatureStatus SignatureStatus { get; set; }
     public string Hash { get; set; } = "";
+
+    /// <summary>Tenant identifier for multi-tenant isolation. Null = default/system tenant.</summary>
+    public string? TenantId { get; set; }
 }
 
 public enum SignatureStatus

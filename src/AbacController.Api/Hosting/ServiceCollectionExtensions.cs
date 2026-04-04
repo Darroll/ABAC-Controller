@@ -1,4 +1,5 @@
 using AbacController.Api.Auth;
+using AbacController.Api.Middleware;
 using AbacController.Api.Configuration;
 using AbacController.Api.Health;
 using AbacController.Api.Observability;
@@ -55,7 +56,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IDecisionCache, DecisionCache>();
         services.AddSingleton<ILabelCodecRegistry, LabelCodecRegistry>();
         services.AddSingleton<IMarkingGenerator, MarkingGenerator>();
-        services.AddSingleton<ISpifRegistry, SpifRegistry>();
+        services.AddScoped<HttpTenantContext>();
+        services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<HttpTenantContext>());
+        services.AddSingleton<TenantSpifRegistryStore>();
+        services.AddScoped<ISpifRegistry, TenantSpifRegistry>();
         services.AddSingleton<IPipResolver, PipResolver>();
         services.AddSingleton<IPipCacheManager, PipCacheManager>();
         services.AddSingleton<PipHealthMonitor>();
@@ -151,6 +155,7 @@ public static class ServiceCollectionExtensions
         app.UseMiddleware<Middleware.CorrelationIdMiddleware>();
         app.UseRouting();
         app.UseAuthentication();
+        app.UseMiddleware<TenantContextMiddleware>();
         app.UseAuthorization();
         app.UseAntiforgery();
 

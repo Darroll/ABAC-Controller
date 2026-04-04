@@ -14,6 +14,9 @@ public class PolicySetEntity
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
+    /// <summary>Tenant identifier for multi-tenant isolation. Null = default/system tenant.</summary>
+    public string? TenantId { get; set; }
+
     // Navigation
     public SpifEntity? Spif { get; set; }
     public List<PolicyEntity> Policies { get; set; } = [];

@@ -21,6 +21,7 @@ public sealed class PdpEngine : IPdpEngine
     private readonly IPolicyRepository _policyRepository;
     private readonly IPipResolver _pipResolver;
     private readonly IAuditWriter _auditWriter;
+    private readonly ITenantContext _tenantContext;
 
     public PdpEngine(
         IAcdfEvaluator acdf,
@@ -28,7 +29,8 @@ public sealed class PdpEngine : IPdpEngine
         IDecisionCache decisionCache,
         IPolicyRepository policyRepository,
         IPipResolver pipResolver,
-        IAuditWriter auditWriter)
+        IAuditWriter auditWriter,
+        ITenantContext? tenantContext = null)
     {
         _acdf = acdf;
         _spifRegistry = spifRegistry;
@@ -36,6 +38,7 @@ public sealed class PdpEngine : IPdpEngine
         _policyRepository = policyRepository;
         _pipResolver = pipResolver;
         _auditWriter = auditWriter;
+        _tenantContext = tenantContext ?? NullTenantContext.Instance;
     }
 
     /// <inheritdoc />
@@ -140,7 +143,7 @@ public sealed class PdpEngine : IPdpEngine
 
         if (!explain && !request.Options.BypassCache)
         {
-            var cacheKey = _decisionCache.ComputeKey(request, policyVersion);
+            var cacheKey = ComputeTenantScopedCacheKey(request, policyVersion);
             if (_decisionCache.TryGet(cacheKey, out var cached) && cached is not null)
             {
                 var cacheHit = cached with
@@ -235,7 +238,7 @@ public sealed class PdpEngine : IPdpEngine
 
         if (!explain && !request.Options.BypassCache && result.Decision != Decision.Indeterminate)
         {
-            var cacheKey = _decisionCache.ComputeKey(request, policyVersion);
+            var cacheKey = ComputeTenantScopedCacheKey(request, policyVersion);
             _decisionCache.Set(cacheKey, result, ComputeDecisionTtl(enrichment.ResolvedAttributes));
         }
 
@@ -421,6 +424,12 @@ public sealed class PdpEngine : IPdpEngine
         };
     }
 
+    private string ComputeTenantScopedCacheKey(EvaluationRequest request, string policyVersion)
+    {
+        var cacheKey = _decisionCache.ComputeKey(request, policyVersion);
+        return $"{_tenantContext.TenantId ?? "default"}:{cacheKey}";
+    }
+
     private static TimeSpan ComputeDecisionTtl(IReadOnlyList<AttributeValue> resolvedAttributes)
     {
         var configuredTtl = TimeSpan.FromMinutes(5);
@@ -476,7 +485,8 @@ public sealed class PdpEngine : IPdpEngine
             AppliedPolicies = JsonSerializer.Serialize(result.AppliedPolicies),
             ObligationsJson = result.Obligations.Count > 0 ? JsonSerializer.Serialize(result.Obligations) : null,
             AttributesUsedJson = result.AttributeProvenance.Count > 0 ? JsonSerializer.Serialize(result.AttributeProvenance) : null,
-            EvaluationTimeMs = result.EvaluationTime.TotalMilliseconds
+            EvaluationTimeMs = result.EvaluationTime.TotalMilliseconds,
+            TenantId = _tenantContext.TenantId
         });
     }
 
@@ -486,4 +496,11 @@ public sealed class PdpEngine : IPdpEngine
         List<string> MissingAttributes);
 
     private sealed record InternalEvaluation(EvaluationResult Result, EvaluationTrace? Trace);
+
+    private sealed class NullTenantContext : ITenantContext
+    {
+        public static readonly NullTenantContext Instance = new();
+
+        public string? TenantId => null;
+    }
 }

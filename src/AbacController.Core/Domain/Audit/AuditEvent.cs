@@ -59,6 +59,9 @@ public sealed record AuditEvent
 
     /// <summary>Additional detail for PAP events (JSON).</summary>
     public string? DetailJson { get; init; }
+
+    /// <summary>Tenant identifier for multi-tenant isolation. Null = default/system tenant.</summary>
+    public string? TenantId { get; init; }
 }
 
 /// <summary>

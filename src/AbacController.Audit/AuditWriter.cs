@@ -188,6 +188,7 @@ public sealed class AuditBatchWriterService : Microsoft.Extensions.Hosting.Backg
         EvaluationTimeMs = e.EvaluationTimeMs,
         PepId = e.PepId,
         ActorIdentity = e.ActorIdentity,
-        DetailJson = e.DetailJson
+        DetailJson = e.DetailJson,
+        TenantId = e.TenantId
     };
 }

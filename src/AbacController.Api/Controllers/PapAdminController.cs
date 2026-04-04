@@ -26,19 +26,23 @@ public sealed class PapAdminController : ControllerBase
     private readonly ISpifRegistry _spifRegistry;
     private readonly AbacDbContext _dbContext;
     private readonly IAuditWriter _auditWriter;
+    private readonly ITenantContext _tenantContext;
 
+    /// <summary>Initializes a new instance of the <see cref="PapAdminController"/> class.</summary>
     public PapAdminController(
         IPolicyRepository policyRepository,
         ISpifParser spifParser,
         ISpifRegistry spifRegistry,
         AbacDbContext dbContext,
-        IAuditWriter auditWriter)
+        IAuditWriter auditWriter,
+        ITenantContext tenantContext)
     {
         _policyRepository = policyRepository;
         _spifParser = spifParser;
         _spifRegistry = spifRegistry;
         _dbContext = dbContext;
         _auditWriter = auditWriter;
+        _tenantContext = tenantContext;
     }
 
     private string GetActorIdentity()
@@ -55,7 +59,8 @@ public sealed class PapAdminController : ControllerBase
             ResourceType = resourceType,
             ResourceId = resourceId,
             ActorIdentity = GetActorIdentity(),
-            DetailJson = detail is not null ? JsonSerializer.Serialize(detail) : null
+            DetailJson = detail is not null ? JsonSerializer.Serialize(detail) : null,
+            TenantId = _tenantContext.TenantId
         });
     }
 
@@ -264,7 +269,11 @@ public sealed class PapAdminController : ControllerBase
     [Authorize(Policy = "PolicyRead")]
     public async Task<ActionResult<List<SpifEntity>>> ListSpifs(CancellationToken ct)
     {
-        var spifs = await _dbContext.Spifs.AsNoTracking().OrderBy(s => s.PolicyOid).ToListAsync(ct);
+        var tenantId = _tenantContext.TenantId;
+        var spifs = await _dbContext.Spifs.AsNoTracking()
+            .Where(s => s.TenantId == tenantId)
+            .OrderBy(s => s.PolicyOid)
+            .ToListAsync(ct);
         return Ok(spifs);
     }
 
@@ -283,7 +292,9 @@ public sealed class PapAdminController : ControllerBase
         if (request.SetAsDefault)
             _spifRegistry.SetDefault(spifIndex.PolicyOid);
 
-        var exists = await _dbContext.Spifs.FirstOrDefaultAsync(x => x.PolicyOid == spifIndex.PolicyOid, ct);
+        var tenantId = _tenantContext.TenantId;
+        var exists = await _dbContext.Spifs.FirstOrDefaultAsync(
+            x => x.PolicyOid == spifIndex.PolicyOid && x.TenantId == tenantId, ct);
         var entity = exists ?? new SpifEntity { Id = Guid.NewGuid(), PolicyOid = spifIndex.PolicyOid };
         entity.Name = spifIndex.PolicyName;
         entity.SchemaVersion = parsed.Spif.SchemaVersion ?? "unknown";
@@ -291,6 +302,7 @@ public sealed class PapAdminController : ControllerBase
         entity.IsActive = request.Activate;
         entity.ImportedAt = DateTimeOffset.UtcNow;
         entity.ImportedBy = request.ImportedBy;
+        entity.TenantId = tenantId;
         entity.ClassificationCount = parsed.Spif.Classifications.Count;
         entity.CategoryCount = parsed.Spif.CategoryTagSets.Sum(ts => ts.Tags.Sum(t => t.Categories.Count));
         entity.Hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(request.Xml)));
@@ -319,7 +331,9 @@ public sealed class PapAdminController : ControllerBase
     [Authorize(Policy = "PolicyAdmin")]
     public async Task<IActionResult> DeleteSpif(Guid id, CancellationToken ct)
     {
-        var entity = await _dbContext.Spifs.FirstOrDefaultAsync(x => x.Id == id, ct);
+        var tenantId = _tenantContext.TenantId;
+        var entity = await _dbContext.Spifs.FirstOrDefaultAsync(
+            x => x.Id == id && x.TenantId == tenantId, ct);
         if (entity is null)
             return NotFound();
 
@@ -342,7 +356,9 @@ public sealed class PapAdminController : ControllerBase
     [Authorize(Policy = "PolicyRead")]
     public async Task<IActionResult> ExportSpif(Guid id, CancellationToken ct)
     {
-        var entity = await _dbContext.Spifs.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        var tenantId = _tenantContext.TenantId;
+        var entity = await _dbContext.Spifs.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId, ct);
         if (entity is null)
             return NotFound();
 
@@ -388,8 +404,9 @@ public sealed class PapAdminController : ControllerBase
         [FromQuery] int pageSize = 50,
         CancellationToken ct = default)
     {
+        var tenantId = _tenantContext.TenantId;
         var query = _dbContext.AuditEvents.AsNoTracking()
-            .Where(e => e.EventType == "policy_change" || e.EventType == "import_spif");
+            .Where(e => (e.EventType == "policy_change" || e.EventType == "import_spif") && e.TenantId == tenantId);
 
         if (from.HasValue)
             query = query.Where(e => e.Timestamp >= from.Value);
@@ -416,7 +433,8 @@ public sealed class PapAdminController : ControllerBase
                 ResourceType = e.ResourceType,
                 ResourceId = e.ResourceId,
                 ActorIdentity = e.ActorIdentity,
-                DetailJson = e.DetailJson
+                DetailJson = e.DetailJson,
+                TenantId = e.TenantId
             })
             .ToListAsync(ct);
 

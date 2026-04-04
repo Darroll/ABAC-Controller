@@ -6,19 +6,29 @@ using Microsoft.EntityFrameworkCore;
 namespace AbacController.Data.Repositories;
 
 /// <summary>
-/// EF Core implementation of IPolicyRepository.
+/// EF Core implementation of <see cref="IPolicyRepository"/> with multi-tenant isolation.
+/// When a tenant context is provided, all queries are scoped to that tenant.
 /// </summary>
 public sealed class PolicyRepository : IPolicyRepository
 {
     private readonly AbacDbContext _db;
+    private readonly ITenantContext? _tenantContext;
 
-    public PolicyRepository(AbacDbContext db) => _db = db;
+    /// <summary>Initializes a new instance of the <see cref="PolicyRepository"/> class.</summary>
+    public PolicyRepository(AbacDbContext db, ITenantContext? tenantContext = null)
+    {
+        _db = db;
+        _tenantContext = tenantContext;
+    }
+
+    private string? CurrentTenantId => _tenantContext?.TenantId;
 
     // ── Policy Sets ──
 
+    /// <inheritdoc />
     public async Task<List<PolicySet>> GetPolicySetsAsync(CancellationToken ct = default)
     {
-        var entities = await _db.PolicySets
+        var entities = await PolicySetsQuery()
             .Include(ps => ps.Policies)
             .ThenInclude(p => p.Versions)
             .AsNoTracking()
@@ -27,9 +37,10 @@ public sealed class PolicyRepository : IPolicyRepository
         return entities.Select(MapToDomain).ToList();
     }
 
+    /// <inheritdoc />
     public async Task<PolicySet?> GetPolicySetAsync(string id, CancellationToken ct = default)
     {
-        var entity = await _db.PolicySets
+        var entity = await PolicySetsQuery()
             .Include(ps => ps.Policies)
             .ThenInclude(p => p.Versions)
             .AsNoTracking()
@@ -38,17 +49,20 @@ public sealed class PolicyRepository : IPolicyRepository
         return entity is null ? null : MapToDomain(entity);
     }
 
+    /// <inheritdoc />
     public async Task<PolicySet> CreatePolicySetAsync(PolicySet policySet, CancellationToken ct = default)
     {
         var entity = MapToEntity(policySet);
+        entity.TenantId = CurrentTenantId;
         _db.PolicySets.Add(entity);
         await _db.SaveChangesAsync(ct);
         return MapToDomain(entity);
     }
 
+    /// <inheritdoc />
     public async Task<PolicySet> UpdatePolicySetAsync(PolicySet policySet, CancellationToken ct = default)
     {
-        var entity = await _db.PolicySets.FindAsync([policySet.Id], ct)
+        var entity = await PolicySetsQuery().FirstOrDefaultAsync(ps => ps.Id == policySet.Id, ct)
             ?? throw new InvalidOperationException($"PolicySet {policySet.Id} not found");
 
         entity.Name = policySet.Name;
@@ -62,9 +76,10 @@ public sealed class PolicyRepository : IPolicyRepository
         return MapToDomain(entity);
     }
 
+    /// <inheritdoc />
     public async Task DeletePolicySetAsync(string id, CancellationToken ct = default)
     {
-        var entity = await _db.PolicySets.FindAsync([id], ct);
+        var entity = await PolicySetsQuery().FirstOrDefaultAsync(ps => ps.Id == id, ct);
         if (entity is not null)
         {
             _db.PolicySets.Remove(entity);
@@ -74,9 +89,10 @@ public sealed class PolicyRepository : IPolicyRepository
 
     // ── Policies ──
 
+    /// <inheritdoc />
     public async Task<Policy?> GetPolicyAsync(string id, CancellationToken ct = default)
     {
-        var entity = await _db.Policies
+        var entity = await PoliciesQuery()
             .Include(p => p.Versions)
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == id, ct);
@@ -84,6 +100,7 @@ public sealed class PolicyRepository : IPolicyRepository
         return entity is null ? null : MapPolicyToDomain(entity);
     }
 
+    /// <inheritdoc />
     public async Task<Policy> CreatePolicyAsync(Policy policy, CancellationToken ct = default)
     {
         var entity = MapPolicyToEntity(policy);
@@ -92,9 +109,10 @@ public sealed class PolicyRepository : IPolicyRepository
         return MapPolicyToDomain(entity);
     }
 
+    /// <inheritdoc />
     public async Task<Policy> UpdatePolicyAsync(Policy policy, CancellationToken ct = default)
     {
-        var entity = await _db.Policies.FindAsync([policy.Id], ct)
+        var entity = await PoliciesQuery().FirstOrDefaultAsync(p => p.Id == policy.Id, ct)
             ?? throw new InvalidOperationException($"Policy {policy.Id} not found");
 
         entity.Name = policy.Name;
@@ -106,9 +124,10 @@ public sealed class PolicyRepository : IPolicyRepository
         return MapPolicyToDomain(entity);
     }
 
+    /// <inheritdoc />
     public async Task DeletePolicyAsync(string id, CancellationToken ct = default)
     {
-        var entity = await _db.Policies.FindAsync([id], ct);
+        var entity = await PoliciesQuery().FirstOrDefaultAsync(p => p.Id == id, ct);
         if (entity is not null)
         {
             _db.Policies.Remove(entity);
@@ -118,10 +137,12 @@ public sealed class PolicyRepository : IPolicyRepository
 
     // ── Policy Versions ──
 
+    /// <inheritdoc />
     public async Task<List<PolicyVersion>> GetVersionsAsync(string policyId, CancellationToken ct = default)
     {
+        var allowedPolicyIds = PoliciesQuery().Select(p => p.Id);
         var entities = await _db.PolicyVersions
-            .Where(v => v.PolicyId == policyId)
+            .Where(v => v.PolicyId == policyId && allowedPolicyIds.Contains(v.PolicyId))
             .OrderByDescending(v => v.VersionNumber)
             .AsNoTracking()
             .ToListAsync(ct);
@@ -129,26 +150,34 @@ public sealed class PolicyRepository : IPolicyRepository
         return entities.Select(MapVersionToDomain).ToList();
     }
 
+    /// <inheritdoc />
     public async Task<PolicyVersion?> GetVersionAsync(Guid versionId, CancellationToken ct = default)
     {
+        var allowedPolicyIds = PoliciesQuery().Select(p => p.Id);
         var entity = await _db.PolicyVersions
             .AsNoTracking()
-            .FirstOrDefaultAsync(v => v.Id == versionId, ct);
+            .FirstOrDefaultAsync(v => v.Id == versionId && allowedPolicyIds.Contains(v.PolicyId), ct);
 
         return entity is null ? null : MapVersionToDomain(entity);
     }
 
+    /// <inheritdoc />
     public async Task<PolicyVersion> CreateVersionAsync(PolicyVersion version, CancellationToken ct = default)
     {
+        var policyExists = await PoliciesQuery().AnyAsync(p => p.Id == version.PolicyId, ct);
+        if (!policyExists)
+            throw new InvalidOperationException($"Policy {version.PolicyId} not found");
+
         var entity = MapVersionToEntity(version);
         _db.PolicyVersions.Add(entity);
         await _db.SaveChangesAsync(ct);
         return MapVersionToDomain(entity);
     }
 
+    /// <inheritdoc />
     public async Task ActivateVersionAsync(string policyId, Guid versionId, CancellationToken ct = default)
     {
-        var policy = await _db.Policies.FindAsync([policyId], ct)
+        var policy = await PoliciesQuery().FirstOrDefaultAsync(p => p.Id == policyId, ct)
             ?? throw new InvalidOperationException($"Policy {policyId} not found");
 
         // Deactivate all versions
@@ -168,6 +197,23 @@ public sealed class PolicyRepository : IPolicyRepository
         policy.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _db.SaveChangesAsync(ct);
+    }
+
+    // ── Tenant-scoped queries ──
+
+    private IQueryable<PolicySetEntity> PolicySetsQuery()
+    {
+        var tenantId = CurrentTenantId;
+        return _db.PolicySets.Where(ps => ps.TenantId == tenantId);
+    }
+
+    private IQueryable<PolicyEntity> PoliciesQuery()
+    {
+        var tenantId = CurrentTenantId;
+        return _db.Policies.Where(p => _db.PolicySets
+            .Where(ps => ps.TenantId == tenantId)
+            .Select(ps => ps.Id)
+            .Contains(p.PolicySetId));
     }
 
     // ── Mapping ──

@@ -23,4 +23,7 @@ public class AuditEventEntity
     public string? PepId { get; set; }
     public string? ActorIdentity { get; set; }
     public string? DetailJson { get; set; }
+
+    /// <summary>Tenant identifier for multi-tenant isolation. Null = default/system tenant.</summary>
+    public string? TenantId { get; set; }
 }
