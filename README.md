@@ -82,6 +82,16 @@ AbacController/
     └── sbom.spdx.json
 ```
 
+## Documentation
+
+- `INSTALL.md` — setup and runtime configuration
+- `USAGE.md` — common operational flows and curl examples
+- `ARCHITECTURE.md` — runtime layout and evaluation pipeline
+- `API.md` — HTTP/gRPC surface summary
+- `CONTRIBUTING.md` — development and PR expectations
+- `docs/runtime-baseline.md` — current deployment/runtime truth
+- `docs/standards-gaps.md` — standards coverage and gaps
+
 ## Getting started
 
 ### Prerequisites
