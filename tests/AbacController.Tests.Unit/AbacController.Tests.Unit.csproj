@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\AbacController.Api\AbacController.Api.csproj" />
     <ProjectReference Include="..\..\src\AbacController.Audit\AbacController.Audit.csproj" />
     <ProjectReference Include="..\..\src\AbacController.Core\AbacController.Core.csproj" />
     <ProjectReference Include="..\..\src\AbacController.Pdp\AbacController.Pdp.csproj" />

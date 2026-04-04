@@ -91,6 +91,7 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static void UseAbacControllerHost(this WebApplication app)
     {
+        app.UseMiddleware<Middleware.CorrelationIdMiddleware>();
         app.UseRouting();
         app.UseAuthentication();
         app.UseAuthorization();
@@ -118,17 +119,18 @@ public static class ServiceCollectionExtensions
         AbacControllerOptions options)
     {
         var hasAuthority = !string.IsNullOrWhiteSpace(options.Auth.Authority);
+        var hasApiKeys = options.Auth.ApiKeys.Count > 0;
         var allowDevelopmentAuth = environment.IsDevelopment() && options.Auth.EnableDevelopmentAuth;
 
-        if (!hasAuthority && !allowDevelopmentAuth)
+        if (!hasAuthority && !hasApiKeys && !allowDevelopmentAuth)
         {
             throw new InvalidOperationException(
-                "Authentication is not configured. Set Auth:Authority for JWT bearer validation or explicitly enable Auth:EnableDevelopmentAuth in Development only.");
+                "Authentication is not configured. Set Auth:Authority for JWT bearer, configure Auth:ApiKeys for API key auth, or explicitly enable Auth:EnableDevelopmentAuth in Development only.");
         }
 
         if (hasAuthority)
         {
-            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            var authBuilder = services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(jwtOptions =>
                 {
                     jwtOptions.Authority = options.Auth.Authority;
@@ -136,13 +138,33 @@ public static class ServiceCollectionExtensions
                     jwtOptions.RequireHttpsMetadata = options.Auth.RequireHttpsMetadata;
                 });
 
+            if (hasApiKeys)
+            {
+                authBuilder.AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, ApiKeyAuthHandler>(
+                    ApiKeyAuthenticationDefaults.SchemeName, _ => { });
+            }
+
             return;
         }
 
-        services.AddAuthentication(DevelopmentAuthenticationDefaults.SchemeName)
+        if (hasApiKeys && !allowDevelopmentAuth)
+        {
+            services.AddAuthentication(ApiKeyAuthenticationDefaults.SchemeName)
+                .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, ApiKeyAuthHandler>(
+                    ApiKeyAuthenticationDefaults.SchemeName, _ => { });
+            return;
+        }
+
+        var devBuilder = services.AddAuthentication(DevelopmentAuthenticationDefaults.SchemeName)
             .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, DevelopmentAuthHandler>(
                 DevelopmentAuthenticationDefaults.SchemeName,
                 _ => { });
+
+        if (hasApiKeys)
+        {
+            devBuilder.AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, ApiKeyAuthHandler>(
+                ApiKeyAuthenticationDefaults.SchemeName, _ => { });
+        }
     }
 
     private static void ConfigureAuthorization(IServiceCollection services)

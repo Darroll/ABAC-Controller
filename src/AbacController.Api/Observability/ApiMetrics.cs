@@ -17,6 +17,13 @@ public sealed class ApiMetrics
     private long _batchEvaluations;
     private long _evaluationDurationCount;
     private double _evaluationDurationTotalMs;
+    private long _cacheHits;
+    private long _cacheMisses;
+    private long _cacheBypass;
+    private long _pipResolutions;
+    private long _pipFailures;
+    private long _policyChangeEvents;
+    private long _simulationEvaluations;
 
     public void RecordEvaluation(Decision decision, TimeSpan evaluationTime)
     {
@@ -46,6 +53,14 @@ public sealed class ApiMetrics
         Interlocked.Add(ref _batchEvaluations, count);
     }
 
+    public void RecordCacheHit() => Interlocked.Increment(ref _cacheHits);
+    public void RecordCacheMiss() => Interlocked.Increment(ref _cacheMisses);
+    public void RecordCacheBypass() => Interlocked.Increment(ref _cacheBypass);
+    public void RecordPipResolution() => Interlocked.Increment(ref _pipResolutions);
+    public void RecordPipFailure() => Interlocked.Increment(ref _pipFailures);
+    public void RecordPolicyChange() => Interlocked.Increment(ref _policyChangeEvents);
+    public void RecordSimulation() => Interlocked.Increment(ref _simulationEvaluations);
+
     public string RenderPrometheus(AppRuntimeStateSnapshot snapshot)
     {
         var builder = new StringBuilder();
@@ -57,6 +72,13 @@ public sealed class ApiMetrics
         AppendCounter(builder, "abac_batch_evaluations_total", "Total AuthZEN batch members evaluated.", Interlocked.Read(ref _batchEvaluations));
         AppendCounter(builder, "abac_evaluation_duration_ms_count", "Number of recorded evaluation durations.", Interlocked.Read(ref _evaluationDurationCount));
         AppendGauge(builder, "abac_evaluation_duration_ms_sum", "Sum of evaluation durations in milliseconds.", Interlocked.CompareExchange(ref _evaluationDurationTotalMs, 0, 0));
+        AppendCounter(builder, "abac_cache_hits_total", "Decision cache hits.", Interlocked.Read(ref _cacheHits));
+        AppendCounter(builder, "abac_cache_misses_total", "Decision cache misses.", Interlocked.Read(ref _cacheMisses));
+        AppendCounter(builder, "abac_cache_bypass_total", "Decision cache bypasses.", Interlocked.Read(ref _cacheBypass));
+        AppendCounter(builder, "abac_pip_resolutions_total", "PIP attribute resolutions.", Interlocked.Read(ref _pipResolutions));
+        AppendCounter(builder, "abac_pip_failures_total", "PIP attribute resolution failures.", Interlocked.Read(ref _pipFailures));
+        AppendCounter(builder, "abac_policy_changes_total", "Policy administration changes.", Interlocked.Read(ref _policyChangeEvents));
+        AppendCounter(builder, "abac_simulation_evaluations_total", "Simulation/dry-run evaluations.", Interlocked.Read(ref _simulationEvaluations));
         AppendGauge(builder, "abac_startup_complete", "Startup completion state (1=complete).", snapshot.StartupCompleted ? 1 : 0);
         AppendGauge(builder, "abac_ready", "Readiness state (1=ready).", snapshot.Ready ? 1 : 0);
         return builder.ToString();

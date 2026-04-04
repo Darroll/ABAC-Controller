@@ -102,6 +102,98 @@ public class AuthZenController : ControllerBase
     }
 
     /// <summary>
+    /// Simulation/dry-run endpoint. Evaluates as normal but marks result as simulated.
+    /// Does not affect metrics, audit, or caching.
+    /// POST /access/v1/evaluation/simulate
+    /// </summary>
+    [HttpPost("/access/v1/evaluation/simulate")]
+    [Authorize(Policy = "EvaluateExplain")]
+    public async Task<IActionResult> Simulate(
+        [FromBody] AuthZenEvaluationRequest request, CancellationToken ct)
+    {
+        var internalRequest = MapToInternal(request);
+        // Use explain mode to get the trace, but bypass cache so simulation doesn't pollute it
+        internalRequest = internalRequest with
+        {
+            Options = internalRequest.Options with { BypassCache = true }
+        };
+        var explained = await _pdp.EvaluateExplainAsync(internalRequest, ct);
+        // Don't record metrics for simulation
+
+        return Ok(new
+        {
+            decision = explained.Result.Decision == Decision.Permit,
+            simulated = true,
+            result = new
+            {
+                decisionId = explained.Result.DecisionId,
+                decision = explained.Result.Decision.ToString(),
+                status = explained.Result.Status,
+                obligations = explained.Result.Obligations,
+                advice = explained.Result.Advice,
+                appliedPolicies = explained.Result.AppliedPolicies,
+                evaluationTime = explained.Result.EvaluationTime.TotalMilliseconds + "ms",
+                attributeProvenance = explained.Result.AttributeProvenance
+            },
+            trace = new
+            {
+                policySetId = explained.Trace.PolicySetId,
+                policyVersion = explained.Trace.PolicyVersion,
+                matchedPolicy = explained.Trace.MatchedPolicy,
+                steps = explained.Trace.Steps.Select(s => new
+                {
+                    ruleId = s.RuleId,
+                    effect = s.Effect,
+                    result = s.Result,
+                    reason = s.Reason
+                })
+            }
+        });
+    }
+
+    /// <summary>
+    /// Decision explanation endpoint. Returns full evaluation trace.
+    /// POST /access/v1/evaluation/explain
+    /// </summary>
+    [HttpPost("/access/v1/evaluation/explain")]
+    [Authorize(Policy = "EvaluateExplain")]
+    public async Task<IActionResult> Explain(
+        [FromBody] AuthZenEvaluationRequest request, CancellationToken ct)
+    {
+        var internalRequest = MapToInternal(request);
+        var explained = await _pdp.EvaluateExplainAsync(internalRequest, ct);
+        _metrics.RecordEvaluation(explained.Result.Decision, explained.Result.EvaluationTime);
+
+        return Ok(new
+        {
+            decision = explained.Result.Decision == Decision.Permit,
+            context = new Dictionary<string, object>
+            {
+                ["id"] = explained.Result.DecisionId,
+                ["decision"] = explained.Result.Decision.ToString(),
+                ["evaluationTime"] = explained.Result.EvaluationTime.TotalMilliseconds + "ms"
+            },
+            obligations = explained.Result.Obligations,
+            advice = explained.Result.Advice,
+            appliedPolicies = explained.Result.AppliedPolicies,
+            attributeProvenance = explained.Result.AttributeProvenance,
+            trace = new
+            {
+                policySetId = explained.Trace.PolicySetId,
+                policyVersion = explained.Trace.PolicyVersion,
+                matchedPolicy = explained.Trace.MatchedPolicy,
+                steps = explained.Trace.Steps.Select(s => new
+                {
+                    ruleId = s.RuleId,
+                    effect = s.Effect,
+                    result = s.Result,
+                    reason = s.Reason
+                })
+            }
+        });
+    }
+
+    /// <summary>
     /// AuthZEN 1.0 discovery endpoint.
     /// GET /.well-known/authzen-configuration
     /// </summary>
@@ -114,6 +206,8 @@ public class AuthZenController : ControllerBase
             issuer = $"{Request.Scheme}://{Request.Host}",
             evaluation_endpoint = "/access/v1/evaluation",
             evaluations_endpoint = "/access/v1/evaluations",
+            evaluation_explain_endpoint = "/access/v1/evaluation/explain",
+            evaluation_simulate_endpoint = "/access/v1/evaluation/simulate",
             subjects_endpoint = "/access/v1/subjects",
             resources_endpoint = "/access/v1/resources",
             actions_endpoint = "/access/v1/actions",

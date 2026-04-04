@@ -24,6 +24,22 @@ public sealed class AuthOptions
     public bool RequireHttpsMetadata { get; set; } = true;
     public string? JwksFile { get; set; }
     public bool EnableDevelopmentAuth { get; set; }
+    public List<ApiKeyConfig> ApiKeys { get; set; } = [];
+}
+
+public sealed class ApiKeyConfig
+{
+    /// <summary>The API key value (secret).</summary>
+    public required string Key { get; set; }
+
+    /// <summary>Client identifier for audit trail.</summary>
+    public required string ClientId { get; set; }
+
+    /// <summary>Scopes granted to this API key.</summary>
+    public List<string> Scopes { get; set; } = [];
+
+    /// <summary>Optional description.</summary>
+    public string? Description { get; set; }
 }
 
 public sealed class PdpOptions

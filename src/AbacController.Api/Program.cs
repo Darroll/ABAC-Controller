@@ -28,7 +28,30 @@ builder.Configuration
     .AddJsonFile("appsettings.json", optional: true)
     .AddEnvironmentVariables("ABAC_");
 
+// Structured JSON logging when not in development
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Logging.AddJsonConsole(options =>
+    {
+        options.IncludeScopes = true;
+        options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+        options.UseUtcTimestamp = true;
+    });
+}
+
 var config = builder.Configuration.Get<AbacControllerOptions>() ?? new();
+
+// Fail fast with clear messages on invalid configuration
+var configErrors = AbacController.Api.Configuration.ConfigurationValidator.Validate(config, builder.Environment.IsDevelopment());
+if (configErrors.Count > 0)
+{
+    foreach (var error in configErrors)
+    {
+        Console.Error.WriteLine($"[FATAL] Configuration error: {error}");
+    }
+    throw new InvalidOperationException(
+        $"ABAC Controller configuration is invalid ({configErrors.Count} error(s)). See log output above.");
+}
 
 builder.Services.AddAbacControllerHost(builder.Configuration, builder.Environment, config);
 
