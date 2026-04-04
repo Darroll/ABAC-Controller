@@ -8,37 +8,37 @@ import "google/api/annotations.proto";
 
 service PepApi {
   rpc ListEnforcementPoints(ListEnforcementPointsRequestMessage) returns (ListEnforcementPointsResponseMessage) {
-    option (google.api.http) = { get: "/api/v1/pep/enforcement-points" };
+    option (google.api.http) = { get: "/api/v1/grpc/pep/enforcement-points" };
   }
 
   rpc UpsertEnforcementPoint(UpsertEnforcementPointRequestMessage) returns (EnforcementPointMessage) {
     option (google.api.http) = {
-      put: "/api/v1/pep/enforcement-points/{enforcement_point.id}"
+      put: "/api/v1/grpc/pep/enforcement-points/{enforcement_point.id}"
       body: "enforcement_point"
     };
   }
 
   rpc DeleteEnforcementPoint(DeleteEnforcementPointRequestMessage) returns (OperationStatusMessage) {
-    option (google.api.http) = { delete: "/api/v1/pep/enforcement-points/{id}" };
+    option (google.api.http) = { delete: "/api/v1/grpc/pep/enforcement-points/{id}" };
   }
 
   rpc DecodeLabel(DecodeLabelRequestMessage) returns (DecodeLabelResponseMessage) {
     option (google.api.http) = {
-      post: "/api/v1/pep/labels/decode"
+      post: "/api/v1/grpc/pep/labels/decode"
       body: "*"
     };
   }
 
   rpc EncodeLabel(EncodeLabelRequestMessage) returns (EncodeLabelResponseMessage) {
     option (google.api.http) = {
-      post: "/api/v1/pep/labels/encode"
+      post: "/api/v1/grpc/pep/labels/encode"
       body: "*"
     };
   }
 
   rpc ValidateLabel(ValidateLabelRequestMessage) returns (ValidateLabelResponseMessage) {
     option (google.api.http) = {
-      post: "/api/v1/pep/labels/validate"
+      post: "/api/v1/grpc/pep/labels/validate"
       body: "*"
     };
   }
