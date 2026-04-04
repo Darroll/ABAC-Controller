@@ -45,20 +45,20 @@ service PepApi {
 
   rpc BindMetadata(BindMetadataRequestMessage) returns (BindMetadataResponseMessage) {
     option (google.api.http) = {
-      post: "/api/v1/pep/metadata/bind"
+      post: "/api/v1/grpc/pep/metadata/bind"
       body: "*"
     };
   }
 
   rpc UnbindMetadata(UnbindMetadataRequestMessage) returns (UnbindMetadataResponseMessage) {
     option (google.api.http) = {
-      post: "/api/v1/pep/metadata/unbind"
+      post: "/api/v1/grpc/pep/metadata/unbind"
       body: "*"
     };
   }
 
   rpc ListCodecs(ListCodecsRequestMessage) returns (ListCodecsResponseMessage) {
-    option (google.api.http) = { get: "/api/v1/pep/metadata/codecs" };
+    option (google.api.http) = { get: "/api/v1/grpc/pep/metadata/codecs" };
   }
 }
 

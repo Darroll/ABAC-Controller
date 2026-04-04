@@ -8,26 +8,26 @@ import "google/api/annotations.proto";
 
 service PapApi {
   rpc ListPolicySets(ListPolicySetsRequestMessage) returns (ListPolicySetsResponseMessage) {
-    option (google.api.http) = { get: "/api/v1/pap/policy-sets" };
+    option (google.api.http) = { get: "/api/v1/grpc/pap/policy-sets" };
   }
 
   rpc GetPolicySet(GetPolicySetRequestMessage) returns (GetPolicySetResponseMessage) {
-    option (google.api.http) = { get: "/api/v1/pap/policy-sets/{id}" };
+    option (google.api.http) = { get: "/api/v1/grpc/pap/policy-sets/{id}" };
   }
 
   rpc UpsertPolicySet(UpsertPolicySetRequestMessage) returns (PolicySetSummaryMessage) {
     option (google.api.http) = {
-      put: "/api/v1/pap/policy-sets/{policy_set.id}"
+      put: "/api/v1/grpc/pap/policy-sets/{policy_set.id}"
       body: "policy_set"
     };
   }
 
   rpc ListPolicyVersions(ListPolicyVersionsRequestMessage) returns (ListPolicyVersionsResponseMessage) {
-    option (google.api.http) = { get: "/api/v1/pap/policies/{policy_id}/versions" };
+    option (google.api.http) = { get: "/api/v1/grpc/pap/policies/{policy_id}/versions" };
   }
 
   rpc ListSpifs(ListSpifsRequestMessage) returns (ListSpifsResponseMessage) {
-    option (google.api.http) = { get: "/api/v1/pap/spifs" };
+    option (google.api.http) = { get: "/api/v1/grpc/pap/spifs" };
   }
 }
 

@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+using AbacController.Core.Domain.Policy;
 using AbacController.Core.Interfaces;
 using AbacController.Data;
 using AbacController.Data.Entities;
@@ -93,6 +96,62 @@ public sealed class PapAdminController : ControllerBase
     public async Task<IActionResult> DeletePolicy(string id, CancellationToken ct)
     {
         await _policyRepository.DeletePolicyAsync(id, ct);
+        return NoContent();
+    }
+
+    [HttpGet("policies/{id}/versions")]
+    [Authorize(Policy = "PolicyRead")]
+    public async Task<ActionResult<List<PolicyVersion>>> ListPolicyVersions(string id, CancellationToken ct)
+        => Ok(await _policyRepository.GetVersionsAsync(id, ct));
+
+    public sealed record CreatePolicyVersionRequest(string Content, string? CreatedBy = null, bool Activate = true);
+
+    [HttpPost("policies/{id}/versions")]
+    [Authorize(Policy = "PolicyWrite")]
+    public async Task<ActionResult<PolicyVersion>> CreatePolicyVersion(string id, [FromBody] CreatePolicyVersionRequest request, CancellationToken ct)
+    {
+        var policy = await _policyRepository.GetPolicyAsync(id, ct);
+        if (policy is null)
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(request.Content))
+            return BadRequest("content is required");
+
+        var existingVersions = await _policyRepository.GetVersionsAsync(id, ct);
+        var nextVersionNumber = existingVersions.Count == 0 ? 1 : existingVersions.Max(v => v.VersionNumber) + 1;
+
+        var version = new PolicyVersion
+        {
+            PolicyId = id,
+            VersionNumber = nextVersionNumber,
+            Content = request.Content,
+            Hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(request.Content))),
+            CreatedBy = request.CreatedBy,
+            IsActive = request.Activate
+        };
+
+        var saved = await _policyRepository.CreateVersionAsync(version, ct);
+        if (request.Activate)
+        {
+            await _policyRepository.ActivateVersionAsync(id, saved.Id, ct);
+        }
+
+        return Ok(await _policyRepository.GetVersionAsync(saved.Id, ct));
+    }
+
+    [HttpPost("policies/{id}/versions/{versionId:guid}/activate")]
+    [Authorize(Policy = "PolicyWrite")]
+    public async Task<IActionResult> ActivatePolicyVersion(string id, Guid versionId, CancellationToken ct)
+    {
+        var policy = await _policyRepository.GetPolicyAsync(id, ct);
+        if (policy is null)
+            return NotFound();
+
+        var version = await _policyRepository.GetVersionAsync(versionId, ct);
+        if (version is null || !string.Equals(version.PolicyId, id, StringComparison.Ordinal))
+            return NotFound();
+
+        await _policyRepository.ActivateVersionAsync(id, versionId, ct);
         return NoContent();
     }
 

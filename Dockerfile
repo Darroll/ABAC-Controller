@@ -21,8 +21,8 @@ RUN useradd --no-create-home --shell /bin/false abac \
 
 COPY --from=build /app/publish .
 
-ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
+EXPOSE 8081
 VOLUME ["/data"]
 USER abac
 

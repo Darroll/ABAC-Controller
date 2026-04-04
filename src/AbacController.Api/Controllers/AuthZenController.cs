@@ -1,7 +1,10 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using AbacController.Api.Observability;
 using AbacController.Core.Constants;
 using AbacController.Core.Domain.Decisions;
+using AbacController.Core.Domain.Labels;
+using AbacController.Core.Domain.Spif;
 using AbacController.Core.Interfaces;
 using AbacController.Data;
 using Microsoft.AspNetCore.Authorization;
@@ -187,27 +190,253 @@ public class AuthZenController : ControllerBase
 
     public sealed record AuthZenSearchRequest(string? Query = null, int? Limit = null);
 
-    private static EvaluationRequest MapToInternal(AuthZenEvaluationRequest request) => new()
+    private static EvaluationRequest MapToInternal(AuthZenEvaluationRequest request)
     {
-        RequestId = request.RequestId,
-        Subject = new SubjectInfo
+        var subjectProperties = request.Subject?.Properties is null
+            ? new Dictionary<string, object?>()
+            : new Dictionary<string, object?>(request.Subject.Properties, StringComparer.Ordinal);
+
+        var resourceProperties = request.Resource?.Properties is null
+            ? new Dictionary<string, object?>()
+            : new Dictionary<string, object?>(request.Resource.Properties, StringComparer.Ordinal);
+
+        if (TryParseSecurityClearance(subjectProperties, out var securityClearance))
         {
-            Type = request.Subject?.Type ?? "user",
-            Id = request.Subject?.Id ?? "",
-            Properties = request.Subject?.Properties ?? new()
-        },
-        Action = new ActionInfo
-        {
-            Name = request.Action?.Name ?? "",
-            Properties = request.Action?.Properties ?? new()
-        },
-        Resource = new ResourceInfo
-        {
-            Type = request.Resource?.Type ?? "",
-            Id = request.Resource?.Id ?? "",
-            Properties = request.Resource?.Properties ?? new()
+            subjectProperties["securityClearance"] = securityClearance;
         }
-    };
+
+        if (TryParseSecurityLabel(resourceProperties, out var securityLabel))
+        {
+            resourceProperties["securityLabel"] = securityLabel;
+            if (!string.IsNullOrWhiteSpace(securityLabel.PolicyOid))
+            {
+                resourceProperties["securityLabel.policyOid"] = securityLabel.PolicyOid;
+            }
+        }
+
+        return new EvaluationRequest
+        {
+            RequestId = request.RequestId,
+            Subject = new SubjectInfo
+            {
+                Type = request.Subject?.Type ?? "user",
+                Id = request.Subject?.Id ?? "",
+                Properties = subjectProperties
+            },
+            Action = new ActionInfo
+            {
+                Name = request.Action?.Name ?? "",
+                Properties = request.Action?.Properties ?? new()
+            },
+            Resource = new ResourceInfo
+            {
+                Type = request.Resource?.Type ?? "",
+                Id = request.Resource?.Id ?? "",
+                Properties = resourceProperties
+            }
+        };
+    }
+
+    private static bool TryParseSecurityClearance(
+        IReadOnlyDictionary<string, object?> properties,
+        out SecurityClearance clearance)
+    {
+        clearance = null!;
+        if (!properties.TryGetValue("securityClearance", out var raw) || raw is null)
+        {
+            return false;
+        }
+
+        var element = ToJsonElement(raw);
+        if (element.ValueKind != JsonValueKind.Object ||
+            !element.TryGetProperty("policyOid", out var policyOidElement) ||
+            string.IsNullOrWhiteSpace(policyOidElement.GetString()))
+        {
+            return false;
+        }
+
+        var classificationLacvs = element.TryGetProperty("classificationLacvs", out var classificationElement) && classificationElement.ValueKind == JsonValueKind.Array
+            ? classificationElement.EnumerateArray()
+                .Where(static entry => entry.TryGetInt32(out _))
+                .Select(static entry => (LacvValue)entry.GetInt32())
+                .ToImmutableHashSet()
+            : ImmutableHashSet<LacvValue>.Empty;
+
+        var categoryTagSets = new List<ClearanceCategoryTagSet>();
+        if (element.TryGetProperty("categoryTagSets", out var categoryTagSetsElement) && categoryTagSetsElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var tagSetElement in categoryTagSetsElement.EnumerateArray())
+            {
+                if (!tagSetElement.TryGetProperty("tagSetOid", out var tagSetOidElement) || string.IsNullOrWhiteSpace(tagSetOidElement.GetString()))
+                {
+                    continue;
+                }
+
+                var tags = new List<ClearanceCategoryTag>();
+                if (tagSetElement.TryGetProperty("tags", out var tagsElement) && tagsElement.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var tagElement in tagsElement.EnumerateArray())
+                    {
+                        tags.Add(new ClearanceCategoryTag
+                        {
+                            TagOid = tagElement.TryGetProperty("tagOid", out var tagOidElement) ? tagOidElement.GetString() : null,
+                            TagType = ParseTagType(tagElement.TryGetProperty("tagType", out var tagTypeElement) ? tagTypeElement.GetString() : null),
+                            Bits = ParseLacvSet(tagElement, "bits"),
+                            EnumeratedValues = ParseLacvSet(tagElement, "enumeratedValues")
+                        });
+                    }
+                }
+
+                categoryTagSets.Add(new ClearanceCategoryTagSet
+                {
+                    TagSetOid = tagSetOidElement.GetString()!,
+                    Tags = tags.ToImmutableList()
+                });
+            }
+        }
+
+        clearance = new SecurityClearance
+        {
+            PolicyOid = policyOidElement.GetString()!,
+            ClassificationLacvs = classificationLacvs,
+            CategoryTagSets = categoryTagSets.ToImmutableList()
+        };
+
+        return true;
+    }
+
+    private static bool TryParseSecurityLabel(
+        IReadOnlyDictionary<string, object?> properties,
+        out SecurityLabel label)
+    {
+        label = null!;
+        if (!properties.TryGetValue("securityLabel", out var raw) || raw is null)
+        {
+            return false;
+        }
+
+        var element = ToJsonElement(raw);
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        var categoryTagSets = new List<LabelCategoryTagSet>();
+        if (element.TryGetProperty("categoryTagSets", out var categoryTagSetsElement) && categoryTagSetsElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var tagSetElement in categoryTagSetsElement.EnumerateArray())
+            {
+                if (!tagSetElement.TryGetProperty("tagSetOid", out var tagSetOidElement) || string.IsNullOrWhiteSpace(tagSetOidElement.GetString()))
+                {
+                    continue;
+                }
+
+                var tags = new List<LabelCategoryTag>();
+                if (tagSetElement.TryGetProperty("tags", out var tagsElement) && tagsElement.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var tagElement in tagsElement.EnumerateArray())
+                    {
+                        var categories = new List<LabelCategory>();
+                        if (tagElement.TryGetProperty("categories", out var categoriesElement) && categoriesElement.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var categoryElement in categoriesElement.EnumerateArray())
+                            {
+                                if (!categoryElement.TryGetProperty("name", out var categoryNameElement) || !categoryElement.TryGetProperty("lacv", out var lacvElement) || !lacvElement.TryGetInt32(out var lacvValue))
+                                {
+                                    continue;
+                                }
+
+                                categories.Add(new LabelCategory
+                                {
+                                    Name = categoryNameElement.GetString() ?? string.Empty,
+                                    Lacv = lacvValue,
+                                    NotBefore = ParseOptionalDateTimeOffset(categoryElement, "notBefore"),
+                                    NotAfter = ParseOptionalDateTimeOffset(categoryElement, "notAfter")
+                                });
+                            }
+                        }
+
+                        tags.Add(new LabelCategoryTag
+                        {
+                            Name = tagElement.TryGetProperty("name", out var nameElement) ? nameElement.GetString() : null,
+                            TagOid = tagElement.TryGetProperty("tagOid", out var tagOidElement) ? tagOidElement.GetString() : null,
+                            TagType = ParseTagType(tagElement.TryGetProperty("tagType", out var tagTypeElement) ? tagTypeElement.GetString() : null),
+                            EnumType = ParseOptionalEnumType(tagElement.TryGetProperty("enumType", out var enumTypeElement) ? enumTypeElement.GetString() : null),
+                            Bits = ParseLacvSet(tagElement, "bits"),
+                            EnumeratedValues = ParseLacvSet(tagElement, "enumeratedValues"),
+                            Categories = categories.ToImmutableList()
+                        });
+                    }
+                }
+
+                categoryTagSets.Add(new LabelCategoryTagSet
+                {
+                    TagSetOid = tagSetOidElement.GetString()!,
+                    Tags = tags.ToImmutableList()
+                });
+            }
+        }
+
+        var privacyMarks = element.TryGetProperty("privacyMarks", out var privacyMarksElement) && privacyMarksElement.ValueKind == JsonValueKind.Array
+            ? privacyMarksElement.EnumerateArray().Where(static entry => entry.ValueKind == JsonValueKind.String).Select(static entry => entry.GetString()!).ToImmutableList()
+            : ImmutableList<string>.Empty;
+
+        label = new SecurityLabel
+        {
+            PolicyOid = element.TryGetProperty("policyOid", out var policyOidElement) ? policyOidElement.GetString() : null,
+            PolicyName = element.TryGetProperty("policyName", out var policyNameElement) ? policyNameElement.GetString() : null,
+            ClassificationLacv = element.TryGetProperty("classificationLacv", out var classificationLacvElement) && classificationLacvElement.TryGetInt32(out var classificationLacv)
+                ? classificationLacv
+                : 0,
+            ClassificationName = element.TryGetProperty("classificationName", out var classificationNameElement) ? classificationNameElement.GetString() : null,
+            CategoryTagSets = categoryTagSets.ToImmutableList(),
+            PrivacyMarks = privacyMarks,
+            CreatedAt = ParseOptionalDateTimeOffset(element, "createdAt")
+        };
+
+        return true;
+    }
+
+    private static ImmutableHashSet<LacvValue> ParseLacvSet(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var valuesElement) || valuesElement.ValueKind != JsonValueKind.Array)
+        {
+            return ImmutableHashSet<LacvValue>.Empty;
+        }
+
+        return valuesElement.EnumerateArray()
+            .Where(static value => value.TryGetInt32(out _))
+            .Select(static value => (LacvValue)value.GetInt32())
+            .ToImmutableHashSet();
+    }
+
+    private static DateTimeOffset? ParseOptionalDateTimeOffset(JsonElement element, string propertyName)
+        => element.TryGetProperty(propertyName, out var propertyElement)
+            && propertyElement.ValueKind == JsonValueKind.String
+            && DateTimeOffset.TryParse(propertyElement.GetString(), out var parsed)
+                ? parsed
+                : null;
+
+    private static TagType ParseTagType(string? value)
+        => Enum.TryParse<TagType>(value, ignoreCase: true, out var parsed)
+            ? parsed
+            : TagType.Restrictive;
+
+    private static EnumType? ParseOptionalEnumType(string? value)
+        => Enum.TryParse<EnumType>(value, ignoreCase: true, out var parsed)
+            ? parsed
+            : null;
+
+    private static JsonElement ToJsonElement(object raw)
+    {
+        if (raw is JsonElement element)
+        {
+            return element;
+        }
+
+        var json = JsonSerializer.Serialize(raw);
+        return JsonDocument.Parse(json).RootElement.Clone();
+    }
 }
 
 // ── AuthZEN DTOs ──
