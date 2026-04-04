@@ -19,6 +19,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
 using System.Threading.RateLimiting;
 
 namespace AbacController.Api.Hosting;
@@ -72,6 +73,53 @@ public static class ServiceCollectionExtensions
         services.AddGrpc().AddJsonTranscoding();
         services.AddControllers();
         services.AddEndpointsApiExplorer();
+        services.AddSwaggerGen(swagger =>
+        {
+            swagger.SwaggerDoc("v1", new OpenApiInfo
+            {
+                Title = "ABAC Controller API",
+                Version = "v1",
+                Description = "Feature-complete ABAC/PDP/PAP/PIP/PEP controller with AuthZEN and XACML JSON support."
+            });
+
+            swagger.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+            {
+                Name = "Authorization",
+                Type = SecuritySchemeType.Http,
+                Scheme = "bearer",
+                BearerFormat = "JWT",
+                In = ParameterLocation.Header,
+                Description = "JWT bearer token. Format: Bearer {token}"
+            });
+
+            swagger.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
+            {
+                Name = ApiKeyAuthenticationDefaults.HeaderName,
+                Type = SecuritySchemeType.ApiKey,
+                In = ParameterLocation.Header,
+                Description = "Service-to-service API key"
+            });
+
+            swagger.AddSecurityRequirement(new OpenApiSecurityRequirement
+            {
+                {
+                    new OpenApiSecurityScheme
+                    {
+                        Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+                    },
+                    []
+                },
+                {
+                    new OpenApiSecurityScheme
+                    {
+                        Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "ApiKey" }
+                    },
+                    []
+                }
+            });
+
+            swagger.CustomSchemaIds(static type => type.FullName?.Replace('+', '.') ?? type.Name);
+        });
         services.AddRazorComponents().AddInteractiveServerComponents();
 
         services.AddHealthChecks()

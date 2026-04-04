@@ -61,6 +61,13 @@ await InitializeAsync(app);
 RegisterLabelCodecs(app);
 
 app.UseRateLimiter();
+app.UseSwagger();
+app.UseSwaggerUI(options =>
+{
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "ABAC Controller API v1");
+    options.RoutePrefix = "swagger";
+    options.DocumentTitle = "ABAC Controller API";
+});
 app.UseAbacControllerHost();
 app.MapGrpcService<PdpGrpcService>();
 app.MapGrpcService<PapGrpcService>();
