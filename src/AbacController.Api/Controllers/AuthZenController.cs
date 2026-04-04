@@ -216,6 +216,26 @@ public class AuthZenController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// XACML JSON profile single evaluation.
+    /// POST /access/v1/xacml-json
+    /// </summary>
+    [HttpPost("/access/v1/xacml-json")]
+    [Authorize(Policy = "Evaluate")]
+    [EnableRateLimiting("pdp")]
+    public async Task<IActionResult> EvaluateXacmlJson(
+        [FromBody] JsonElement xacmlRequest, CancellationToken ct)
+    {
+        var internalRequest = AbacController.Pdp.XacmlJsonMapper.MapFromXacmlJson(xacmlRequest);
+        if (internalRequest is null)
+            return BadRequest(new { error = "Invalid XACML JSON request. Expected { \"Request\": { ... } }" });
+
+        var result = await _pdp.EvaluateAsync(internalRequest, ct);
+        _metrics.RecordEvaluation(result.Decision, result.EvaluationTime);
+
+        return Ok(AbacController.Pdp.XacmlJsonMapper.MapToXacmlJsonResponse(result));
+    }
+
     [HttpPost("/access/v1/subjects")]
     [Authorize(Policy = "Evaluate")]
     public async Task<IActionResult> SearchSubjects([FromBody] AuthZenSearchRequest? request, CancellationToken ct)
