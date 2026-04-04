@@ -6,6 +6,10 @@ using AbacController.Core.Domain.Policy;
 
 namespace AbacController.Pdp;
 
+/// <summary>
+/// Evaluates native JSON policy documents against evaluation requests.
+/// Supports deny-overrides, permit-overrides, first-applicable, and only-one-applicable combining algorithms.
+/// </summary>
 internal static class NativePolicyEvaluator
 {
     public static string ComputeVersionFingerprint(

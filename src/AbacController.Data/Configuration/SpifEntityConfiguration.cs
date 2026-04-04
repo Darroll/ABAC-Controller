@@ -4,6 +4,9 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace AbacController.Data.Configuration;
 
+/// <summary>
+/// EF Core entity configuration for <see cref="SpifEntity"/>.
+/// </summary>
 public class SpifEntityConfiguration : IEntityTypeConfiguration<SpifEntity>
 {
     public void Configure(EntityTypeBuilder<SpifEntity> builder)

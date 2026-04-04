@@ -6,6 +6,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AbacController.Api.Controllers;
 
+/// <summary>
+/// PIP (Policy Information Point) administration endpoints for managing attribute sources.
+/// </summary>
 [ApiController]
 [Route("api/v1/pip")]
 public sealed class PipAdminController : ControllerBase

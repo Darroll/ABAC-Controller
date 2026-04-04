@@ -5,6 +5,9 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace AbacController.Api.Health;
 
+/// <summary>
+/// Health check that reports healthy when startup is complete and the database is reachable.
+/// </summary>
 public sealed class ReadinessHealthCheck(
     AppRuntimeState runtimeState,
     AbacDbContext dbContext) : IHealthCheck

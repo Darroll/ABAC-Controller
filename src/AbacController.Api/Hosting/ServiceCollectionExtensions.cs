@@ -23,8 +23,14 @@ using System.Threading.RateLimiting;
 
 namespace AbacController.Api.Hosting;
 
+/// <summary>
+/// Extension methods for configuring all ABAC Controller host services.
+/// </summary>
 public static class ServiceCollectionExtensions
 {
+    /// <summary>
+    /// Registers all ABAC Controller services, persistence, authentication, and middleware.
+    /// </summary>
     public static IServiceCollection AddAbacControllerHost(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -53,7 +59,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPipCacheManager, PipCacheManager>();
         services.AddSingleton<LabelValidator>();
         services.AddSingleton<IStanag4778MetadataBinder, Stanag4778MetadataBinder>();
-        services.AddSingleton<IAuditWriter, AuditWriter>();
+        services.AddSingleton<AuditWriter>();
+        services.AddSingleton<IAuditWriter>(sp => sp.GetRequiredService<AuditWriter>());
+        services.AddSingleton<IAuditChannelReader>(sp => sp.GetRequiredService<AuditWriter>());
         services.AddHostedService<AuditBatchWriterService>();
         services.AddSingleton<ILabelCodec, XmlStanag4774Codec>();
         services.AddScoped<IPdpEngine, PdpEngine>();
@@ -78,6 +86,9 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
+    /// <summary>
+    /// Configures the ABAC Controller middleware pipeline including auth, health checks, and routing.
+    /// </summary>
     public static void UseAbacControllerHost(this WebApplication app)
     {
         app.UseRouting();

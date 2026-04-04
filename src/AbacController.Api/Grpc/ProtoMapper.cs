@@ -10,6 +10,9 @@ using Google.Protobuf.WellKnownTypes;
 
 namespace AbacController.Api.Grpc;
 
+/// <summary>
+/// Maps between protobuf message types and domain model types.
+/// </summary>
 internal static class ProtoMapper
 {
     public static EvaluationRequest ToDomain(EvaluateRequestMessage request)

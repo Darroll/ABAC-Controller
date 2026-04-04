@@ -7,6 +7,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AbacController.Api.Grpc;
 
+/// <summary>
+/// gRPC service implementation for the Pip API.
+/// </summary>
 [Authorize(Policy = "PipRead")]
 public sealed class PipGrpcService : PipApi.PipApiBase
 {

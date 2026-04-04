@@ -7,6 +7,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AbacController.Api.Grpc;
 
+/// <summary>
+/// gRPC service implementation for the Pap API.
+/// </summary>
 [Authorize(Policy = "PolicyRead")]
 public sealed class PapGrpcService : PapApi.PapApiBase
 {

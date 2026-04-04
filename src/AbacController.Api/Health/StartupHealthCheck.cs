@@ -3,6 +3,9 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace AbacController.Api.Health;
 
+/// <summary>
+/// Health check that reports healthy once application startup is complete.
+/// </summary>
 public sealed class StartupHealthCheck(AppRuntimeState runtimeState) : IHealthCheck
 {
     public Task<HealthCheckResult> CheckHealthAsync(

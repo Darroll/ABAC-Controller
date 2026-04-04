@@ -8,6 +8,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AbacController.Api.Controllers;
 
+/// <summary>
+/// System administration endpoints for status, configuration, and enforcement point management.
+/// </summary>
 [ApiController]
 [Route("api/v1/system")]
 public sealed class SystemAdminController : ControllerBase

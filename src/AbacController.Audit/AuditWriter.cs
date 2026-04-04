@@ -12,7 +12,7 @@ namespace AbacController.Audit;
 /// When the channel is full, callers experience explicit backpressure instead of
 /// silently dropping older audit records.
 /// </summary>
-public sealed class AuditWriter : IAuditWriter
+public sealed class AuditWriter : IAuditWriter, IAuditChannelReader
 {
     internal const int DefaultCapacity = 10_000;
     internal static readonly TimeSpan DefaultEnqueueTimeout = TimeSpan.FromSeconds(5);
@@ -42,8 +42,8 @@ public sealed class AuditWriter : IAuditWriter
         });
     }
 
-    /// <summary>Get the channel reader for the background writer service.</summary>
-    internal ChannelReader<AuditEvent> Reader => _channel.Reader;
+    /// <inheritdoc />
+    public ChannelReader<AuditEvent> Reader => _channel.Reader;
 
     /// <inheritdoc />
     public void Write(AuditEvent auditEvent)
@@ -95,14 +95,17 @@ public sealed class AuditWriter : IAuditWriter
 /// </summary>
 public sealed class AuditBatchWriterService : Microsoft.Extensions.Hosting.BackgroundService
 {
-    private readonly AuditWriter _writer;
+    private readonly IAuditChannelReader _channelReader;
     private readonly IServiceScopeFactory _scopeFactory;
     private const int BatchSize = 100;
     private static readonly TimeSpan FlushInterval = TimeSpan.FromSeconds(1);
 
-    public AuditBatchWriterService(IAuditWriter writer, IServiceScopeFactory scopeFactory)
+    /// <summary>
+    /// Initializes the batch writer with the audit channel reader and scope factory.
+    /// </summary>
+    public AuditBatchWriterService(IAuditChannelReader channelReader, IServiceScopeFactory scopeFactory)
     {
-        _writer = (AuditWriter)writer;
+        _channelReader = channelReader;
         _scopeFactory = scopeFactory;
     }
 
@@ -120,10 +123,10 @@ public sealed class AuditBatchWriterService : Microsoft.Extensions.Hosting.Backg
                 try
                 {
                     while (batch.Count < BatchSize &&
-                           await _writer.Reader.WaitToReadAsync(cts.Token))
+                           await _channelReader.Reader.WaitToReadAsync(cts.Token))
                     {
                         while (batch.Count < BatchSize &&
-                               _writer.Reader.TryRead(out var auditEvent))
+                               _channelReader.Reader.TryRead(out var auditEvent))
                         {
                             batch.Add(MapToEntity(auditEvent));
                         }
@@ -151,7 +154,7 @@ public sealed class AuditBatchWriterService : Microsoft.Extensions.Hosting.Backg
             }
         }
 
-        while (_writer.Reader.TryRead(out var finalEvent))
+        while (_channelReader.Reader.TryRead(out var finalEvent))
             batch.Add(MapToEntity(finalEvent));
 
         if (batch.Count > 0)

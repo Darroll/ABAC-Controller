@@ -11,6 +11,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AbacController.Api.Controllers;
 
+/// <summary>
+/// PAP (Policy Administration Point) endpoints for managing policy sets, policies, versions, and SPIFs.
+/// </summary>
 [ApiController]
 [Route("api/v1/pap")]
 public sealed class PapAdminController : ControllerBase

@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace AbacController.Api.Grpc;
 
+/// <summary>
+/// gRPC service implementation for the System API.
+/// </summary>
 [Authorize(Policy = "SysRead")]
 public sealed class SystemGrpcService : SystemApi.SystemApiBase
 {

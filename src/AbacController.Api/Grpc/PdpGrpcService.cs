@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace AbacController.Api.Grpc;
 
 [Authorize(Policy = "Evaluate")]
+/// <summary>
+/// gRPC service implementation for the Pdp API.
+/// </summary>
 [EnableRateLimiting("pdp")]
 public sealed class PdpGrpcService : PdpApi.PdpApiBase
 {

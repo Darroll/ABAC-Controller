@@ -4,6 +4,9 @@ using AbacController.Core.Constants;
 
 namespace AbacController.Pap;
 
+/// <summary>
+/// Provides compiled XML schema sets for SPIF validation.
+/// </summary>
 internal static class SpifSchemas
 {
     private static readonly Lazy<XmlSchemaSet> Schemas = new(CreateSchemaSet);

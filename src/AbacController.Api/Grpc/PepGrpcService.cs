@@ -7,6 +7,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AbacController.Api.Grpc;
 
+/// <summary>
+/// gRPC service implementation for the Pep API.
+/// </summary>
 [Authorize(Policy = "PepRead")]
 public sealed class PepGrpcService : PepApi.PepApiBase
 {

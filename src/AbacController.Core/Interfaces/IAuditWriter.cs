@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using AbacController.Core.Domain.Audit;
 
 namespace AbacController.Core.Interfaces;
@@ -20,6 +21,16 @@ public interface IAuditWriter
     /// Called on graceful shutdown.
     /// </summary>
     Task FlushAsync(CancellationToken ct = default);
+}
+
+/// <summary>
+/// Provides read access to the audit event channel for background consumption.
+/// Separates the channel-reading concern from the write interface (ISP).
+/// </summary>
+public interface IAuditChannelReader
+{
+    /// <summary>Gets the channel reader for consuming buffered audit events.</summary>
+    ChannelReader<AuditEvent> Reader { get; }
 }
 
 /// <summary>
