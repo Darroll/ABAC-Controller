@@ -48,8 +48,26 @@ public sealed class PdpOptions
     public bool DecisionCacheEnabled { get; set; } = true;
 }
 
+/// <summary>
+/// Rate limiting options for the PDP evaluation endpoints.
+/// </summary>
 public sealed class RateLimitingOptions
 {
+    /// <summary>Global permit limit per window for the PDP partition.</summary>
     public int PdpPermitLimit { get; set; } = 1000;
+
+    /// <summary>Window size in seconds for the global rate limiter.</summary>
     public int WindowSeconds { get; set; } = 1;
+
+    /// <summary>Per-client permit limit per window (0 = no per-client limit).</summary>
+    public int PerClientPermitLimit { get; set; } = 200;
+
+    /// <summary>Per-client window size in seconds.</summary>
+    public int PerClientWindowSeconds { get; set; } = 1;
+
+    /// <summary>Per-resource permit limit per window (0 = no per-resource limit).</summary>
+    public int PerResourcePermitLimit { get; set; } = 100;
+
+    /// <summary>Per-resource window size in seconds.</summary>
+    public int PerResourceWindowSeconds { get; set; } = 1;
 }

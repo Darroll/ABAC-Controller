@@ -312,6 +312,43 @@ public sealed class PapAdminController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Delete a SPIF by its database ID.
+    /// </summary>
+    [HttpDelete("spifs/{id:guid}")]
+    [Authorize(Policy = "PolicyAdmin")]
+    public async Task<IActionResult> DeleteSpif(Guid id, CancellationToken ct)
+    {
+        var entity = await _dbContext.Spifs.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (entity is null)
+            return NotFound();
+
+        // Remove from in-memory registry
+        _spifRegistry.Remove(entity.PolicyOid);
+
+        _dbContext.Spifs.Remove(entity);
+        await _dbContext.SaveChangesAsync(ct);
+
+        AuditPolicyChange("delete_spif", "spif", entity.PolicyOid,
+            new { name = entity.Name, deletedById = id });
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Export a SPIF as raw XML by its database ID.
+    /// </summary>
+    [HttpGet("spifs/{id:guid}/export")]
+    [Authorize(Policy = "PolicyRead")]
+    public async Task<IActionResult> ExportSpif(Guid id, CancellationToken ct)
+    {
+        var entity = await _dbContext.Spifs.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (entity is null)
+            return NotFound();
+
+        return Content(entity.RawXml, "application/xml");
+    }
+
     public sealed record ConflictCheckRequest(string Content);    
 
     /// <summary>

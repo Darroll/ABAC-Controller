@@ -70,6 +70,14 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPolicyRepository, PolicyRepository>();
         services.AddScoped<IAuditReader, AuditRepository>();
 
+        // Async evaluation support
+        services.AddSingleton<AsyncEvaluationQueue>();
+        services.AddHostedService<AsyncEvaluationService>();
+        services.AddHttpClient("AsyncEvalCallback", client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+
         services.AddGrpc().AddJsonTranscoding();
         services.AddControllers();
         services.AddEndpointsApiExplorer();
@@ -241,12 +249,50 @@ public static class ServiceCollectionExtensions
         services.AddRateLimiter(rateLimiterOptions =>
         {
             rateLimiterOptions.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+            // Global rate limit for all PDP evaluation traffic
             rateLimiterOptions.AddFixedWindowLimiter("pdp", limiterOptions =>
             {
                 limiterOptions.PermitLimit = options.RateLimiting.PdpPermitLimit;
                 limiterOptions.Window = TimeSpan.FromSeconds(options.RateLimiting.WindowSeconds);
                 limiterOptions.QueueLimit = 0;
             });
+
+            // Per-client rate limit (partitioned by client identity)
+            if (options.RateLimiting.PerClientPermitLimit > 0)
+            {
+                rateLimiterOptions.AddPolicy("pdp-per-client", httpContext =>
+                {
+                    var clientId = httpContext.User.FindFirst("client_id")?.Value
+                                   ?? httpContext.User.FindFirst("sub")?.Value
+                                   ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                                   ?? "anonymous";
+
+                    return RateLimitPartition.GetFixedWindowLimiter(clientId, _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = options.RateLimiting.PerClientPermitLimit,
+                        Window = TimeSpan.FromSeconds(options.RateLimiting.PerClientWindowSeconds),
+                        QueueLimit = 0
+                    });
+                });
+            }
+
+            // Per-resource rate limit (partitioned by resource type:id from request body)
+            if (options.RateLimiting.PerResourcePermitLimit > 0)
+            {
+                rateLimiterOptions.AddPolicy("pdp-per-resource", httpContext =>
+                {
+                    // Resource partitioning uses a header set by the evaluation endpoints
+                    var resourceKey = httpContext.Request.Headers["X-ABAC-Resource-Key"].FirstOrDefault() ?? "default";
+
+                    return RateLimitPartition.GetFixedWindowLimiter(resourceKey, _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = options.RateLimiting.PerResourcePermitLimit,
+                        Window = TimeSpan.FromSeconds(options.RateLimiting.PerResourceWindowSeconds),
+                        QueueLimit = 0
+                    });
+                });
+            }
         });
     }
 

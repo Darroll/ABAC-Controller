@@ -1,0 +1,306 @@
+@*
+    Component: DecisionTester
+    Purpose: Submit test authorization evaluation requests from the UI and view results.
+    Route: /test
+    Dependencies: HttpClient.
+*@
+@page "/test"
+@inject HttpClient Http
+
+<h2>Decision Tester</h2>
+<p class="text-muted" style="margin-top:-0.5rem; margin-bottom:1.5rem; font-size:0.95rem;">
+    Submit test authorization requests and inspect decision results with full trace.
+</p>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-3">
+            <div class="card-header"><strong>Evaluation Request</strong></div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Subject</label>
+                    <div class="row g-2">
+                        <div class="col-4">
+                            <input type="text" class="form-control form-control-sm" placeholder="Type" @bind="_subjectType" />
+                        </div>
+                        <div class="col-8">
+                            <input type="text" class="form-control form-control-sm" placeholder="ID" @bind="_subjectId" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Action</label>
+                    <input type="text" class="form-control form-control-sm" placeholder="Action name (e.g., read, write, execute)" @bind="_actionName" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Resource</label>
+                    <div class="row g-2">
+                        <div class="col-4">
+                            <input type="text" class="form-control form-control-sm" placeholder="Type" @bind="_resourceType" />
+                        </div>
+                        <div class="col-8">
+                            <input type="text" class="form-control form-control-sm" placeholder="ID" @bind="_resourceId" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Subject Properties (JSON, optional)</label>
+                    <textarea class="form-control form-control-sm font-monospace" rows="3"
+                              placeholder='{"clearanceLevel": "SECRET"}' @bind="_subjectPropertiesJson"></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Resource Properties (JSON, optional)</label>
+                    <textarea class="form-control form-control-sm font-monospace" rows="3"
+                              placeholder='{"classification": "CONFIDENTIAL"}' @bind="_resourcePropertiesJson"></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="mode" id="modeEval" value="evaluate"
+                               checked="@(_mode == "evaluate")" @onchange='() => _mode = "evaluate"' />
+                        <label class="form-check-label" for="modeEval">Evaluate</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="mode" id="modeExplain" value="explain"
+                               checked="@(_mode == "explain")" @onchange='() => _mode = "explain"' />
+                        <label class="form-check-label" for="modeExplain">Explain</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="mode" id="modeSimulate" value="simulate"
+                               checked="@(_mode == "simulate")" @onchange='() => _mode = "simulate"' />
+                        <label class="form-check-label" for="modeSimulate">Simulate</label>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(_error))
+                {
+                    <div class="alert alert-danger py-2 small">@_error</div>
+                }
+
+                <button class="btn btn-primary" @onclick="SubmitEvaluation" disabled="@_submitting">
+                    @(_submitting ? "Evaluating..." : "Submit")
+                </button>
+                <button class="btn btn-outline-secondary ms-2" @onclick="ClearForm">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>Result</strong>
+                @if (_resultDecision is not null)
+                {
+                    var badgeClass = _resultDecision == true ? "bg-success" : "bg-danger";
+                    var label = _resultDecision == true ? "PERMIT" : "DENY";
+                    <span class="badge @badgeClass">@label</span>
+                }
+            </div>
+            <div class="card-body">
+                @if (_resultJson is null && !_submitting)
+                {
+                    <p class="text-muted small"><em>Submit a request to see the decision result.</em></p>
+                }
+                else if (_submitting)
+                {
+                    <p><em>Evaluating...</em></p>
+                }
+                else
+                {
+                    <pre class="bg-light p-3 rounded" style="max-height:500px; overflow:auto; font-size:0.8rem; white-space:pre-wrap; word-break:break-all;">@_resultJson</pre>
+
+                    @if (_responseHeaders.Count > 0)
+                    {
+                        <h6 class="small fw-bold text-muted mt-3">Response Headers</h6>
+                        <table class="table table-sm" style="font-size:0.8rem;">
+                            <tbody>
+                                @foreach (var header in _responseHeaders)
+                                {
+                                    <tr>
+                                        <td><code>@header.Key</code></td>
+                                        <td>@header.Value</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                }
+            </div>
+        </div>
+
+        @if (_history.Count > 0)
+        {
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>History</strong>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="ClearHistory">Clear</button>
+                </div>
+                <div class="card-body p-0" style="max-height:300px; overflow:auto;">
+                    <table class="table table-sm mb-0" style="font-size:0.82rem;">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Subject</th>
+                                <th>Action</th>
+                                <th>Resource</th>
+                                <th>Decision</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var entry in _history)
+                            {
+                                <tr>
+                                    <td style="white-space:nowrap;">@entry.Time.ToString("HH:mm:ss")</td>
+                                    <td>@entry.SubjectId</td>
+                                    <td>@entry.Action</td>
+                                    <td>@entry.ResourceId</td>
+                                    <td>
+                                        <span class="badge @(entry.Permit ? "bg-success" : "bg-danger")">
+                                            @(entry.Permit ? "PERMIT" : "DENY")
+                                        </span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private string _subjectType = "user";
+    private string _subjectId = "";
+    private string _actionName = "read";
+    private string _resourceType = "document";
+    private string _resourceId = "";
+    private string _subjectPropertiesJson = "";
+    private string _resourcePropertiesJson = "";
+    private string _mode = "evaluate";
+    private bool _submitting;
+    private string? _error;
+    private string? _resultJson;
+    private bool? _resultDecision;
+    private Dictionary<string, string> _responseHeaders = new();
+    private List<HistoryEntry> _history = [];
+
+    private async Task SubmitEvaluation()
+    {
+        _error = null;
+        _resultJson = null;
+        _resultDecision = null;
+        _responseHeaders.Clear();
+
+        if (string.IsNullOrWhiteSpace(_subjectId))
+        {
+            _error = "Subject ID is required.";
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var subjectProperties = ParseJsonProperties(_subjectPropertiesJson);
+            var resourceProperties = ParseJsonProperties(_resourcePropertiesJson);
+
+            var requestBody = new
+            {
+                subject = new { type = _subjectType, id = _subjectId, properties = subjectProperties },
+                action = new { name = _actionName },
+                resource = new { type = _resourceType, id = _resourceId, properties = resourceProperties }
+            };
+
+            var endpoint = _mode switch
+            {
+                "explain" => "access/v1/evaluation/explain",
+                "simulate" => "access/v1/evaluation/simulate",
+                _ => "access/v1/evaluation"
+            };
+
+            var response = await Http.PostAsJsonAsync(endpoint, requestBody);
+            var body = await response.Content.ReadAsStringAsync();
+
+            // Pretty-print JSON
+            try
+            {
+                var parsed = System.Text.Json.JsonDocument.Parse(body);
+                _resultJson = System.Text.Json.JsonSerializer.Serialize(parsed.RootElement,
+                    new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+
+                // Extract decision
+                if (parsed.RootElement.TryGetProperty("decision", out var decisionProp))
+                {
+                    _resultDecision = decisionProp.ValueKind == System.Text.Json.JsonValueKind.True;
+                }
+            }
+            catch
+            {
+                _resultJson = body;
+            }
+
+            // Capture relevant response headers
+            foreach (var header in response.Headers)
+            {
+                if (header.Key.StartsWith("X-ABAC-", StringComparison.OrdinalIgnoreCase))
+                {
+                    _responseHeaders[header.Key] = string.Join(", ", header.Value);
+                }
+            }
+
+            // Add to history
+            _history.Insert(0, new HistoryEntry(
+                DateTime.Now, _subjectId, _actionName, _resourceId,
+                _resultDecision == true));
+
+            if (_history.Count > 20)
+                _history.RemoveAt(_history.Count - 1);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Request failed: {ex.Message}";
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private static Dictionary<string, object?> ParseJsonProperties(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return new();
+
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(json) ?? new();
+        }
+        catch
+        {
+            return new();
+        }
+    }
+
+    private void ClearForm()
+    {
+        _subjectType = "user";
+        _subjectId = "";
+        _actionName = "read";
+        _resourceType = "document";
+        _resourceId = "";
+        _subjectPropertiesJson = "";
+        _resourcePropertiesJson = "";
+        _error = null;
+        _resultJson = null;
+        _resultDecision = null;
+        _responseHeaders.Clear();
+    }
+
+    private void ClearHistory() => _history.Clear();
+
+    private sealed record HistoryEntry(DateTime Time, string SubjectId, string Action, string ResourceId, bool Permit);
+}

@@ -1,7 +1,7 @@
 @*
     Component: PolicyManagement
-    Purpose: Policy set management. Lists policy sets with their combining algorithms
-             and contained policies. Allows viewing and basic management.
+    Purpose: Policy set management. Create/edit policy sets with combining algorithm selector,
+             manage policies within sets, and handle versioning.
     Route: /policies
     Dependencies: HttpClient, NavigationManager.
 *@
@@ -14,6 +14,111 @@
     XACML-style policy sets controlling access decisions.
 </p>
 
+<div class="mb-3">
+    <button class="btn btn-primary" @onclick="ShowCreatePolicySetDialog">
+        + New Policy Set
+    </button>
+</div>
+
+@* Create/Edit Policy Set Dialog *@
+@if (_showPolicySetDialog)
+{
+    <div class="card mb-3 border-primary">
+        <div class="card-header bg-primary text-white">
+            <strong>@(_editingPolicySetId is null ? "Create Policy Set" : "Edit Policy Set")</strong>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold">ID</label>
+                    <input type="text" class="form-control form-control-sm" @bind="_psId"
+                           disabled="@(_editingPolicySetId is not null)" placeholder="unique-id" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold">Name</label>
+                    <input type="text" class="form-control form-control-sm" @bind="_psName" placeholder="Policy Set Name" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold">Combining Algorithm</label>
+                    <select class="form-select form-select-sm" @bind="_psCombiningAlgorithm">
+                        <option value="deny-overrides">deny-overrides</option>
+                        <option value="permit-overrides">permit-overrides</option>
+                        <option value="first-applicable">first-applicable</option>
+                        <option value="only-one-applicable">only-one-applicable</option>
+                        <option value="ordered-deny-overrides">ordered-deny-overrides</option>
+                        <option value="ordered-permit-overrides">ordered-permit-overrides</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label small fw-bold">Description</label>
+                    <textarea class="form-control form-control-sm" rows="2" @bind="_psDescription" placeholder="Optional description"></textarea>
+                </div>
+                <div class="col-12">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="psActive" @bind="_psIsActive" />
+                        <label class="form-check-label" for="psActive">Active</label>
+                    </div>
+                </div>
+            </div>
+            @if (!string.IsNullOrEmpty(_psError))
+            {
+                <div class="alert alert-danger mt-2 py-1 small">@_psError</div>
+            }
+            <div class="mt-3">
+                <button class="btn btn-primary btn-sm" @onclick="SavePolicySetAsync" disabled="@_psSaving">
+                    @(_psSaving ? "Saving..." : "Save")
+                </button>
+                <button class="btn btn-secondary btn-sm ms-2" @onclick="() => _showPolicySetDialog = false">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@* Create Policy Dialog *@
+@if (_showPolicyDialog)
+{
+    <div class="card mb-3 border-success">
+        <div class="card-header bg-success text-white">
+            <strong>Create Policy in "@_targetPolicySetName"</strong>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold">Policy ID</label>
+                    <input type="text" class="form-control form-control-sm" @bind="_policyId" placeholder="unique-policy-id" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold">Name</label>
+                    <input type="text" class="form-control form-control-sm" @bind="_policyName" placeholder="Policy Name" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold">Format</label>
+                    <select class="form-select form-select-sm" @bind="_policyFormat">
+                        <option value="native">native</option>
+                        <option value="xacml-json">xacml-json</option>
+                        <option value="xacml-xml">xacml-xml</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label small fw-bold">Initial Version Content</label>
+                    <textarea class="form-control form-control-sm font-monospace" rows="6" @bind="_policyContent"
+                              placeholder="Policy content (JSON/XML)..."></textarea>
+                </div>
+            </div>
+            @if (!string.IsNullOrEmpty(_policyError))
+            {
+                <div class="alert alert-danger mt-2 py-1 small">@_policyError</div>
+            }
+            <div class="mt-3">
+                <button class="btn btn-success btn-sm" @onclick="SavePolicyAsync" disabled="@_policySaving">
+                    @(_policySaving ? "Saving..." : "Create Policy")
+                </button>
+                <button class="btn btn-secondary btn-sm ms-2" @onclick="() => _showPolicyDialog = false">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
 @if (!string.IsNullOrEmpty(_error))
 {
     <div class="alert alert-danger">@_error</div>
@@ -25,7 +130,7 @@
 }
 else if (_policySets.Count == 0)
 {
-    <div class="alert alert-info">No policy sets defined. Policy sets are created and managed via the API.</div>
+    <div class="alert alert-info">No policy sets defined. Click "New Policy Set" to create one.</div>
 }
 else
 {
@@ -45,7 +150,11 @@ else
                     }
                     <span class="badge bg-light text-dark border ms-1" style="font-size:0.75rem;">@ps.CombiningAlgorithm</span>
                 </div>
-                <small class="text-muted"><code>@ps.Id</code></small>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditPolicySet(ps)">Edit</button>
+                    <button class="btn btn-sm btn-outline-success me-1" @onclick="() => ShowCreatePolicyDialog(ps.Id, ps.Name)">+ Policy</button>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeletePolicySetAsync(ps.Id)">Delete</button>
+                </div>
             </div>
             @if (!string.IsNullOrWhiteSpace(ps.Description))
             {
@@ -64,16 +173,20 @@ else
                                 <th>Format</th>
                                 <th>Versions</th>
                                 <th>Updated</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var policy in ps.Policies)
                             {
                                 <tr>
-                                    <td>@policy.Name</td>
+                                    <td>@policy.Name <small class="text-muted">(@policy.Id)</small></td>
                                     <td><span class="badge bg-secondary" style="font-size:0.75rem;">@policy.Format</span></td>
                                     <td>@(policy.Versions?.Count ?? 0) version(s)</td>
                                     <td>@policy.UpdatedAt.ToString("g")</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-danger py-0" @onclick="() => DeletePolicyAsync(policy.Id)">Delete</button>
+                                    </td>
                                 </tr>
                             }
                         </tbody>
@@ -122,7 +235,34 @@ else
     private List<PolicySetRow>? _policySets;
     private string? _error;
 
+    // Policy Set dialog
+    private bool _showPolicySetDialog;
+    private string? _editingPolicySetId;
+    private string _psId = "";
+    private string _psName = "";
+    private string _psDescription = "";
+    private string _psCombiningAlgorithm = "deny-overrides";
+    private bool _psIsActive = true;
+    private bool _psSaving;
+    private string? _psError;
+
+    // Policy dialog
+    private bool _showPolicyDialog;
+    private string _targetPolicySetId = "";
+    private string _targetPolicySetName = "";
+    private string _policyId = "";
+    private string _policyName = "";
+    private string _policyFormat = "native";
+    private string _policyContent = "";
+    private bool _policySaving;
+    private string? _policyError;
+
     protected override async Task OnInitializedAsync()
+    {
+        await LoadPolicySetsAsync();
+    }
+
+    private async Task LoadPolicySetsAsync()
     {
         try
         {
@@ -132,6 +272,165 @@ else
         {
             _error = $"Failed to load policy sets: {ex.Message}";
             _policySets = [];
+        }
+    }
+
+    private void ShowCreatePolicySetDialog()
+    {
+        _editingPolicySetId = null;
+        _psId = "";
+        _psName = "";
+        _psDescription = "";
+        _psCombiningAlgorithm = "deny-overrides";
+        _psIsActive = true;
+        _psError = null;
+        _showPolicySetDialog = true;
+        _showPolicyDialog = false;
+    }
+
+    private void EditPolicySet(PolicySetRow ps)
+    {
+        _editingPolicySetId = ps.Id;
+        _psId = ps.Id;
+        _psName = ps.Name;
+        _psDescription = ps.Description ?? "";
+        _psCombiningAlgorithm = ps.CombiningAlgorithm;
+        _psIsActive = ps.IsActive;
+        _psError = null;
+        _showPolicySetDialog = true;
+        _showPolicyDialog = false;
+    }
+
+    private async Task SavePolicySetAsync()
+    {
+        _psError = null;
+        if (string.IsNullOrWhiteSpace(_psId) || string.IsNullOrWhiteSpace(_psName))
+        {
+            _psError = "ID and Name are required.";
+            return;
+        }
+
+        _psSaving = true;
+        try
+        {
+            var body = new
+            {
+                id = _psId,
+                name = _psName,
+                description = string.IsNullOrWhiteSpace(_psDescription) ? (string?)null : _psDescription,
+                combiningAlgorithm = _psCombiningAlgorithm,
+                isActive = _psIsActive
+            };
+
+            var response = await Http.PutAsJsonAsync($"api/v1/pap/policy-sets/{_psId}", body);
+            if (!response.IsSuccessStatusCode)
+            {
+                _psError = $"Save failed: {await response.Content.ReadAsStringAsync()}";
+                return;
+            }
+
+            _showPolicySetDialog = false;
+            await LoadPolicySetsAsync();
+        }
+        catch (Exception ex)
+        {
+            _psError = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _psSaving = false;
+        }
+    }
+
+    private async Task DeletePolicySetAsync(string id)
+    {
+        try
+        {
+            await Http.DeleteAsync($"api/v1/pap/policy-sets/{id}");
+            await LoadPolicySetsAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Delete failed: {ex.Message}";
+        }
+    }
+
+    private void ShowCreatePolicyDialog(string policySetId, string policySetName)
+    {
+        _targetPolicySetId = policySetId;
+        _targetPolicySetName = policySetName;
+        _policyId = "";
+        _policyName = "";
+        _policyFormat = "native";
+        _policyContent = "";
+        _policyError = null;
+        _showPolicyDialog = true;
+        _showPolicySetDialog = false;
+    }
+
+    private async Task SavePolicyAsync()
+    {
+        _policyError = null;
+        if (string.IsNullOrWhiteSpace(_policyId) || string.IsNullOrWhiteSpace(_policyName))
+        {
+            _policyError = "Policy ID and Name are required.";
+            return;
+        }
+
+        _policySaving = true;
+        try
+        {
+            // Create the policy
+            var policyBody = new
+            {
+                id = _policyId,
+                policySetId = _targetPolicySetId,
+                name = _policyName,
+                format = _policyFormat
+            };
+
+            var policyResponse = await Http.PutAsJsonAsync($"api/v1/pap/policies/{_policyId}", policyBody);
+            if (!policyResponse.IsSuccessStatusCode)
+            {
+                _policyError = $"Policy creation failed: {await policyResponse.Content.ReadAsStringAsync()}";
+                return;
+            }
+
+            // Create initial version if content provided
+            if (!string.IsNullOrWhiteSpace(_policyContent))
+            {
+                var versionBody = new { content = _policyContent, activate = true };
+                var versionResponse = await Http.PostAsJsonAsync($"api/v1/pap/policies/{_policyId}/versions", versionBody);
+                if (!versionResponse.IsSuccessStatusCode)
+                {
+                    _policyError = $"Version creation failed: {await versionResponse.Content.ReadAsStringAsync()}";
+                    return;
+                }
+            }
+
+            _showPolicyDialog = false;
+            await LoadPolicySetsAsync();
+        }
+        catch (Exception ex)
+        {
+            _policyError = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _policySaving = false;
+        }
+    }
+
+    private async Task DeletePolicyAsync(string id)
+    {
+        try
+        {
+            await Http.DeleteAsync($"api/v1/pap/policies/{id}");
+            await LoadPolicySetsAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Delete failed: {ex.Message}";
         }
     }
 

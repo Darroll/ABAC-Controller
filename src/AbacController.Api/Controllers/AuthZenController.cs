@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Concurrent;
 
 namespace AbacController.Api.Controllers;
 
@@ -23,12 +24,17 @@ public class AuthZenController : ControllerBase
     private readonly IPdpEngine _pdp;
     private readonly ApiMetrics _metrics;
     private readonly AbacDbContext _dbContext;
+    private readonly AsyncEvaluationQueue _asyncQueue;
 
-    public AuthZenController(IPdpEngine pdp, ApiMetrics metrics, AbacDbContext dbContext)
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AuthZenController"/> class.
+    /// </summary>
+    public AuthZenController(IPdpEngine pdp, ApiMetrics metrics, AbacDbContext dbContext, AsyncEvaluationQueue asyncQueue)
     {
         _pdp = pdp;
         _metrics = metrics;
         _dbContext = dbContext;
+        _asyncQueue = asyncQueue;
     }
 
     /// <summary>
@@ -42,6 +48,7 @@ public class AuthZenController : ControllerBase
         [FromBody] AuthZenEvaluationRequest request, CancellationToken ct)
     {
         var internalRequest = MapToInternal(request);
+        Response.Headers["X-ABAC-Resource-Key"] = $"{internalRequest.Resource.Type}:{internalRequest.Resource.Id}";
         var result = await _pdp.EvaluateAsync(internalRequest, ct);
         _metrics.RecordEvaluation(result.Decision, result.EvaluationTime);
 
@@ -79,6 +86,12 @@ public class AuthZenController : ControllerBase
     public async Task<IActionResult> EvaluateBatch(
         [FromBody] AuthZenBatchRequest request, CancellationToken ct)
     {
+        if (request.Evaluations.Count == 0)
+            return BadRequest(new { error = "At least one evaluation is required." });
+
+        if (request.Evaluations.Count > 100)
+            return BadRequest(new { error = "Batch size exceeds maximum of 100." });
+
         var results = new List<AuthZenEvaluationResponse>();
         _metrics.RecordBatchEvaluation(request.Evaluations.Count);
 
@@ -194,6 +207,74 @@ public class AuthZenController : ControllerBase
     }
 
     /// <summary>
+    /// Async evaluation — queues an evaluation for background processing and
+    /// delivers the result via webhook callback.
+    /// POST /access/v1/evaluation/async
+    /// </summary>
+    [HttpPost("/access/v1/evaluation/async")]
+    [Authorize(Policy = "Evaluate")]
+    [EnableRateLimiting("pdp")]
+    public IActionResult EvaluateAsync(
+        [FromBody] AsyncEvaluationRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.CallbackUrl))
+            return BadRequest(new { error = "callbackUrl is required for async evaluation." });
+
+        if (!Uri.TryCreate(request.CallbackUrl, UriKind.Absolute, out var callbackUri)
+            || (callbackUri.Scheme != "https" && callbackUri.Scheme != "http"))
+            return BadRequest(new { error = "callbackUrl must be a valid HTTP(S) URL." });
+
+        var evaluationId = Guid.NewGuid().ToString("N");
+        var internalRequest = MapToInternal(request);
+
+        _asyncQueue.Enqueue(new AsyncEvaluationJob(
+            evaluationId, internalRequest, request.CallbackUrl,
+            request.CallbackHeaders ?? new()));
+
+        return Accepted(new
+        {
+            evaluationId,
+            status = "queued",
+            callbackUrl = request.CallbackUrl,
+            message = "Evaluation has been queued. Result will be delivered via webhook."
+        });
+    }
+
+    /// <summary>
+    /// Check the status of an async evaluation.
+    /// GET /access/v1/evaluation/async/{evaluationId}
+    /// </summary>
+    [HttpGet("/access/v1/evaluation/async/{evaluationId}")]
+    [Authorize(Policy = "Evaluate")]
+    public IActionResult GetAsyncEvaluationStatus(string evaluationId)
+    {
+        if (_asyncQueue.TryGetResult(evaluationId, out var result))
+        {
+            return Ok(new
+            {
+                evaluationId,
+                status = "completed",
+                result = new AuthZenEvaluationResponse
+                {
+                    Decision = result!.Decision == Decision.Permit,
+                    Context = new Dictionary<string, object>
+                    {
+                        ["id"] = result.DecisionId,
+                        ["evaluationTime"] = result.EvaluationTime.TotalMilliseconds + "ms"
+                    }
+                }
+            });
+        }
+
+        if (_asyncQueue.IsQueued(evaluationId))
+        {
+            return Ok(new { evaluationId, status = "processing" });
+        }
+
+        return NotFound(new { evaluationId, status = "not_found" });
+    }
+
+    /// <summary>
     /// AuthZEN 1.0 discovery endpoint.
     /// GET /.well-known/authzen-configuration
     /// </summary>
@@ -208,6 +289,7 @@ public class AuthZenController : ControllerBase
             evaluations_endpoint = "/access/v1/evaluations",
             evaluation_explain_endpoint = "/access/v1/evaluation/explain",
             evaluation_simulate_endpoint = "/access/v1/evaluation/simulate",
+            evaluation_async_endpoint = "/access/v1/evaluation/async",
             subjects_endpoint = "/access/v1/subjects",
             resources_endpoint = "/access/v1/resources",
             actions_endpoint = "/access/v1/actions",
@@ -592,4 +674,16 @@ public class AuthZenEvaluationResponse
 public class AuthZenBatchRequest
 {
     public List<AuthZenEvaluationRequest> Evaluations { get; set; } = [];
+}
+
+/// <summary>
+/// Request for async evaluation with webhook callback.
+/// </summary>
+public class AsyncEvaluationRequest : AuthZenEvaluationRequest
+{
+    /// <summary>URL to receive the evaluation result via HTTP POST.</summary>
+    public string CallbackUrl { get; set; } = "";
+
+    /// <summary>Optional headers to include in the callback request.</summary>
+    public Dictionary<string, string>? CallbackHeaders { get; set; }
 }

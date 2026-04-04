@@ -1,7 +1,9 @@
 using AbacController.Api.Configuration;
 using AbacController.Api.Runtime;
+using AbacController.Core.Domain.Audit;
 using AbacController.Core.Interfaces;
 using AbacController.Data;
+using AbacController.Data.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -20,22 +22,32 @@ public sealed class SystemAdminController : ControllerBase
     private readonly ISpifRegistry _spifRegistry;
     private readonly AbacDbContext _dbContext;
     private readonly AbacControllerOptions _options;
+    private readonly IAuditReader _auditReader;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SystemAdminController"/> class.
+    /// </summary>
     public SystemAdminController(
         AppRuntimeState runtimeState,
         ILabelCodecRegistry labelCodecRegistry,
         ISpifRegistry spifRegistry,
         AbacDbContext dbContext,
-        AbacControllerOptions options)
+        AbacControllerOptions options,
+        IAuditReader auditReader)
     {
         _runtimeState = runtimeState;
         _labelCodecRegistry = labelCodecRegistry;
         _spifRegistry = spifRegistry;
         _dbContext = dbContext;
         _options = options;
+        _auditReader = auditReader;
     }
 
+    /// <summary>
+    /// Get system status information.
+    /// </summary>
     [HttpGet("info")]
+    [HttpGet("status")]
     [Authorize(Policy = "SysRead")]
     public ActionResult<object> GetStatus()
         => Ok(new
@@ -60,8 +72,56 @@ public sealed class SystemAdminController : ControllerBase
             rateLimit = new { _options.RateLimiting.PdpPermitLimit, _options.RateLimiting.WindowSeconds }
         });
 
+    /// <summary>
+    /// List registered enforcement points.
+    /// </summary>
     [HttpGet("enforcement-points")]
     [Authorize(Policy = "SysRead")]
     public async Task<ActionResult<object>> ListEnforcementPoints(CancellationToken ct)
         => Ok(await _dbContext.EnforcementPoints.AsNoTracking().OrderBy(x => x.Id).ToListAsync(ct));
+
+    /// <summary>
+    /// Query all audit events with filtering and pagination.
+    /// Unlike the PAP audit endpoint which only shows policy changes,
+    /// this returns all event types (evaluations, policy changes, system events, etc.).
+    /// </summary>
+    [HttpGet("audit")]
+    [Authorize(Policy = "AuditRead")]
+    public async Task<ActionResult<AuditQueryResult>> GetAuditLog(
+        [FromQuery] DateTimeOffset? from,
+        [FromQuery] DateTimeOffset? to,
+        [FromQuery] string? eventType,
+        [FromQuery] string? subjectId,
+        [FromQuery] string? resourceId,
+        [FromQuery] string? decision,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        CancellationToken ct = default)
+    {
+        var query = new AuditQuery
+        {
+            From = from,
+            To = to,
+            EventType = eventType,
+            SubjectId = subjectId,
+            ResourceId = resourceId,
+            Decision = decision,
+            Page = page,
+            PageSize = Math.Clamp(pageSize, 1, 200)
+        };
+
+        var result = await _auditReader.QueryAsync(query, ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Get a single audit event by ID.
+    /// </summary>
+    [HttpGet("audit/{id:guid}")]
+    [Authorize(Policy = "AuditRead")]
+    public async Task<ActionResult<AuditEvent>> GetAuditEvent(Guid id, CancellationToken ct)
+    {
+        var evt = await _auditReader.GetByIdAsync(id, ct);
+        return evt is null ? NotFound() : Ok(evt);
+    }
 }

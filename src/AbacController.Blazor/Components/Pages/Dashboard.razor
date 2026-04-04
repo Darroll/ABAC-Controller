@@ -1,9 +1,10 @@
 @page "/"
 @inject HttpClient Http
+@implements IDisposable
 
 <h2>ABAC Controller — Dashboard</h2>
 <p class="text-muted" style="margin-top:-0.5rem; margin-bottom:1.5rem; font-size:0.95rem;">
-    Overview of the Policy Administration Point.
+    Overview of the Policy Administration Point. Metrics refresh every 10 seconds.
 </p>
 
 <div class="dashboard-metrics mb-4">
@@ -28,6 +29,136 @@
         <p class="metric-value">@_pepCount</p>
     </div>
 </div>
+
+@* Live metrics from Prometheus *@
+@if (_metricsLoaded)
+{
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <strong>Live Decision Metrics</strong>
+            <small class="text-muted">Updated @_metricsUpdatedAt?.ToString("HH:mm:ss")</small>
+        </div>
+        <div class="card-body">
+            <div class="dashboard-metrics">
+                <div class="metric-card metric-highlight">
+                    <h4>Total Evaluations</h4>
+                    <p class="metric-value">@_totalEvaluations</p>
+                </div>
+                <div class="metric-card" style="background:#e8f5e9;">
+                    <h4>Permit</h4>
+                    <p class="metric-value" style="color:#2e7d32;">@_permitCount</p>
+                </div>
+                <div class="metric-card" style="background:#ffebee;">
+                    <h4>Deny</h4>
+                    <p class="metric-value" style="color:#c62828;">@_denyCount</p>
+                </div>
+                <div class="metric-card" style="background:#fff3e0;">
+                    <h4>Not Applicable</h4>
+                    <p class="metric-value" style="color:#e65100;">@_notApplicableCount</p>
+                </div>
+                <div class="metric-card" style="background:#fce4ec;">
+                    <h4>Indeterminate</h4>
+                    <p class="metric-value" style="color:#880e4f;">@_indeterminateCount</p>
+                </div>
+                <div class="metric-card">
+                    <h4>Batch Members</h4>
+                    <p class="metric-value">@_batchCount</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header"><strong>Cache Performance</strong></div>
+                <div class="card-body">
+                    <div class="dashboard-metrics">
+                        <div class="metric-card" style="background:#e3f2fd;">
+                            <h4>Cache Hits</h4>
+                            <p class="metric-value" style="color:#1565c0;">@_cacheHits</p>
+                        </div>
+                        <div class="metric-card" style="background:#f3e5f5;">
+                            <h4>Cache Misses</h4>
+                            <p class="metric-value" style="color:#6a1b9a;">@_cacheMisses</p>
+                        </div>
+                        <div class="metric-card">
+                            <h4>Hit Rate</h4>
+                            <p class="metric-value" style="font-size:1.5rem;">@_cacheHitRate</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header"><strong>PIP &amp; Performance</strong></div>
+                <div class="card-body">
+                    <div class="dashboard-metrics">
+                        <div class="metric-card">
+                            <h4>PIP Resolutions</h4>
+                            <p class="metric-value">@_pipResolutions</p>
+                        </div>
+                        <div class="metric-card" style="background:#ffebee;">
+                            <h4>PIP Failures</h4>
+                            <p class="metric-value" style="color:#c62828;">@_pipFailures</p>
+                        </div>
+                        <div class="metric-card">
+                            <h4>Avg Eval (ms)</h4>
+                            <p class="metric-value" style="font-size:1.5rem;">@_avgEvalMs</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_pipHealthLoaded)
+{
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <strong>PIP Source Health</strong>
+            @if (_pipAllHealthy)
+            {
+                <span class="badge bg-success">All Healthy</span>
+            }
+            else
+            {
+                <span class="badge bg-warning text-dark">Degraded</span>
+            }
+        </div>
+        <div class="card-body p-0">
+            @if (_pipHealthSources.Count == 0)
+            {
+                <div class="p-3 text-muted"><em>No PIP sources registered.</em></div>
+            }
+            else
+            {
+                <table class="admin-table mb-0">
+                    <thead>
+                        <tr><th>Source</th><th>Status</th><th>Last Check</th><th>Message</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var src in _pipHealthSources)
+                        {
+                            <tr>
+                                <td><strong>@src.SourceId</strong></td>
+                                <td>
+                                    <span class="badge @(src.Healthy ? "bg-success" : "bg-danger")">
+                                        @(src.Healthy ? "Healthy" : "Unhealthy")
+                                    </span>
+                                </td>
+                                <td><small>@src.LastChecked?.ToString("HH:mm:ss")</small></td>
+                                <td><small class="text-muted">@(src.Message ?? "—")</small></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+}
 
 @if (_statusReady.HasValue)
 {
@@ -87,6 +218,9 @@
         <a href="/spif" class="btn btn-outline-secondary">
             <span class="oi oi-document me-1"></span> Manage SPIFs
         </a>
+        <a href="/test" class="btn btn-outline-info">
+            <span class="oi oi-beaker me-1"></span> Decision Tester
+        </a>
         <a href="/pip" class="btn btn-outline-secondary">
             <span class="oi oi-pulse me-1"></span> PIP Sources
         </a>
@@ -130,6 +264,11 @@
         color: #1a1a2e;
     }
 
+    .metric-highlight {
+        background: #e8eaf6 !important;
+        border-color: #3f51b5 !important;
+    }
+
     .info-table {
         width: 100%;
         border-collapse: collapse;
@@ -152,6 +291,28 @@
         font-size: 0.95rem;
         color: #495057;
     }
+
+    .admin-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+    }
+
+    .admin-table thead th {
+        text-align: left;
+        padding: 0.5rem 0.75rem;
+        background: #f5f6fa;
+        border-bottom: 1px solid #dee2e6;
+        font-weight: 600;
+        color: #6c757d;
+        font-size: 0.8rem;
+    }
+
+    .admin-table tbody td {
+        padding: 0.4rem 0.75rem;
+        border-bottom: 1px solid #f0f0f0;
+        vertical-align: middle;
+    }
 </style>
 
 @code {
@@ -165,7 +326,40 @@
     private List<string>? _registeredCodecs;
     private List<string>? _registeredOids;
 
+    // Live metrics
+    private bool _metricsLoaded;
+    private DateTime? _metricsUpdatedAt;
+    private long _totalEvaluations;
+    private long _permitCount;
+    private long _denyCount;
+    private long _notApplicableCount;
+    private long _indeterminateCount;
+    private long _batchCount;
+    private long _cacheHits;
+    private long _cacheMisses;
+    private string _cacheHitRate = "—";
+    private long _pipResolutions;
+    private long _pipFailures;
+    private string _avgEvalMs = "—";
+
+    // PIP health
+    private bool _pipHealthLoaded;
+    private bool _pipAllHealthy;
+    private List<PipHealthRow> _pipHealthSources = [];
+
+    private System.Threading.Timer? _refreshTimer;
+
     protected override async Task OnInitializedAsync()
+    {
+        await LoadAllAsync();
+        _refreshTimer = new System.Threading.Timer(async _ =>
+        {
+            await LoadMetricsAsync();
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+    }
+
+    private async Task LoadAllAsync()
     {
         try
         {
@@ -210,8 +404,108 @@
         {
             // Dashboard loads gracefully even if some endpoints are unavailable
         }
+
+        await LoadMetricsAsync();
+        await LoadPipHealthAsync();
+    }
+
+    private async Task LoadMetricsAsync()
+    {
+        try
+        {
+            var metricsText = await Http.GetStringAsync("metrics");
+            ParsePrometheusMetrics(metricsText);
+            _metricsLoaded = true;
+            _metricsUpdatedAt = DateTime.Now;
+        }
+        catch
+        {
+            // Metrics endpoint may not be available
+        }
+    }
+
+    private void ParsePrometheusMetrics(string text)
+    {
+        foreach (var line in text.Split('\n'))
+        {
+            if (line.StartsWith('#') || string.IsNullOrWhiteSpace(line))
+                continue;
+
+            var parts = line.Split(' ', 2);
+            if (parts.Length != 2 || !double.TryParse(parts[1], System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out var value))
+                continue;
+
+            switch (parts[0])
+            {
+                case "abac_evaluations_total":
+                    _totalEvaluations = (long)value;
+                    break;
+                case "abac_evaluations_by_decision_total{decision=\"permit\"}":
+                    _permitCount = (long)value;
+                    break;
+                case "abac_evaluations_by_decision_total{decision=\"deny\"}":
+                    _denyCount = (long)value;
+                    break;
+                case "abac_evaluations_by_decision_total{decision=\"not_applicable\"}":
+                    _notApplicableCount = (long)value;
+                    break;
+                case "abac_evaluations_by_decision_total{decision=\"indeterminate\"}":
+                    _indeterminateCount = (long)value;
+                    break;
+                case "abac_batch_evaluations_total":
+                    _batchCount = (long)value;
+                    break;
+                case "abac_cache_hits_total":
+                    _cacheHits = (long)value;
+                    break;
+                case "abac_cache_misses_total":
+                    _cacheMisses = (long)value;
+                    break;
+                case "abac_pip_resolutions_total":
+                    _pipResolutions = (long)value;
+                    break;
+                case "abac_pip_failures_total":
+                    _pipFailures = (long)value;
+                    break;
+                case "abac_evaluation_duration_ms_sum":
+                    var count = _totalEvaluations > 0 ? _totalEvaluations : 1;
+                    _avgEvalMs = (value / count).ToString("F1");
+                    break;
+            }
+        }
+
+        var totalCacheOps = _cacheHits + _cacheMisses;
+        _cacheHitRate = totalCacheOps > 0
+            ? $"{(double)_cacheHits / totalCacheOps * 100:F1}%"
+            : "—";
+    }
+
+    private async Task LoadPipHealthAsync()
+    {
+        try
+        {
+            var health = await Http.GetFromJsonAsync<PipHealthResult>("api/v1/pip/health/cached");
+            if (health is not null)
+            {
+                _pipAllHealthy = health.AllHealthy;
+                _pipHealthSources = health.Sources;
+                _pipHealthLoaded = true;
+            }
+        }
+        catch
+        {
+            // PIP health may not be available
+        }
+    }
+
+    public void Dispose()
+    {
+        _refreshTimer?.Dispose();
     }
 
     private sealed record SpifRow(Guid Id, string PolicyOid, string Name, bool IsActive);
     private sealed record StatusRow(bool Ready, string Runtime, List<string>? RegisteredLabelCodecs, List<string>? RegisteredPolicyOids);
+    private sealed record PipHealthResult(bool AllHealthy, int SourceCount, List<PipHealthRow> Sources);
+    private sealed record PipHealthRow(string SourceId, bool Healthy, DateTimeOffset? LastChecked, string? Message);
 }

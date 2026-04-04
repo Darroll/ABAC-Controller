@@ -1,0 +1,204 @@
+@*
+    Component: SpifDiff
+    Purpose: Compare two SPIF versions side by side showing structural differences.
+    Route: /spif-diff
+    Dependencies: HttpClient.
+*@
+@page "/spif-diff"
+@inject HttpClient Http
+
+<h2>SPIF Version Diff</h2>
+<p class="text-muted" style="margin-top:-0.5rem; margin-bottom:1.5rem; font-size:0.95rem;">
+    Compare two SPIF policies side by side.
+</p>
+
+@if (_spifs is null)
+{
+    <p><em>Loading SPIFs...</em></p>
+}
+else if (_spifs.Count < 2)
+{
+    <div class="alert alert-info">At least two SPIFs must be imported to perform a comparison.</div>
+}
+else
+{
+    <div class="row mb-3">
+        <div class="col-md-5">
+            <label class="form-label small fw-bold">Left SPIF</label>
+            <select class="form-select form-select-sm" @bind="_leftId">
+                <option value="">— Select —</option>
+                @foreach (var spif in _spifs)
+                {
+                    <option value="@spif.Id">@spif.Name (@spif.PolicyOid)</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-5">
+            <label class="form-label small fw-bold">Right SPIF</label>
+            <select class="form-select form-select-sm" @bind="_rightId">
+                <option value="">— Select —</option>
+                @foreach (var spif in _spifs)
+                {
+                    <option value="@spif.Id">@spif.Name (@spif.PolicyOid)</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+            <button class="btn btn-primary btn-sm w-100" @onclick="CompareSpifsAsync"
+                    disabled="@(string.IsNullOrEmpty(_leftId) || string.IsNullOrEmpty(_rightId) || _comparing)">
+                @(_comparing ? "Comparing..." : "Compare")
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+
+    @if (_leftXml is not null && _rightXml is not null)
+    {
+        <div class="card mb-3">
+            <div class="card-header">
+                <strong>Structural Summary</strong>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm" style="font-size:0.85rem;">
+                    <thead>
+                        <tr><th>Property</th><th>Left</th><th>Right</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var diff in _structuralDiffs)
+                        {
+                            <tr class="@(diff.Changed ? "table-warning" : "")">
+                                <td><strong>@diff.Property</strong></td>
+                                <td><code>@diff.Left</code></td>
+                                <td><code>@diff.Right</code></td>
+                                <td>
+                                    @if (diff.Changed)
+                                    {
+                                        <span class="badge bg-warning text-dark">Changed</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-success">Same</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><strong>Raw XML Side-by-Side</strong></div>
+            <div class="card-body p-0">
+                <div class="row g-0">
+                    <div class="col-6 border-end">
+                        <div class="p-2" style="font-size:0.65rem; font-weight:600; color:#6c757d; text-transform:uppercase; background:#f5f6fa;">
+                            Left: @_leftLabel
+                        </div>
+                        <pre class="diff-pane">@_leftXml</pre>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2" style="font-size:0.65rem; font-weight:600; color:#6c757d; text-transform:uppercase; background:#f5f6fa;">
+                            Right: @_rightLabel
+                        </div>
+                        <pre class="diff-pane">@_rightXml</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+<style>
+    .diff-pane {
+        margin: 0;
+        padding: 0.75rem;
+        font-size: 0.75rem;
+        max-height: 600px;
+        overflow: auto;
+        background: #fdfdfd;
+        white-space: pre-wrap;
+        word-break: break-all;
+        border: none;
+    }
+</style>
+
+@code {
+    private List<SpifRow>? _spifs;
+    private string _leftId = "";
+    private string _rightId = "";
+    private string? _leftXml;
+    private string? _rightXml;
+    private string? _leftLabel;
+    private string? _rightLabel;
+    private List<StructuralDiff> _structuralDiffs = [];
+    private bool _comparing;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _spifs = await Http.GetFromJsonAsync<List<SpifRow>>("api/v1/pap/spifs");
+        }
+        catch
+        {
+            _spifs = [];
+        }
+    }
+
+    private async Task CompareSpifsAsync()
+    {
+        _error = null;
+        _leftXml = null;
+        _rightXml = null;
+        _structuralDiffs.Clear();
+        _comparing = true;
+
+        try
+        {
+            var leftTask = Http.GetStringAsync($"api/v1/pap/spifs/{_leftId}/export");
+            var rightTask = Http.GetStringAsync($"api/v1/pap/spifs/{_rightId}/export");
+            await Task.WhenAll(leftTask, rightTask);
+
+            _leftXml = leftTask.Result;
+            _rightXml = rightTask.Result;
+
+            var left = _spifs!.First(s => s.Id.ToString() == _leftId);
+            var right = _spifs!.First(s => s.Id.ToString() == _rightId);
+            _leftLabel = $"{left.Name} ({left.PolicyOid})";
+            _rightLabel = $"{right.Name} ({right.PolicyOid})";
+
+            // Build structural diff
+            _structuralDiffs =
+            [
+                new("Name", left.Name, right.Name, !string.Equals(left.Name, right.Name, StringComparison.Ordinal)),
+                new("Policy OID", left.PolicyOid, right.PolicyOid, !string.Equals(left.PolicyOid, right.PolicyOid, StringComparison.Ordinal)),
+                new("Schema Version", left.SchemaVersion, right.SchemaVersion, !string.Equals(left.SchemaVersion, right.SchemaVersion, StringComparison.Ordinal)),
+                new("Classifications", left.ClassificationCount.ToString(), right.ClassificationCount.ToString(), left.ClassificationCount != right.ClassificationCount),
+                new("Categories", left.CategoryCount.ToString(), right.CategoryCount.ToString(), left.CategoryCount != right.CategoryCount),
+                new("Active", left.IsActive.ToString(), right.IsActive.ToString(), left.IsActive != right.IsActive),
+                new("Hash", left.Hash, right.Hash, !string.Equals(left.Hash, right.Hash, StringComparison.Ordinal)),
+                new("XML Length", _leftXml.Length.ToString(), _rightXml.Length.ToString(), _leftXml.Length != _rightXml.Length),
+            ];
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load SPIFs for comparison: {ex.Message}";
+        }
+        finally
+        {
+            _comparing = false;
+        }
+    }
+
+    private sealed record SpifRow(
+        Guid Id, string PolicyOid, string Name, string SchemaVersion,
+        bool IsActive, DateTimeOffset ImportedAt, int ClassificationCount, int CategoryCount, string Hash);
+
+    private sealed record StructuralDiff(string Property, string Left, string Right, bool Changed);
+}

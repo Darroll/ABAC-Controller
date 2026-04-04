@@ -26,4 +26,7 @@ EXPOSE 8081
 VOLUME ["/data"]
 USER abac
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health/live || exit 1
+
 ENTRYPOINT ["dotnet", "AbacController.Api.dll"]
