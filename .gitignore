@@ -31,3 +31,4 @@ packages/
 ## Secrets
 appsettings.*.local.json
 .env
+.github/workflows/
