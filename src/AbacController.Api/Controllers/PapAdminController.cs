@@ -252,6 +252,30 @@ public sealed class PapAdminController : ControllerBase
         });
     }
 
+    public sealed record ConflictCheckRequest(string Content);    
+
+    /// <summary>
+    /// Check a candidate policy for conflicts with existing policies.
+    /// POST /api/v1/pap/policies/check-conflicts
+    /// </summary>
+    [HttpPost("policies/check-conflicts")]
+    [Authorize(Policy = "PolicyWrite")]
+    public async Task<ActionResult<object>> CheckConflicts([FromBody] ConflictCheckRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Content))
+            return BadRequest("content is required");
+
+        var policySets = await _policyRepository.GetPolicySetsAsync(ct);
+        var conflicts = PolicyConflictDetector.DetectConflicts(request.Content, policySets);
+
+        return Ok(new
+        {
+            hasConflicts = conflicts.Count > 0,
+            conflictCount = conflicts.Count,
+            conflicts
+        });
+    }
+
     /// <summary>
     /// Query the audit trail for policy changes.
     /// </summary>
