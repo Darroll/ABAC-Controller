@@ -254,6 +254,29 @@ Import path includes:
 - invalidate one subject: `POST /pip/api/cache/invalidate/{subjectId}`
 - invalidate all: `POST /pip/api/cache/invalidate-all`
 
+### PIP source payload notes
+
+`PUT /pip/api/sources/{id}` persists a `PipSourceEntity` with these operationally important fields:
+
+- `id`, `name`, `sourceType`, `configJson`
+- `providesAttributes` as a comma-separated list
+- `priority`, `isRequired`
+- `cacheEnabled`, `cacheTtlSeconds`, `cacheMaxEntries`
+
+Representative `configJson` shapes:
+
+- `static`
+  - `{"subjects":{"user-123":{"department":"engineering"}}}`
+  - or wildcard/default form: `{"attributes":{"department":"engineering"}}`
+- `rest`
+  - `{"urlTemplate":"https://attributes.example.com/users/{subjectId}"}`
+- `oidc`
+  - `{"userInfoEndpoint":"https://issuer.example.com/connect/userinfo","claimMapping":{"department":"department"}}`
+- `ldap`
+  - `{"host":"ldap.example.com","baseDn":"ou=people,dc=example,dc=com","subjectIdAttribute":"uid","port":636,"useSsl":true}`
+
+Persisted PIP definitions are not only admin records: they are materialized into live runtime sources for `POST /pip/grpc/resolve`, AuthZEN evaluation enrichment, and `POST /pip/api/sources/{id}/test`.
+
 ### Metrics
 
 `GET /metrics`

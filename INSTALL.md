@@ -207,6 +207,17 @@ sg docker -c "docker build -t abac-controller:v1.0 ."
 sg docker -c "docker run ..."
 ```
 
+## PIP source operator notes
+
+- Static, REST, OIDC, LDAP, and file-backed PIP sources are configured through persisted `PipSourceEntity` records.
+- `configJson` is source-specific; see `USAGE.md` for concrete payload examples.
+- REST and OIDC sources should point at deployment-local or otherwise reachable endpoints from inside the container/network namespace that runs ABAC Controller.
+- LDAP bind credentials live in `configJson` today, so treat the database and backups as sensitive deployment assets.
+- File-backed sources require the referenced file path to exist inside the running container.
+- After configuring a source, validate both:
+  - `POST /pip/api/sources/{id}/test`
+  - one real evaluation path that depends on a PIP-supplied attribute
+
 ## Common install-time issues
 
 ### Startup fails with authentication configuration error

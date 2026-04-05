@@ -183,8 +183,8 @@ ABAC_Database__ConnectionString="Data Source=abac-controller.db" \
 ## Current test baseline
 
 - **288 unit tests**
-- **21 integration tests**
-- **309 total tests**
+- **22 integration tests**
+- **310 total tests**
 
 ## Highlights in the HTTP surface
 

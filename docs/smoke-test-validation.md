@@ -88,6 +88,84 @@ Interpretation:
 - Route works end-to-end and is UI-usable.
 - Persisted-source test behavior now runs the runtime source health path instead of returning a placeholder message.
 
+### 3b. Prove persisted-source runtime resolution during evaluation
+
+After the source was created, a policy was activated that required `subject.department == engineering`.
+
+An evaluation was then sent for `user-123` **without** `subject.properties.department` present in the request body. The persisted static PIP source supplied that attribute at runtime.
+
+Representative request shape:
+
+```bash
+curl -X POST http://127.0.0.1:18080/access/v1/evaluation \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "requestId": "pip-runtime-smoke",
+    "subject": {
+      "type": "user",
+      "id": "user-123",
+      "properties": {
+        "securityClearance": {
+          "policyOid": "1.2.3.4",
+          "classificationLacvs": [3],
+          "categoryTagSets": [
+            {
+              "tagSetOid": "1.2.3.4.1",
+              "tags": [
+                {
+                  "tagOid": "SCI",
+                  "tagType": "Restrictive",
+                  "bits": [10]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "action": { "name": "read", "properties": {} },
+    "resource": {
+      "type": "document",
+      "id": "doc-pip-runtime",
+      "properties": {
+        "securityLabel": {
+          "policyOid": "1.2.3.4",
+          "policyName": "TEST",
+          "classificationLacv": 3,
+          "classificationName": "SECRET",
+          "categoryTagSets": [
+            {
+              "tagSetOid": "1.2.3.4.1",
+              "tags": [
+                {
+                  "name": "SCI",
+                  "tagOid": "SCI",
+                  "tagType": "Restrictive",
+                  "bits": [10],
+                  "categories": [
+                    { "name": "ALPHA", "lacv": 10 }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }'
+```
+
+Observed result:
+
+- `200 OK`
+- Decision `true`
+- `context.reason_admin` reported a permit path
+
+Interpretation:
+
+- The persisted PIP source was not merely stored and health-checkable.
+- The live runtime resolver consumed it during a real containerized evaluation path and supplied the missing policy-required attribute.
+
 ### 4. Import, list, and export a SPIF
 
 A minimal valid XMLSPIF sample was used:
@@ -179,6 +257,7 @@ Container-based smoke run result:
 
 - UI shell: pass
 - PIP create/list/test: pass
+- persisted PIP runtime resolution during evaluation: pass
 - SPIF import/list/export: pass
 - PAP policy lifecycle basics: pass
 - System info: pass

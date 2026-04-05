@@ -392,6 +392,89 @@ Supported source config keys by `sourceType`:
 - `oidc`: `userInfoEndpoint` plus `claimMapping`
 - `ldap`: `host`, `baseDn`, `subjectIdAttribute` and optional `port`, `useSsl`, `username`, `password`
 
+Concrete `configJson` examples:
+
+#### Static source with per-subject values
+
+```json
+{
+  "subjects": {
+    "user-123": {
+      "department": "engineering",
+      "securityClearance": {
+        "policyOid": "1.2.3.4",
+        "classificationLacvs": [3]
+      }
+    },
+    "user-999": {
+      "department": "finance"
+    }
+  }
+}
+```
+
+#### REST source
+
+```json
+{
+  "urlTemplate": "https://attributes.example.com/users/{subjectId}"
+}
+```
+
+Pair it with `providesAttributes` such as:
+
+```text
+department,managerId,costCenter
+```
+
+#### OIDC UserInfo source
+
+```json
+{
+  "userInfoEndpoint": "https://issuer.example.com/connect/userinfo",
+  "claimMapping": {
+    "department": "department",
+    "groups": "groups",
+    "email": "email"
+  }
+}
+```
+
+The runtime expects the incoming evaluation context to already carry a bearer token when OIDC resolution is used.
+
+#### LDAP source
+
+```json
+{
+  "host": "ldap.example.com",
+  "port": 636,
+  "useSsl": true,
+  "baseDn": "ou=people,dc=example,dc=com",
+  "subjectIdAttribute": "uid",
+  "username": "cn=svc-abac,ou=svc,dc=example,dc=com",
+  "password": "replace-me"
+}
+```
+
+Typical `providesAttributes` value:
+
+```text
+department,title,memberOf
+```
+
+### Validate persisted-source runtime resolution end-to-end
+
+After upserting a source, prove the running controller is actually consuming the persisted record by evaluating a request that omits a policy-required subject attribute and lets the PIP source supply it.
+
+Example shape:
+
+1. Create a policy that permits only when `subject.department == engineering`.
+2. Upsert a static source that provides `department` for `user-123`.
+3. Send an AuthZEN request for `user-123` without `subject.properties.department`.
+4. Expect a permit decision because runtime enrichment resolved the missing attribute from the persisted source.
+
+This exact flow is captured in `docs/smoke-test-validation.md` and in the Docker-backed integration test `PersistedPipSourceTests`.
+
 ### Test a source
 
 ```bash

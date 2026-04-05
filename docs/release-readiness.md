@@ -8,7 +8,7 @@ Validated baseline:
 
 - build: `~/.dotnet/dotnet build AbacController.slnx --nologo -v q`
 - tests: `~/.dotnet/dotnet test AbacController.slnx --nologo -v q`
-- latest observed result: **288 unit + 21 integration = 309 passing**
+- latest observed result: **288 unit + 22 integration = 310 passing**
 - container smoke flow: documented in `docs/smoke-test-validation.md`
 
 ## Notable release-facing behaviors
@@ -47,6 +47,4 @@ docker run -d --name abac-controller \
 
 ## Remaining non-blocking follow-ups
 
-- add another container smoke run capturing the new persisted PIP runtime behavior end-to-end
-- broaden docs/examples for non-static PIP source config payloads if operators will use REST/OIDC/LDAP immediately
 - if cryptographic SPIF trust is required for production, replace the default rejecting XML signature verifier with a deployment-specific implementation
