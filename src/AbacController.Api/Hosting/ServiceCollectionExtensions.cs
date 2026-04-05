@@ -154,6 +154,7 @@ public static class ServiceCollectionExtensions
     {
         app.UseMiddleware<Middleware.CorrelationIdMiddleware>();
         app.UseRouting();
+        app.UseRateLimiter();
         app.UseAuthentication();
         app.UseMiddleware<TenantContextMiddleware>();
         app.UseAuthorization();

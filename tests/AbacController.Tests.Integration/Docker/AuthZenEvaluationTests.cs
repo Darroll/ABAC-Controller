@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using AbacController.Tests.Integration.Fixtures;
 
@@ -120,5 +121,17 @@ public sealed class AuthZenEvaluationTests
         Assert.True(completed, "Async evaluation did not complete within the expected polling window.");
         Assert.True(statusPayload.TryGetProperty("result", out var result));
         Assert.True(result.TryGetProperty("decision", out _));
+    }
+
+    [Fact]
+    public async Task XacmlJsonEndpoint_ReturnsBadRequest_ForMalformedRequest()
+    {
+        using var response = await _fixture.HttpClient.PostAsync(
+            "/access/v1/xacml-json",
+            new StringContent("{\"notARequest\":true}", Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("Invalid XACML JSON request. Expected { \"Request\": { ... } }", json.GetProperty("error").GetString());
     }
 }

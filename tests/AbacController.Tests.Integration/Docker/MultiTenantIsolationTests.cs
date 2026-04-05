@@ -44,6 +44,35 @@ public sealed class MultiTenantIsolationTests
         Assert.DoesNotContain("tenant-b-ps", defaultItems);
     }
 
+    [Fact]
+    public async Task SpifListing_IsScopedByTenantHeader()
+    {
+        var tenantAImport = $"tenant-a-import-{Guid.NewGuid():N}";
+        var tenantBImport = $"tenant-b-import-{Guid.NewGuid():N}";
+
+        await ImportSpifAsync("tenant-a", tenantAImport);
+        await ImportSpifAsync("tenant-b", tenantBImport);
+
+        var tenantASpifs = (await GetSpifsAsync("tenant-a"))
+            .Where(spif => string.Equals(spif.GetProperty("importedBy").GetString(), tenantAImport, StringComparison.Ordinal))
+            .ToList();
+        var tenantBSpifs = (await GetSpifsAsync("tenant-b"))
+            .Where(spif => string.Equals(spif.GetProperty("importedBy").GetString(), tenantBImport, StringComparison.Ordinal))
+            .ToList();
+        var defaultSpifs = (await GetSpifsAsync(null))
+            .Where(spif => string.Equals(spif.GetProperty("importedBy").GetString(), tenantAImport, StringComparison.Ordinal)
+                        || string.Equals(spif.GetProperty("importedBy").GetString(), tenantBImport, StringComparison.Ordinal))
+            .ToList();
+
+        Assert.Single(tenantASpifs);
+        Assert.Single(tenantBSpifs);
+        Assert.Empty(defaultSpifs);
+
+        Assert.Equal("1.2.3.4.10", tenantASpifs[0].GetProperty("policyOid").GetString());
+        Assert.Equal("1.2.3.4.20", tenantBSpifs[0].GetProperty("policyOid").GetString());
+        Assert.NotEqual(tenantASpifs[0].GetProperty("id").GetGuid(), tenantBSpifs[0].GetProperty("id").GetGuid());
+    }
+
     private async Task PutPolicySetAsync(string? tenantId, string id, string name)
     {
         using var request = new HttpRequestMessage(HttpMethod.Put, $"/pap/api/policy-sets/{id}")
@@ -68,12 +97,7 @@ public sealed class MultiTenantIsolationTests
 
     private async Task<List<string>> GetPolicySetIdsAsync(string? tenantId)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/pap/api/policy-sets");
-        if (!string.IsNullOrWhiteSpace(tenantId))
-        {
-            request.Headers.Add("X-Tenant-Id", tenantId);
-        }
-
+        using var request = CreateTenantRequest(HttpMethod.Get, "/pap/api/policy-sets", tenantId);
         using var response = await _fixture.HttpClient.SendAsync(request);
         response.EnsureSuccessStatusCode();
 
@@ -81,5 +105,50 @@ public sealed class MultiTenantIsolationTests
         return payload.EnumerateArray()
             .Select(static item => item.GetProperty("id").GetString()!)
             .ToList();
+    }
+
+    private async Task ImportSpifAsync(string? tenantId, string importedBy)
+    {
+        var policyOid = importedBy switch
+        {
+            "tenant-a-import" => "1.2.3.4.10",
+            "tenant-b-import" => "1.2.3.4.20",
+            _ => $"1.2.3.4.{Math.Abs(importedBy.GetHashCode())}"
+        };
+
+        var xml = TestSpifSamples.BasicPolicy.Replace("1.2.3.4", policyOid, StringComparison.Ordinal);
+
+        using var request = CreateTenantRequest(HttpMethod.Post, "/pap/api/spifs/import", tenantId);
+        request.Content = JsonContent.Create(new
+        {
+            xml,
+            activate = true,
+            setAsDefault = false,
+            importedBy
+        });
+
+        using var response = await _fixture.HttpClient.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+    }
+
+    private async Task<List<JsonElement>> GetSpifsAsync(string? tenantId)
+    {
+        using var request = CreateTenantRequest(HttpMethod.Get, "/pap/api/spifs", tenantId);
+        using var response = await _fixture.HttpClient.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement[]>();
+        return payload?.Select(static item => item.Clone()).ToList() ?? [];
+    }
+
+    private static HttpRequestMessage CreateTenantRequest(HttpMethod method, string uri, string? tenantId)
+    {
+        var request = new HttpRequestMessage(method, uri);
+        if (!string.IsNullOrWhiteSpace(tenantId))
+        {
+            request.Headers.Add("X-Tenant-Id", tenantId);
+        }
+
+        return request;
     }
 }

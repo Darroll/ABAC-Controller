@@ -60,7 +60,6 @@ var app = builder.Build();
 await InitializeAsync(app);
 RegisterLabelCodecs(app);
 
-app.UseRateLimiter();
 app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
