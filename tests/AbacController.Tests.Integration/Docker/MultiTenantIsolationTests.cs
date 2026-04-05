@@ -109,12 +109,11 @@ public sealed class MultiTenantIsolationTests
 
     private async Task ImportSpifAsync(string? tenantId, string importedBy)
     {
-        var policyOid = importedBy switch
-        {
-            "tenant-a-import" => "1.2.3.4.10",
-            "tenant-b-import" => "1.2.3.4.20",
-            _ => $"1.2.3.4.{Math.Abs(importedBy.GetHashCode())}"
-        };
+        var policyOid = importedBy.StartsWith("tenant-a-import", StringComparison.Ordinal)
+            ? "1.2.3.4.10"
+            : importedBy.StartsWith("tenant-b-import", StringComparison.Ordinal)
+                ? "1.2.3.4.20"
+                : $"1.2.3.4.{Math.Abs(importedBy.GetHashCode())}";
 
         var xml = TestSpifSamples.BasicPolicy.Replace("1.2.3.4", policyOid, StringComparison.Ordinal);
 
