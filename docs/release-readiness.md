@@ -19,6 +19,14 @@ Validated baseline:
 - signed SPIFs remain rejected by default unless a deployment supplies a real XML signature verifier
 - STANAG 4778 support remains intentionally minimal and envelope-oriented
 
+## Deployment references
+
+For the practical operator path, see:
+
+- `docs/deployment-guide.md` for the pre-deployment checklist, go-live checks, and Docker/Kubernetes examples
+- `docs/smoke-test-validation.md` for the exact observed container smoke baseline
+- `docs/releases-v1.md` for the drafted v1 release notes
+
 ## Deployment example
 
 ```bash
@@ -30,6 +38,7 @@ docker run -d --name abac-controller \
   -e ABAC_Database__ConnectionString='Data Source=/data/abac-controller.db' \
   -e ABAC_Auth__Authority='https://issuer.example.com/' \
   -e ABAC_Auth__Audience='abac-controller' \
+  -e ABAC_Auth__RequireHttpsMetadata=true \
   -v $(pwd)/data:/data \
   abac-controller:v1
 ```
@@ -48,3 +57,4 @@ docker run -d --name abac-controller \
 ## Remaining non-blocking follow-ups
 
 - if cryptographic SPIF trust is required for production, replace the default rejecting XML signature verifier with a deployment-specific implementation
+- if Kubernetes is the target platform, convert the example manifests in `docs/deployment-guide.md` into environment-specific manifests or a chart before rollout

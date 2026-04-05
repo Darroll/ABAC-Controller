@@ -281,7 +281,7 @@ curl http://localhost:8080/pdp/api/evaluate/async/{evaluationId}/status
 ## 11) Evaluate using XACML JSON input
 
 ```bash
-curl -X POST http://localhost:8080/pdp/api/evaluate/xacml-json \
+curl -X POST http://localhost:8080/access/v1/xacml-json \
   -H 'Content-Type: application/json' \
   -H "$TENANT_HEADER" \
   -d '{

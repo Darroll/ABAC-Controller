@@ -251,3 +251,10 @@ By default, signed SPIFs are rejected unless a real XML signature verifier is su
 - scrape `/metrics`
 - collect JSON logs
 - front with TLS / reverse proxy as appropriate for your environment
+- use the full operator checklist in `docs/deployment-guide.md` before go-live
+
+## Deployment references
+
+- `docs/deployment-guide.md` — deployment checklist, go-live notes, Docker, and Kubernetes examples
+- `docs/release-readiness.md` — v1 release baseline and validation summary
+- `docs/releases-v1.md` — drafted v1 release notes

@@ -156,7 +156,9 @@ AbacController/
 - `docs/standards-gaps.md` — standards coverage and explicit limits
 - `docs/emailclassification-migration-guide.md` — migration notes from the EmailClassification baseline
 - `docs/smoke-test-validation.md` — exact container-based smoke steps and observed v1 validation results
+- `docs/deployment-guide.md` — practical deployment checklist, go-live checks, and Docker/Kubernetes examples
 - `docs/release-readiness.md` — deployment-oriented v1 release checklist, validation baseline, and operator notes
+- `docs/releases-v1.md` — drafted v1 release notes for operators and reviewers
 
 ## Quick start
 
@@ -195,7 +197,7 @@ Representative endpoints:
 - `POST /pdp/api/evaluate/explain`
 - `POST /pdp/api/evaluate/simulate`
 - `POST /pdp/api/evaluate/async`
-- `POST /pdp/api/evaluate/xacml-json`
+- `POST /access/v1/xacml-json`
 - `POST /pap/api/spifs/import`
 - `GET /pap/api/spifs/{id}/export`
 - `POST /pap/api/policies/{id}/versions`
@@ -203,7 +205,7 @@ Representative endpoints:
 - `GET /metrics`
 - `GET /health/live`
 
-See `API.md` for the full surface.
+See `API.md` for the full surface. For operator rollout guidance, see `docs/deployment-guide.md`, `docs/release-readiness.md`, and `docs/releases-v1.md`.
 
 ## Notes for operators
 

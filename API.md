@@ -78,7 +78,7 @@ Underlying scopes are ABAC-specific values such as `abac:evaluate` and `abac:pol
 - `POST /pdp/api/evaluate/simulate`
 - `POST /pdp/api/evaluate/async`
 - `GET /pdp/api/evaluate/async/{evaluationId}/status`
-- `POST /pdp/api/evaluate/xacml-json`
+- `POST /access/v1/xacml-json`
 
 ### PAP endpoints
 
@@ -223,7 +223,7 @@ Status lookup:
 
 ### XACML JSON evaluation
 
-`POST /pdp/api/evaluate/xacml-json`
+`POST /access/v1/xacml-json`
 
 - expects a payload of the form `{ "Request": { ... } }`
 - maps XACML JSON profile input into internal evaluation requests
