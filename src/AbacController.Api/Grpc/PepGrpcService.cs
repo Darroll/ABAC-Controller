@@ -20,6 +20,7 @@ public sealed class PepGrpcService : PepApi.PepApiBase
     private readonly IMarkingGenerator _markingGenerator;
     private readonly IStanag4778MetadataBinder _metadataBinder;
 
+    /// <summary>Initializes a new instance of the <see cref="PepGrpcService"/> class.</summary>
     public PepGrpcService(
         AbacDbContext dbContext,
         ILabelCodecRegistry labelCodecRegistry,

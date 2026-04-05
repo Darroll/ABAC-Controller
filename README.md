@@ -91,6 +91,7 @@ AbacController/
 - `CONTRIBUTING.md` — development and PR expectations
 - `docs/runtime-baseline.md` — current deployment/runtime truth
 - `docs/standards-gaps.md` — standards coverage and gaps
+- `docs/emailclassification-migration-guide.md` — migration/integration notes for teams moving from the EmailClassification baseline
 
 ## Getting started
 

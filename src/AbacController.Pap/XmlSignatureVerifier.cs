@@ -10,7 +10,7 @@ namespace AbacController.Pap;
 public sealed class RejectingXmlSignatureVerifier : IXmlSignatureVerifier
 {
     /// <summary>
-    /// Executes verify.
+    /// Verifies the XML signature state for the supplied SPIF document.
     /// </summary>
     public SignatureVerificationResult Verify(XDocument document, string? keyIdentifier = null)
     {
@@ -36,7 +36,7 @@ public sealed class RejectingXmlSignatureVerifier : IXmlSignatureVerifier
 public sealed class NoOpXmlSignatureVerifier : IXmlSignatureVerifier
 {
     /// <summary>
-    /// Executes verify.
+    /// Skips signature verification and reports a bypassed result.
     /// </summary>
     public SignatureVerificationResult Verify(XDocument document, string? keyIdentifier = null)
         => SignatureVerificationResult.Skipped(

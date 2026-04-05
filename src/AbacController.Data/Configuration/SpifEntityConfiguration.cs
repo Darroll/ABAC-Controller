@@ -5,12 +5,12 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace AbacController.Data.Configuration;
 
 /// <summary>
-/// EF Core entity configuration for <see cref="SpifEntity"/>.
+/// Configures EF Core persistence for stored SPIF documents.
 /// </summary>
 public class SpifEntityConfiguration : IEntityTypeConfiguration<SpifEntity>
 {
     /// <summary>
-    /// Executes configure.
+    /// Configures the <see cref="SpifEntity"/> table, keys, and column constraints.
     /// </summary>
     public void Configure(EntityTypeBuilder<SpifEntity> builder)
     {
@@ -25,12 +25,12 @@ public class SpifEntityConfiguration : IEntityTypeConfiguration<SpifEntity>
 }
 
 /// <summary>
-/// A PolicySetEntityConfiguration class.
+/// Configures EF Core persistence for policy-set definitions.
 /// </summary>
 public class PolicySetEntityConfiguration : IEntityTypeConfiguration<PolicySetEntity>
 {
     /// <summary>
-    /// Executes configure.
+    /// Configures the <see cref="PolicySetEntity"/> table, keys, relationships, and column constraints.
     /// </summary>
     public void Configure(EntityTypeBuilder<PolicySetEntity> builder)
     {
@@ -44,12 +44,12 @@ public class PolicySetEntityConfiguration : IEntityTypeConfiguration<PolicySetEn
 }
 
 /// <summary>
-/// A PolicyEntityConfiguration class.
+/// Configures EF Core persistence for policy definitions.
 /// </summary>
 public class PolicyEntityConfiguration : IEntityTypeConfiguration<PolicyEntity>
 {
     /// <summary>
-    /// Executes configure.
+    /// Configures the <see cref="PolicyEntity"/> table, keys, relationships, and column constraints.
     /// </summary>
     public void Configure(EntityTypeBuilder<PolicyEntity> builder)
     {
@@ -62,12 +62,12 @@ public class PolicyEntityConfiguration : IEntityTypeConfiguration<PolicyEntity>
 }
 
 /// <summary>
-/// A PolicyVersionEntityConfiguration class.
+/// Configures EF Core persistence for immutable policy versions.
 /// </summary>
 public class PolicyVersionEntityConfiguration : IEntityTypeConfiguration<PolicyVersionEntity>
 {
     /// <summary>
-    /// Executes configure.
+    /// Configures the <see cref="PolicyVersionEntity"/> table, keys, indexes, and column constraints.
     /// </summary>
     public void Configure(EntityTypeBuilder<PolicyVersionEntity> builder)
     {
@@ -79,12 +79,12 @@ public class PolicyVersionEntityConfiguration : IEntityTypeConfiguration<PolicyV
 }
 
 /// <summary>
-/// A PipSourceEntityConfiguration class.
+/// Configures EF Core persistence for PIP source definitions.
 /// </summary>
 public class PipSourceEntityConfiguration : IEntityTypeConfiguration<PipSourceEntity>
 {
     /// <summary>
-    /// Executes configure.
+    /// Configures the <see cref="PipSourceEntity"/> table, keys, and column constraints.
     /// </summary>
     public void Configure(EntityTypeBuilder<PipSourceEntity> builder)
     {
@@ -96,12 +96,12 @@ public class PipSourceEntityConfiguration : IEntityTypeConfiguration<PipSourceEn
 }
 
 /// <summary>
-/// An EnforcementPointEntityConfiguration class.
+/// Configures EF Core persistence for registered enforcement points.
 /// </summary>
 public class EnforcementPointEntityConfiguration : IEntityTypeConfiguration<EnforcementPointEntity>
 {
     /// <summary>
-    /// Executes configure.
+    /// Configures the <see cref="EnforcementPointEntity"/> table, keys, and column constraints.
     /// </summary>
     public void Configure(EntityTypeBuilder<EnforcementPointEntity> builder)
     {
@@ -114,12 +114,12 @@ public class EnforcementPointEntityConfiguration : IEntityTypeConfiguration<Enfo
 }
 
 /// <summary>
-/// An AuditEventEntityConfiguration class.
+/// Configures EF Core persistence for audit events captured by the runtime.
 /// </summary>
 public class AuditEventEntityConfiguration : IEntityTypeConfiguration<AuditEventEntity>
 {
     /// <summary>
-    /// Executes configure.
+    /// Configures the <see cref="AuditEventEntity"/> table, indexes, and column constraints.
     /// </summary>
     public void Configure(EntityTypeBuilder<AuditEventEntity> builder)
     {
@@ -134,12 +134,12 @@ public class AuditEventEntityConfiguration : IEntityTypeConfiguration<AuditEvent
 }
 
 /// <summary>
-/// A ConfigurationEntryEntityConfiguration class.
+/// Configures EF Core persistence for key/value configuration entries.
 /// </summary>
 public class ConfigurationEntryEntityConfiguration : IEntityTypeConfiguration<ConfigurationEntryEntity>
 {
     /// <summary>
-    /// Executes configure.
+    /// Configures the <see cref="ConfigurationEntryEntity"/> table and key constraints.
     /// </summary>
     public void Configure(EntityTypeBuilder<ConfigurationEntryEntity> builder)
     {

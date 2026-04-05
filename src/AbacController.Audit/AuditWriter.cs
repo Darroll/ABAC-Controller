@@ -20,11 +20,13 @@ public sealed class AuditWriter : IAuditWriter, IAuditChannelReader
     private readonly Channel<AuditEvent> _channel;
     private readonly TimeSpan _enqueueTimeout;
 
+    /// <summary>Initializes a new instance of the <see cref="AuditWriter"/> class with default settings.</summary>
     public AuditWriter()
         : this(DefaultCapacity, DefaultEnqueueTimeout)
     {
     }
 
+    /// <summary>Initializes a new instance of the <see cref="AuditWriter"/> class.</summary>
     public AuditWriter(int capacity, TimeSpan enqueueTimeout)
     {
         if (capacity <= 0)

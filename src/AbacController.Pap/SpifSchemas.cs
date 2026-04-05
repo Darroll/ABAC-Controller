@@ -12,7 +12,7 @@ internal static class SpifSchemas
     private static readonly Lazy<XmlSchemaSet> Schemas = new(CreateSchemaSet);
 
     /// <summary>
-    /// Executes create Validation Set.
+    /// Gets the compiled XML schema set used for SPIF validation.
     /// </summary>
     public static XmlSchemaSet CreateValidationSet() => Schemas.Value;
 

@@ -272,6 +272,8 @@ public sealed class PepDecisionCache
         public required DateTimeOffset ExpiresAt { get; init; }
         /// <summary>Gets or sets the last Accessed At.</summary>
         public DateTimeOffset LastAccessedAt { get; set; }
+
+        /// <summary>Gets the subject identifier used for subject-based invalidation.</summary>
         public string? SubjectId => Result.RequestId; // Use for subject-based invalidation
     }
 }

@@ -6,16 +6,17 @@ using Microsoft.EntityFrameworkCore;
 namespace AbacController.Data.Repositories;
 
 /// <summary>
-/// EF Core implementation of IAuditReader.
+/// EF Core-backed audit query repository.
 /// </summary>
 public sealed class AuditRepository : IAuditReader
 {
     private readonly AbacDbContext _db;
 
+    /// <summary>Initializes a new instance of the <see cref="AuditRepository"/> class.</summary>
     public AuditRepository(AbacDbContext db) => _db = db;
 
     /// <summary>
-    /// Executes query Async.
+    /// Queries audit events using the supplied filters and pagination settings.
     /// </summary>
     public async Task<AuditQueryResult> QueryAsync(AuditQuery query, CancellationToken ct = default)
     {
@@ -51,7 +52,7 @@ public sealed class AuditRepository : IAuditReader
     }
 
     /// <summary>
-    /// Executes get By Id Async.
+    /// Loads a single audit event by its identifier.
     /// </summary>
     public async Task<AuditEvent?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
@@ -62,7 +63,7 @@ public sealed class AuditRepository : IAuditReader
     }
 
     /// <summary>
-    /// Executes get By Decision Id Async.
+    /// Loads all audit events associated with the supplied decision identifier.
     /// </summary>
     public async Task<List<AuditEvent>> GetByDecisionIdAsync(string decisionId, CancellationToken ct = default)
     {

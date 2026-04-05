@@ -16,6 +16,7 @@ public sealed class PapGrpcService : PapApi.PapApiBase
     private readonly IPolicyRepository _policyRepository;
     private readonly AbacDbContext _dbContext;
 
+    /// <summary>Initializes a new instance of the <see cref="PapGrpcService"/> class.</summary>
     public PapGrpcService(IPolicyRepository policyRepository, AbacDbContext dbContext)
     {
         _policyRepository = policyRepository;

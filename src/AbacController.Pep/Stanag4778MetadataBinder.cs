@@ -15,6 +15,7 @@ public sealed class Stanag4778MetadataBinder : IStanag4778MetadataBinder
 
     private readonly ILabelCodec _labelCodec;
 
+    /// <summary>Initializes a new instance of the <see cref="Stanag4778MetadataBinder"/> class.</summary>
     public Stanag4778MetadataBinder(IEnumerable<ILabelCodec> codecs)
     {
         ArgumentNullException.ThrowIfNull(codecs);

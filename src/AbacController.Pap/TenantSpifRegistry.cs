@@ -5,8 +5,8 @@ using AbacController.Core.Interfaces;
 namespace AbacController.Pap;
 
 /// <summary>
-/// Shared multi-tenant SPIF registry store. Maintains one isolated in-memory
-/// <see cref="SpifRegistry"/> per tenant plus a default/system registry.
+/// Shared multi-tenant SPIF registry store.
+/// Maintains one isolated in-memory <see cref="SpifRegistry"/> per tenant plus a default system registry.
 /// </summary>
 public sealed class TenantSpifRegistryStore
 {
@@ -14,8 +14,8 @@ public sealed class TenantSpifRegistryStore
     private readonly SpifRegistry _defaultRegistry = new();
 
     /// <summary>
-    /// Gets the registry for the specified tenant. A null tenant ID resolves to the
-    /// default/system tenant registry.
+    /// Gets the registry for the specified tenant.
+    /// A null tenant identifier resolves to the default system registry.
     /// </summary>
     public SpifRegistry GetRegistryForTenant(string? tenantId)
     {
@@ -28,7 +28,7 @@ public sealed class TenantSpifRegistryStore
     }
 
     /// <summary>
-    /// Gets the known non-default tenant IDs.
+    /// Gets the known non-default tenant identifiers.
     /// </summary>
     public IReadOnlyList<string> GetKnownTenantIds()
         => _tenantRegistries.Keys.OrderBy(static key => key, StringComparer.Ordinal).ToImmutableArray();

@@ -15,6 +15,7 @@ public sealed class SpifFormState
     public string? DefaultSecurityPolicyId { get; set; }
 
     // ── Classifications ──
+    /// <summary>Gets or sets the working classification rows in display order.</summary>
     public List<ClassificationEntry> Classifications { get; set; } = [new("UNCLASSIFIED", 0)];
 
     // ── Tag Sets ──
@@ -57,7 +58,9 @@ public sealed class SpifFormState
 // Mutable form entry types for two-way binding
 // ═══════════════════════════════════════════════════════════════════
 
-/// <summary>Mutable classification entry for form binding.</summary>
+/// <summary>
+/// Mutable classification row used by the SPIF builder form.
+/// </summary>
 public sealed record ClassificationEntry(
     string Name,
     int LacvValue,
@@ -68,7 +71,9 @@ public sealed record ClassificationEntry(
     string? ForegroundColor = null,
     string? BackgroundColor = null);
 
-/// <summary>Mutable tag set entry for form binding.</summary>
+/// <summary>
+/// Mutable tag-set row used by the SPIF builder form.
+/// </summary>
 public sealed class TagSetEntry
 {
     /// <summary>Gets or sets the name.</summary>
@@ -81,7 +86,7 @@ public sealed class TagSetEntry
     public int DisplayOrder { get; set; }
     /// <summary>Gets or sets the min Lacv.</summary>
     public int? MinLacv { get; set; }
-    /// <summary>Gets or sets the expanded.</summary>
+    /// <summary>Gets or sets a value indicating whether the editor section is expanded.</summary>
     public bool Expanded { get; set; } = true;
     /// <summary>Gets or sets the tags.</summary>
     public List<TagEntry> Tags { get; set; } = [];
@@ -92,7 +97,9 @@ public sealed class TagSetEntry
     public string? SemanticCategory { get; set; }
 }
 
-/// <summary>Mutable tag entry for form binding.</summary>
+/// <summary>
+/// Mutable tag row used by the SPIF builder form.
+/// </summary>
 public sealed record TagEntry
 {
     /// <summary>Gets or sets the tag Name.</summary>
@@ -111,7 +118,9 @@ public sealed record TagEntry
     public string? MarkingCode { get; init; }
 }
 
-/// <summary>Mutable constraint entry for form binding.</summary>
+/// <summary>
+/// Mutable constraint row used by the SPIF builder form.
+/// </summary>
 public sealed record ConstraintEntry
 {
     /// <summary>Gets or sets the constraint Type.</summary>
@@ -130,7 +139,9 @@ public sealed record ConstraintEntry
     public string? ErrorMessage { get; init; }
 }
 
-/// <summary>Mutable extension field entry for form binding.</summary>
+/// <summary>
+/// Mutable extension-field row used by the SPIF builder form.
+/// </summary>
 public sealed record ExtensionFieldEntry
 {
     /// <summary>Gets or sets the field Name.</summary>
@@ -141,14 +152,16 @@ public sealed record ExtensionFieldEntry
     public string? CharSetConstraint { get; init; }
 }
 
-/// <summary>Mutable equivalent policy entry for form binding.</summary>
+/// <summary>
+/// Mutable equivalent-policy row used by the SPIF builder form.
+/// </summary>
 public sealed class EquivalentPolicyEntry
 {
     /// <summary>Gets or sets the policy Oid.</summary>
     public string PolicyOid { get; set; } = string.Empty;
     /// <summary>Gets or sets the policy Name.</summary>
     public string PolicyName { get; set; } = string.Empty;
-    /// <summary>Gets or sets the expanded.</summary>
+    /// <summary>Gets or sets a value indicating whether the editor section is expanded.</summary>
     public bool Expanded { get; set; } = true;
     /// <summary>Gets or sets the classification Mappings.</summary>
     public List<ClassificationMappingEntry> ClassificationMappings { get; set; } = [];
@@ -156,7 +169,9 @@ public sealed class EquivalentPolicyEntry
     public List<CategoryMappingEntry> CategoryMappings { get; set; } = [];
 }
 
-/// <summary>Mutable classification mapping entry for form binding.</summary>
+/// <summary>
+/// Mutable classification-mapping row used by the SPIF builder form.
+/// </summary>
 public sealed class ClassificationMappingEntry
 {
     /// <summary>Gets or sets the source Lacv.</summary>
@@ -165,7 +180,9 @@ public sealed class ClassificationMappingEntry
     public int TargetLacv { get; set; }
 }
 
-/// <summary>Mutable category mapping entry for form binding.</summary>
+/// <summary>
+/// Mutable category-mapping row used by the SPIF builder form.
+/// </summary>
 public sealed class CategoryMappingEntry
 {
     /// <summary>Gets or sets the source Tag Set Id.</summary>
@@ -182,7 +199,7 @@ public sealed class CategoryMappingEntry
 public static class TagSetCategoryHelper
 {
     /// <summary>
-    /// Executes get Category.
+    /// Gets the semantic category for a tag set, using the explicit override when present.
     /// </summary>
     public static string GetCategory(TagSetEntry tagSet)
     {
@@ -209,7 +226,7 @@ public static class TagSetCategoryHelper
     }
 
     /// <summary>
-    /// Executes category Display Name.
+    /// Gets the display name for a semantic category.
     /// </summary>
     public static string CategoryDisplayName(string category) => category switch
     {
@@ -221,7 +238,7 @@ public static class TagSetCategoryHelper
     };
 
     /// <summary>
-    /// Executes category Border Color.
+    /// Gets the border color associated with a semantic category.
     /// </summary>
     public static string CategoryBorderColor(string category) => category switch
     {

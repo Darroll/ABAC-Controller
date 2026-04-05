@@ -12,7 +12,7 @@ namespace AbacController.Pdp;
 public static class PolicyConflictDetector
 {
     /// <summary>
-    /// Detect potential conflicts between a candidate policy and existing policies.
+    /// Detects potential conflicts between a candidate policy document and the active policy baseline.
     /// </summary>
     public static List<PolicyConflict> DetectConflicts(
         string candidateContent,
@@ -163,30 +163,48 @@ public static class PolicyConflictDetector
 
     private sealed class ParsedCondition
     {
-        /// <summary>Gets or sets the path.</summary>
+        /// <summary>
+        /// Gets the JSON path referenced by the parsed condition.
+        /// </summary>
         public string? Path { get; init; }
-        /// <summary>Gets or sets the equals Value.</summary>
+        /// <summary>
+        /// Gets the equality value extracted from the parsed condition, when present.
+        /// </summary>
         public JsonElement? EqualsValue { get; init; }
     }
 }
 
 /// <summary>
-/// A detected conflict between policies.
+/// Describes a potential overlap between two rules that could yield different decisions.
 /// </summary>
 public sealed record PolicyConflict
 {
-    /// <summary>Gets or sets the candidate Rule Id.</summary>
+    /// <summary>
+    /// Gets the candidate rule identifier.
+    /// </summary>
     public required string CandidateRuleId { get; init; }
-    /// <summary>Gets or sets the candidate Effect.</summary>
+    /// <summary>
+    /// Gets the candidate rule effect.
+    /// </summary>
     public required string CandidateEffect { get; init; }
-    /// <summary>Gets or sets the existing Policy Set Id.</summary>
+    /// <summary>
+    /// Gets the existing policy-set identifier.
+    /// </summary>
     public required string ExistingPolicySetId { get; init; }
-    /// <summary>Gets or sets the existing Policy Id.</summary>
+    /// <summary>
+    /// Gets the existing policy identifier.
+    /// </summary>
     public required string ExistingPolicyId { get; init; }
-    /// <summary>Gets or sets the existing Rule Id.</summary>
+    /// <summary>
+    /// Gets the existing rule identifier.
+    /// </summary>
     public required string ExistingRuleId { get; init; }
-    /// <summary>Gets or sets the existing Effect.</summary>
+    /// <summary>
+    /// Gets the effect produced by the existing rule.
+    /// </summary>
     public required string ExistingEffect { get; init; }
-    /// <summary>Gets or sets the reason.</summary>
+    /// <summary>
+    /// Gets the human-readable explanation for the detected conflict.
+    /// </summary>
     public required string Reason { get; init; }
 }

@@ -19,14 +19,30 @@ public sealed class LdapPipSource : IPipSource, IDisposable
     private readonly NetworkCredential? _credential;
     private readonly TimeSpan _cacheTtl;
 
+    /// <summary>
+    /// Gets the source type identifier exposed through health and provenance metadata.
+    /// </summary>
     public string SourceType => "ldap";
-    /// <summary>Gets the source Id.</summary>
+
+    /// <summary>
+    /// Gets the logical source identifier.
+    /// </summary>
     public string SourceId { get; }
-    /// <summary>Gets the provides Attributes.</summary>
+
+    /// <summary>
+    /// Gets the attribute names that this LDAP source can return.
+    /// </summary>
     public IReadOnlySet<string> ProvidesAttributes { get; }
-    /// <summary>Gets the priority.</summary>
+
+    /// <summary>
+    /// Gets the source priority used by the PIP resolver.
+    /// </summary>
     public int Priority { get; }
 
+    /// <summary>
+    /// Initializes an LDAP-backed PIP source.
+    /// </summary>
+    /// <summary>Initializes a new instance of the <see cref="LdapPipSource"/> class.</summary>
     public LdapPipSource(
         string sourceId,
         int priority,
@@ -52,7 +68,7 @@ public sealed class LdapPipSource : IPipSource, IDisposable
     }
 
     /// <summary>
-    /// Executes resolve Async.
+    /// Resolves subject attributes by querying the configured LDAP directory.
     /// </summary>
     public async Task<AttributeResolutionResult> ResolveAsync(
         AttributeResolutionRequest request,
@@ -69,7 +85,7 @@ public sealed class LdapPipSource : IPipSource, IDisposable
     }
 
     /// <summary>
-    /// Executes test Connectivity Async.
+    /// Verifies that the LDAP endpoint can be contacted and bound successfully.
     /// </summary>
     public async Task<SourceHealthResult> TestConnectivityAsync(CancellationToken ct = default)
     {
@@ -205,7 +221,7 @@ public sealed class LdapPipSource : IPipSource, IDisposable
     }
 
     /// <summary>
-    /// Executes dispose.
+    /// Releases this instance.
     /// </summary>
     public void Dispose()
     {

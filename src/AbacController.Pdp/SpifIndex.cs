@@ -16,15 +16,24 @@ public sealed class SpifIndex : ISpifIndex
     private readonly ImmutableDictionary<string, EquivalentPolicy> _equivalentPolicies;
     private readonly ImmutableList<LacvValue> _classificationsByHierarchy;
 
-    /// <summary>Gets the policy Oid.</summary>
+    /// <summary>
+    /// Gets the governing policy OID for the indexed SPIF.
+    /// </summary>
     public string PolicyOid { get; }
-    /// <summary>Gets the policy Name.</summary>
+    /// <summary>
+    /// Gets the governing policy name for the indexed SPIF.
+    /// </summary>
     public string PolicyName { get; }
-    /// <summary>Gets the schema Version.</summary>
+    /// <summary>
+    /// Gets the schema version declared by the indexed SPIF.
+    /// </summary>
     public string SchemaVersion { get; }
-    /// <summary>Gets the spif.</summary>
+    /// <summary>
+    /// Gets the immutable SPIF domain model used to build this index.
+    /// </summary>
     public Spif Spif { get; }
 
+    /// <summary>Initializes a new instance of the <see cref="SpifIndex"/> class.</summary>
     public SpifIndex(Spif spif)
     {
         Spif = spif ?? throw new ArgumentNullException(nameof(spif));
@@ -69,43 +78,43 @@ public sealed class SpifIndex : ISpifIndex
     }
 
     /// <summary>
-    /// Executes try Get Hierarchy.
+    /// Tries to resolve the hierarchy value for the supplied classification LACV.
     /// </summary>
     public bool TryGetHierarchy(LacvValue lacv, out int hierarchy)
         => _hierarchyMap.TryGetValue(lacv, out hierarchy);
 
     /// <summary>
-    /// Executes get Classification.
+    /// Gets the classification definition for the supplied classification LACV.
     /// </summary>
     public SecurityClassification? GetClassification(LacvValue lacv)
         => _classificationMap.GetValueOrDefault(lacv);
 
     /// <summary>
-    /// Executes get Classification Name.
+    /// Gets the classification name for the supplied classification LACV.
     /// </summary>
     public string? GetClassificationName(LacvValue lacv)
         => _classificationMap.TryGetValue(lacv, out var cls) ? cls.Name : null;
 
     /// <summary>
-    /// Executes get Tag Set.
+    /// Gets the indexed tag-set definition for the supplied tag-set OID.
     /// </summary>
     public ITagSetIndex? GetTagSet(string tagSetOid)
         => _tagSetMap.GetValueOrDefault(tagSetOid);
 
     /// <summary>
-    /// Executes get Equivalent Policy.
+    /// Gets an equivalent-policy mapping for the supplied target policy OID.
     /// </summary>
     public EquivalentPolicy? GetEquivalentPolicy(string targetPolicyOid)
         => _equivalentPolicies.GetValueOrDefault(targetPolicyOid);
 
     /// <summary>
-    /// Executes get Classifications By Hierarchy.
+    /// Gets all classification LACVs ordered by increasing hierarchy.
     /// </summary>
     public IReadOnlyList<LacvValue> GetClassificationsByHierarchy()
         => _classificationsByHierarchy;
 
     /// <summary>
-    /// Executes get Tag Set Oids.
+    /// Gets the registered tag-set OIDs contained in the indexed SPIF.
     /// </summary>
     public IReadOnlyList<string> GetTagSetOids()
         => _tagSetMap.Keys.ToImmutableList();
@@ -119,13 +128,20 @@ public sealed class TagSetIndex : ITagSetIndex
     private readonly ImmutableDictionary<(string tagName, LacvValue lacv), TagCategory> _categoryLookup;
     private readonly ImmutableDictionary<string, ImmutableHashSet<LacvValue>> _tagCategoryLacvs;
 
-    /// <summary>Gets the tag Set Oid.</summary>
+    /// <summary>
+    /// Gets the tag-set OID represented by this index.
+    /// </summary>
     public string TagSetOid { get; }
-    /// <summary>Gets the name.</summary>
+    /// <summary>
+    /// Gets the tag-set display name.
+    /// </summary>
     public string Name { get; }
-    /// <summary>Gets the tags.</summary>
+    /// <summary>
+    /// Gets the tag definitions contained in the indexed tag set.
+    /// </summary>
     public IReadOnlyList<SecurityCategoryTag> Tags { get; }
 
+    /// <summary>Initializes a new instance of the <see cref="TagSetIndex"/> class.</summary>
     public TagSetIndex(SecurityCategoryTagSet tagSet)
     {
         TagSetOid = tagSet.TagSetOid;
@@ -151,13 +167,13 @@ public sealed class TagSetIndex : ITagSetIndex
     }
 
     /// <summary>
-    /// Executes get Category.
+    /// Gets a category definition by tag name and category LACV.
     /// </summary>
     public TagCategory? GetCategory(string tagName, LacvValue lacv)
         => _categoryLookup.GetValueOrDefault((tagName, lacv));
 
     /// <summary>
-    /// Executes get Category Lacvs.
+    /// Gets all category LACVs defined for the supplied tag name.
     /// </summary>
     public ImmutableHashSet<LacvValue> GetCategoryLacvs(string tagName)
         => _tagCategoryLacvs.GetValueOrDefault(tagName, ImmutableHashSet<LacvValue>.Empty);

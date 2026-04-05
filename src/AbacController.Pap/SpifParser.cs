@@ -29,6 +29,7 @@ public sealed class SpifParser : ISpifParser
 
     private readonly IXmlSignatureVerifier _signatureVerifier;
 
+    /// <summary>Initializes a new instance of the <see cref="SpifParser"/> class.</summary>
     public SpifParser(IXmlSignatureVerifier? signatureVerifier = null)
     {
         _signatureVerifier = signatureVerifier ?? new RejectingXmlSignatureVerifier();

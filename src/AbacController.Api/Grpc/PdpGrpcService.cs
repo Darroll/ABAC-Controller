@@ -16,6 +16,7 @@ public sealed class PdpGrpcService : PdpApi.PdpApiBase
     private readonly IPdpEngine _pdpEngine;
     private readonly ApiMetrics _metrics;
 
+    /// <summary>Initializes a new instance of the <see cref="PdpGrpcService"/> class.</summary>
     public PdpGrpcService(IPdpEngine pdpEngine, ApiMetrics metrics)
     {
         _pdpEngine = pdpEngine;

@@ -4,8 +4,8 @@ using AbacController.Core.Interfaces;
 namespace AbacController.Pap;
 
 /// <summary>
-/// In-memory SPIF registry with immutable snapshots for lock-free reads.
-/// Registration and default selection updates are serialized.
+/// In-memory SPIF registry that publishes immutable snapshots for lock-free reads.
+/// Registration and default-selection updates are serialized through a private gate.
 /// </summary>
 public sealed class SpifRegistry : ISpifRegistry
 {

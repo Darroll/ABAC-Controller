@@ -12,6 +12,7 @@ public sealed class PipResolver : IPipResolver
     private readonly IEnumerable<IPipSource> _sources;
     private readonly IPipCacheManager _cache;
 
+    /// <summary>Initializes a new instance of the <see cref="PipResolver"/> class.</summary>
     public PipResolver(IEnumerable<IPipSource> sources, IPipCacheManager cache)
     {
         _sources = sources;

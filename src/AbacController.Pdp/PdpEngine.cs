@@ -23,6 +23,7 @@ public sealed class PdpEngine : IPdpEngine
     private readonly IAuditWriter _auditWriter;
     private readonly ITenantContext _tenantContext;
 
+    /// <summary>Initializes a new instance of the <see cref="PdpEngine"/> class.</summary>
     public PdpEngine(
         IAcdfEvaluator acdf,
         ISpifRegistry spifRegistry,
@@ -502,6 +503,7 @@ public sealed class PdpEngine : IPdpEngine
         /// <summary>Gets the Instance field.</summary>
         public static readonly NullTenantContext Instance = new();
 
+        /// <summary>Gets the tenant identifier.</summary>
         public string? TenantId => null;
     }
 }

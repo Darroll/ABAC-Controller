@@ -19,12 +19,24 @@ public sealed class OidcPipSource : IPipSource
     private readonly Dictionary<string, string> _claimMapping;
     private readonly TimeSpan _cacheTtl;
 
+    /// <summary>
+    /// Gets the source type identifier exposed through health and provenance metadata.
+    /// </summary>
     public string SourceType => "oidc";
-    /// <summary>Gets the source Id.</summary>
+
+    /// <summary>
+    /// Gets the logical source identifier.
+    /// </summary>
     public string SourceId { get; }
-    /// <summary>Gets the provides Attributes.</summary>
+
+    /// <summary>
+    /// Gets the attribute names that can be mapped from the configured claims.
+    /// </summary>
     public IReadOnlySet<string> ProvidesAttributes { get; }
-    /// <summary>Gets the priority.</summary>
+
+    /// <summary>
+    /// Gets the source priority used by the PIP resolver.
+    /// </summary>
     public int Priority { get; }
 
     /// <param name="sourceId">Source instance ID.</param>
@@ -51,7 +63,7 @@ public sealed class OidcPipSource : IPipSource
     }
 
     /// <summary>
-    /// Executes resolve Async.
+    /// Resolves subject attributes from the configured OIDC UserInfo endpoint.
     /// </summary>
     public async Task<AttributeResolutionResult> ResolveAsync(
         AttributeResolutionRequest request, CancellationToken ct = default)
@@ -115,7 +127,7 @@ public sealed class OidcPipSource : IPipSource
     }
 
     /// <summary>
-    /// Executes test Connectivity Async.
+    /// Checks whether the configured OIDC endpoint is reachable.
     /// </summary>
     public async Task<SourceHealthResult> TestConnectivityAsync(CancellationToken ct = default)
     {

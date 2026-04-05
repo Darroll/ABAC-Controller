@@ -12,6 +12,7 @@ public sealed class PipHealthMonitor
     private readonly IEnumerable<IPipSource> _sources;
     private readonly ConcurrentDictionary<string, PipSourceStatus> _statuses = new(StringComparer.Ordinal);
 
+    /// <summary>Initializes a new instance of the <see cref="PipHealthMonitor"/> class.</summary>
     public PipHealthMonitor(IEnumerable<IPipSource> sources)
     {
         _sources = sources;

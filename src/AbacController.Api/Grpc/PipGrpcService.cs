@@ -16,6 +16,7 @@ public sealed class PipGrpcService : PipApi.PipApiBase
     private readonly AbacDbContext _dbContext;
     private readonly IPipResolver _pipResolver;
 
+    /// <summary>Initializes a new instance of the <see cref="PipGrpcService"/> class.</summary>
     public PipGrpcService(AbacDbContext dbContext, IPipResolver pipResolver)
     {
         _dbContext = dbContext;

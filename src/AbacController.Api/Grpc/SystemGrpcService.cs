@@ -18,6 +18,7 @@ public sealed class SystemGrpcService : SystemApi.SystemApiBase
     private readonly ISpifRegistry _spifRegistry;
     private readonly IAuditReader _auditReader;
 
+    /// <summary>Initializes a new instance of the <see cref="SystemGrpcService"/> class.</summary>
     public SystemGrpcService(
         AppRuntimeState runtimeState,
         ILabelCodecRegistry labelCodecRegistry,

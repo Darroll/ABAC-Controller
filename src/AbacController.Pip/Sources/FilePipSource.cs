@@ -22,9 +22,19 @@ public sealed class FilePipSource : IPipSource
     private DateTime _lastModified;
     private HashSet<string> _providesAttributes = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// Gets the source type identifier exposed through health and provenance metadata.
+    /// </summary>
     public string SourceType => "file";
-    /// <summary>Gets the source Id.</summary>
+
+    /// <summary>
+    /// Gets the logical source identifier.
+    /// </summary>
     public string SourceId { get; }
+
+    /// <summary>
+    /// Gets the subject attribute names currently available from the loaded file snapshot.
+    /// </summary>
     public IReadOnlySet<string> ProvidesAttributes
     {
         get
@@ -33,9 +43,15 @@ public sealed class FilePipSource : IPipSource
             lock (_lock) return _providesAttributes;
         }
     }
-    /// <summary>Gets the priority.</summary>
+    /// <summary>
+    /// Gets the source priority used by the PIP resolver.
+    /// </summary>
     public int Priority { get; }
 
+    /// <summary>
+    /// Initializes a file-backed PIP source that loads subject attributes from JSON or CSV.
+    /// </summary>
+    /// <summary>Initializes a new instance of the <see cref="FilePipSource"/> class.</summary>
     public FilePipSource(string sourceId, int priority, string filePath, TimeSpan? cacheTtl = null)
     {
         SourceId = sourceId;
@@ -45,7 +61,7 @@ public sealed class FilePipSource : IPipSource
     }
 
     /// <summary>
-    /// Executes resolve Async.
+    /// Resolves the requested subject attributes from the current file snapshot.
     /// </summary>
     public Task<AttributeResolutionResult> ResolveAsync(
         AttributeResolutionRequest request, CancellationToken ct = default)
@@ -81,7 +97,7 @@ public sealed class FilePipSource : IPipSource
     }
 
     /// <summary>
-    /// Executes test Connectivity Async.
+    /// Checks whether the configured backing file is reachable.
     /// </summary>
     public Task<SourceHealthResult> TestConnectivityAsync(CancellationToken ct = default)
     {

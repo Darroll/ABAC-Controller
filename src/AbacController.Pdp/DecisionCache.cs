@@ -16,6 +16,9 @@ public sealed class DecisionCache : IDecisionCache
     private readonly IMemoryCache _cache;
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _policyKeys = new();
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DecisionCache"/> class.
+    /// </summary>
     public DecisionCache(IMemoryCache cache)
     {
         _cache = cache;

@@ -13,7 +13,7 @@ namespace AbacController.Pdp;
 internal static class NativePolicyEvaluator
 {
     /// <summary>
-    /// Executes compute Version Fingerprint.
+    /// Computes a stable fingerprint for the active policy versions participating in evaluation.
     /// </summary>
     public static string ComputeVersionFingerprint(
         IReadOnlyList<PolicySet> policySets,
@@ -39,7 +39,7 @@ internal static class NativePolicyEvaluator
     }
 
     /// <summary>
-    /// Executes collect Required Subject Attributes.
+    /// Collects subject attribute paths referenced by active policy conditions.
     /// </summary>
     public static IReadOnlySet<string> CollectRequiredSubjectAttributes(
         IReadOnlyList<PolicySet> policySets,
@@ -73,7 +73,7 @@ internal static class NativePolicyEvaluator
     }
 
     /// <summary>
-    /// Executes evaluate.
+    /// Evaluates the active policy sets against the supplied request.
     /// </summary>
     public static PolicyEvaluationOutcome Evaluate(
         EvaluationRequest request,

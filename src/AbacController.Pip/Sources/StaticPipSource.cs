@@ -11,14 +11,29 @@ public sealed class StaticPipSource : IPipSource
 {
     private readonly Dictionary<string, Dictionary<string, object>> _staticValues;
 
+    /// <summary>
+    /// Gets the source type identifier exposed through health and provenance metadata.
+    /// </summary>
     public string SourceType => "static";
-    /// <summary>Gets the source Id.</summary>
+
+    /// <summary>
+    /// Gets the logical source identifier.
+    /// </summary>
     public string SourceId { get; }
-    /// <summary>Gets the provides Attributes.</summary>
+
+    /// <summary>
+    /// Gets the attribute names available in the configured static dataset.
+    /// </summary>
     public IReadOnlySet<string> ProvidesAttributes { get; }
-    /// <summary>Gets the priority.</summary>
+
+    /// <summary>
+    /// Gets the source priority used by the PIP resolver.
+    /// </summary>
     public int Priority { get; }
 
+    /// <summary>
+    /// Initializes a static in-memory PIP source for tests and local development.
+    /// </summary>
     public StaticPipSource(
         string sourceId,
         int priority,
@@ -33,7 +48,7 @@ public sealed class StaticPipSource : IPipSource
     }
 
     /// <summary>
-    /// Executes resolve Async.
+    /// Resolves attributes from the configured in-memory subject map.
     /// </summary>
     public Task<AttributeResolutionResult> ResolveAsync(
         AttributeResolutionRequest request, CancellationToken ct = default)
@@ -64,7 +79,7 @@ public sealed class StaticPipSource : IPipSource
     }
 
     /// <summary>
-    /// Executes test Connectivity Async.
+    /// Reports a healthy result because static sources do not require external connectivity.
     /// </summary>
     public Task<SourceHealthResult> TestConnectivityAsync(CancellationToken ct = default)
         => Task.FromResult(new SourceHealthResult

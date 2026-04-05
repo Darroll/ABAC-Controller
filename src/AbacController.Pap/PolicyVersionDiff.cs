@@ -7,7 +7,7 @@ namespace AbacController.Pap;
 public static class PolicyVersionDiff
 {
     /// <summary>
-    /// Executes compare.
+    /// Compares two policy documents and returns a line-oriented diff.
     /// </summary>
     public static PolicyDiffResult Compare(string oldContent, string newContent)
     {
@@ -117,31 +117,47 @@ public static class PolicyVersionDiff
 }
 
 /// <summary>
-/// A PolicyDiffResult record.
+/// Represents the result of comparing two policy document versions.
 /// </summary>
 public sealed record PolicyDiffResult
 {
-    /// <summary>Gets or sets the old Line Count.</summary>
+    /// <summary>
+    /// Gets the number of lines in the original policy content.
+    /// </summary>
     public required int OldLineCount { get; init; }
-    /// <summary>Gets or sets the new Line Count.</summary>
+    /// <summary>
+    /// Gets the number of lines in the updated policy content.
+    /// </summary>
     public required int NewLineCount { get; init; }
-    /// <summary>Gets or sets the has Changes.</summary>
+    /// <summary>
+    /// Gets a value indicating whether any insert or delete operations were detected.
+    /// </summary>
     public required bool HasChanges { get; init; }
-    /// <summary>Gets or sets the operations.</summary>
+    /// <summary>
+    /// Gets the ordered list of diff operations.
+    /// </summary>
     public required List<PolicyDiffOperation> Operations { get; init; }
 }
 
 /// <summary>
-/// A PolicyDiffOperation record.
+/// Represents a single insert, delete, or equal operation in a policy diff.
 /// </summary>
 public sealed record PolicyDiffOperation
 {
-    /// <summary>Gets or sets the operation.</summary>
+    /// <summary>
+    /// Gets the diff operation kind: equal, insert, or delete.
+    /// </summary>
     public required string Operation { get; init; }
-    /// <summary>Gets or sets the old Line Number.</summary>
+    /// <summary>
+    /// Gets the one-based source line number, when the operation references the original content.
+    /// </summary>
     public int? OldLineNumber { get; init; }
-    /// <summary>Gets or sets the new Line Number.</summary>
+    /// <summary>
+    /// Gets the one-based target line number, when the operation references the updated content.
+    /// </summary>
     public int? NewLineNumber { get; init; }
-    /// <summary>Gets or sets the content.</summary>
+    /// <summary>
+    /// Gets the line content associated with the diff operation.
+    /// </summary>
     public required string Content { get; init; }
 }

@@ -11,6 +11,7 @@ public sealed class CorrelationIdMiddleware
     private const string HeaderName = "X-Correlation-Id";
     private readonly RequestDelegate _next;
 
+    /// <summary>Initializes a new instance of the <see cref="CorrelationIdMiddleware"/> class.</summary>
     public CorrelationIdMiddleware(RequestDelegate next)
     {
         _next = next;

@@ -11,7 +11,7 @@ namespace AbacController.Pdp;
 public static class XacmlJsonMapper
 {
     /// <summary>
-    /// Map a XACML JSON request to an internal EvaluationRequest.
+    /// Maps a XACML JSON request document to an internal <see cref="EvaluationRequest"/>.
     /// XACML JSON format:
     /// {
     ///   "Request": {
@@ -62,7 +62,7 @@ public static class XacmlJsonMapper
     }
 
     /// <summary>
-    /// Map an internal EvaluationResult to XACML JSON response format.
+    /// Maps an internal <see cref="EvaluationResult"/> to XACML JSON response format.
     /// </summary>
     public static object MapToXacmlJsonResponse(EvaluationResult result)
     {
@@ -78,7 +78,7 @@ public static class XacmlJsonMapper
     }
 
     /// <summary>
-    /// Map a batch result to XACML JSON response format.
+    /// Maps a batch evaluation result to XACML JSON response format.
     /// </summary>
     public static object MapToXacmlJsonBatchResponse(BatchEvaluationResult batchResult)
     {
