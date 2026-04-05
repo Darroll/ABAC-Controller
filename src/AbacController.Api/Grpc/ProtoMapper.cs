@@ -15,9 +15,7 @@ namespace AbacController.Api.Grpc;
 /// </summary>
 internal static class ProtoMapper
 {
-    /// <summary>
-    /// Executes to Domain.
-    /// </summary>
+    /// <summary>Converts a protobuf evaluation request into the domain evaluation model.</summary>
     public static EvaluationRequest ToDomain(EvaluateRequestMessage request)
         => new()
         {
@@ -29,9 +27,7 @@ internal static class ProtoMapper
             Options = ToDomain(request.Options)
         };
 
-    /// <summary>
-    /// Executes to Domain.
-    /// </summary>
+    /// <summary>Converts a protobuf batch evaluation request into the domain batch model.</summary>
     public static BatchEvaluationRequest ToDomain(EvaluateBatchRequestMessage request)
         => new()
         {
@@ -47,9 +43,7 @@ internal static class ProtoMapper
             }).ToList()
         };
 
-    /// <summary>
-    /// Executes to Proto.
-    /// </summary>
+    /// <summary>Converts a domain evaluation result into its protobuf response representation.</summary>
     public static EvaluateResponseMessage ToProto(EvaluationResult result)
     {
         var response = new EvaluateResponseMessage
@@ -94,9 +88,7 @@ internal static class ProtoMapper
         return response;
     }
 
-    /// <summary>
-    /// Executes to Proto.
-    /// </summary>
+    /// <summary>Converts a domain batch evaluation result into its protobuf response representation.</summary>
     public static EvaluateBatchResponseMessage ToProto(BatchEvaluationResult result)
     {
         var response = new EvaluateBatchResponseMessage
@@ -108,9 +100,7 @@ internal static class ProtoMapper
         return response;
     }
 
-    /// <summary>
-    /// Executes to Proto.
-    /// </summary>
+    /// <summary>Converts an explained evaluation result into its protobuf response representation.</summary>
     public static ExplainedEvaluateResponseMessage ToProto(ExplainedEvaluationResult result)
     {
         var response = new ExplainedEvaluateResponseMessage
@@ -135,9 +125,7 @@ internal static class ProtoMapper
         return response;
     }
 
-    /// <summary>
-    /// Executes to Proto.
-    /// </summary>
+    /// <summary>Converts a domain policy set into a protobuf summary message.</summary>
     public static PolicySetSummaryMessage ToProto(PolicySet policySet)
         => new()
         {
@@ -152,9 +140,7 @@ internal static class ProtoMapper
             PolicyCount = policySet.Policies.Count
         };
 
-    /// <summary>
-    /// Executes to Proto.
-    /// </summary>
+    /// <summary>Converts a domain policy version into a protobuf summary message.</summary>
     public static PolicyVersionSummaryMessage ToProto(PolicyVersion version)
         => new()
         {
@@ -168,9 +154,7 @@ internal static class ProtoMapper
             Content = version.Content
         };
 
-    /// <summary>
-    /// Executes to Domain.
-    /// </summary>
+    /// <summary>Converts a protobuf policy-set summary into the domain policy-set model.</summary>
     public static PolicySet ToDomain(PolicySetSummaryMessage message)
         => new()
         {
@@ -187,9 +171,7 @@ internal static class ProtoMapper
             Policies = []
         };
 
-    /// <summary>
-    /// Executes to Proto.
-    /// </summary>
+    /// <summary>Converts a persisted PIP source entity into its protobuf message representation.</summary>
     public static PipSourceMessage ToProto(AbacController.Data.Entities.PipSourceEntity source)
     {
         var message = new PipSourceMessage
@@ -210,9 +192,7 @@ internal static class ProtoMapper
         return message;
     }
 
-    /// <summary>
-    /// Executes to Entity.
-    /// </summary>
+    /// <summary>Converts a protobuf PIP source message into a persisted entity.</summary>
     public static AbacController.Data.Entities.PipSourceEntity ToEntity(PipSourceMessage source)
         => new()
         {
@@ -230,9 +210,7 @@ internal static class ProtoMapper
             UpdatedAt = source.UpdatedAt?.ToDateTimeOffset() ?? DateTimeOffset.UtcNow
         };
 
-    /// <summary>
-    /// Executes to Proto.
-    /// </summary>
+    /// <summary>Converts a persisted enforcement-point entity into its protobuf message representation.</summary>
     public static EnforcementPointMessage ToProto(AbacController.Data.Entities.EnforcementPointEntity entity)
     {
         var message = new EnforcementPointMessage
@@ -250,9 +228,7 @@ internal static class ProtoMapper
         return message;
     }
 
-    /// <summary>
-    /// Executes to Entity.
-    /// </summary>
+    /// <summary>Converts a protobuf enforcement-point message into a persisted entity.</summary>
     public static AbacController.Data.Entities.EnforcementPointEntity ToEntity(EnforcementPointMessage message)
         => new()
         {
@@ -267,9 +243,7 @@ internal static class ProtoMapper
             UpdatedAt = message.UpdatedAt?.ToDateTimeOffset() ?? DateTimeOffset.UtcNow
         };
 
-    /// <summary>
-    /// Executes to Proto.
-    /// </summary>
+    /// <summary>Converts a persisted SPIF entity into a protobuf registration message.</summary>
     public static SpifRegistrationMessage ToProto(AbacController.Data.Entities.SpifEntity entity)
         => new()
         {
@@ -282,9 +256,7 @@ internal static class ProtoMapper
             CategoryCount = entity.CategoryCount
         };
 
-    /// <summary>
-    /// Executes to Proto.
-    /// </summary>
+    /// <summary>Converts a domain audit event into its protobuf message representation.</summary>
     public static AuditEventMessage ToProto(AbacController.Core.Domain.Audit.AuditEvent auditEvent)
         => new()
         {
@@ -308,9 +280,7 @@ internal static class ProtoMapper
             DetailJson = auditEvent.DetailJson ?? string.Empty
         };
 
-    /// <summary>
-    /// Executes to Proto.
-    /// </summary>
+    /// <summary>Converts an attribute-resolution result into its protobuf response representation.</summary>
     public static ResolveAttributesResponseMessage ToProto(AttributeResolutionResult result)
     {
         var response = new ResolveAttributesResponseMessage
@@ -331,9 +301,7 @@ internal static class ProtoMapper
         return response;
     }
 
-    /// <summary>
-    /// Executes to Domain.
-    /// </summary>
+    /// <summary>Converts a protobuf security label into the domain label model.</summary>
     public static SecurityLabel ToDomain(SecurityLabelMessage message)
         => new()
         {
@@ -346,9 +314,7 @@ internal static class ProtoMapper
             CategoryTagSets = message.CategoryTagSets.Select(ToDomain).ToImmutableList()
         };
 
-    /// <summary>
-    /// Executes to Domain.
-    /// </summary>
+    /// <summary>Converts a protobuf security clearance into the domain clearance model.</summary>
     public static SecurityClearance ToDomain(SecurityClearanceMessage message)
         => new()
         {
@@ -357,9 +323,7 @@ internal static class ProtoMapper
             CategoryTagSets = message.CategoryTagSets.Select(ToDomain).ToImmutableList()
         };
 
-    /// <summary>
-    /// Executes to Proto.
-    /// </summary>
+    /// <summary>Converts a domain security label into its protobuf message representation.</summary>
     public static SecurityLabelMessage ToProto(SecurityLabel label)
     {
         var message = new SecurityLabelMessage
@@ -512,9 +476,7 @@ internal static class ProtoMapper
         return message;
     }
 
-    /// <summary>
-    /// Executes to Struct.
-    /// </summary>
+    /// <summary>Converts a dictionary of values into a protobuf <see cref="Struct"/>.</summary>
     public static Struct ToStruct(IDictionary<string, object?> values)
     {
         var result = new Struct();
@@ -525,9 +487,7 @@ internal static class ProtoMapper
         return result;
     }
 
-    /// <summary>
-    /// Executes to Dictionary.
-    /// </summary>
+    /// <summary>Converts a protobuf <see cref="Struct"/> into a dictionary of CLR values.</summary>
     public static Dictionary<string, object?> ToDictionary(Struct? structValue)
     {
         var result = new Dictionary<string, object?>(StringComparer.Ordinal);
@@ -544,15 +504,11 @@ internal static class ProtoMapper
         return result;
     }
 
-    /// <summary>
-    /// Executes to Struct.
-    /// </summary>
+    /// <summary>Converts a JSON document into a protobuf <see cref="Struct"/>.</summary>
     public static Struct ToStruct(JsonDocument? document)
         => document is null ? new Struct() : Struct.Parser.ParseJson(document.RootElement.GetRawText());
 
-    /// <summary>
-    /// Executes to Value.
-    /// </summary>
+    /// <summary>Converts a CLR value into a protobuf <see cref="Value"/>.</summary>
     public static Value ToValue(object? value)
         => value switch
         {
