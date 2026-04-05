@@ -214,7 +214,7 @@ else
     {
         try
         {
-            var query = $"api/v1/system/audit?page={_currentPage}&pageSize={PageSize}";
+            var query = $"system/api/audit?page={_currentPage}&pageSize={PageSize}";
             if (!string.IsNullOrWhiteSpace(_filterEventType))
                 query += $"&eventType={Uri.EscapeDataString(_filterEventType)}";
             if (_filterFrom.HasValue)

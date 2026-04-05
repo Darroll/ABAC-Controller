@@ -363,11 +363,11 @@
     {
         try
         {
-            var spifsTask = Http.GetFromJsonAsync<List<SpifRow>>("api/v1/pap/spifs");
-            var policySetsTask = Http.GetFromJsonAsync<List<object>>("api/v1/pap/policy-sets");
-            var pipSourcesTask = Http.GetFromJsonAsync<List<object>>("api/v1/pip/sources");
-            var statusTask = Http.GetFromJsonAsync<StatusRow>("api/v1/system/status");
-            var pepTask = Http.GetFromJsonAsync<List<object>>("api/v1/system/enforcement-points");
+            var spifsTask = Http.GetFromJsonAsync<List<SpifRow>>("pap/api/spifs");
+            var policySetsTask = Http.GetFromJsonAsync<List<object>>("pap/api/policy-sets");
+            var pipSourcesTask = Http.GetFromJsonAsync<List<object>>("pip/api/sources");
+            var statusTask = Http.GetFromJsonAsync<StatusRow>("system/api/info");
+            var pepTask = Http.GetFromJsonAsync<List<object>>("system/api/enforcement-points");
 
             await Task.WhenAll(
                 spifsTask.ContinueWith(_ => { }),
@@ -485,7 +485,7 @@
     {
         try
         {
-            var health = await Http.GetFromJsonAsync<PipHealthResult>("api/v1/pip/health/cached");
+            var health = await Http.GetFromJsonAsync<PipHealthResult>("pip/api/health/cached");
             if (health is not null)
             {
                 _pipAllHealthy = health.AllHealthy;

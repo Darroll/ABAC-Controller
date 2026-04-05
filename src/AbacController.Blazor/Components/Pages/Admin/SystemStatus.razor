@@ -169,8 +169,8 @@ else if (_status is not null)
     {
         try
         {
-            var statusTask = Http.GetFromJsonAsync<SystemStatusRow>("api/v1/system/status");
-            var epTask = Http.GetFromJsonAsync<List<EnforcementPointRow>>("api/v1/system/enforcement-points");
+            var statusTask = Http.GetFromJsonAsync<SystemStatusRow>("system/api/info");
+            var epTask = Http.GetFromJsonAsync<List<EnforcementPointRow>>("system/api/enforcement-points");
             await Task.WhenAll(statusTask, epTask);
             _status = statusTask.Result;
             _enforcementPoints = epTask.Result;

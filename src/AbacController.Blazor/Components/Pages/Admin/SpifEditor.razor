@@ -605,15 +605,15 @@ else
         _loadingExisting = true;
         try
         {
-            var spifs = await Http.GetFromJsonAsync<List<SpifSummary>>("api/v1/pap/spifs");
+            var spifs = await Http.GetFromJsonAsync<List<SpifSummary>>("pap/api/spifs");
             var spif = spifs?.FirstOrDefault(s => s.Id == SpifId);
             if (spif is not null)
             {
-                var detail = await Http.GetFromJsonAsync<SpifDetail>($"api/v1/pap/spifs/{SpifId}");
-                if (detail is not null && !string.IsNullOrWhiteSpace(detail.RawXml))
+                var rawXml = await Http.GetStringAsync($"pap/api/spifs/{SpifId}/export");
+                if (!string.IsNullOrWhiteSpace(rawXml))
                 {
-                    _rawXml = detail.RawXml;
-                    PopulateFormFromXml(detail.RawXml);
+                    _rawXml = rawXml;
+                    PopulateFormFromXml(rawXml);
                 }
             }
         }
@@ -927,7 +927,7 @@ else
         {
             var xml = GetFullXml();
             var request = new { Xml = xml, Activate = true };
-            var response = await Http.PostAsJsonAsync("api/v1/pap/spifs/import", request);
+            var response = await Http.PostAsJsonAsync("pap/api/spifs/import", request);
             if (response.IsSuccessStatusCode)
             {
                 _successMessage = IsEditMode ? "SPIF updated successfully." : "SPIF imported successfully.";
@@ -957,7 +957,7 @@ else
         try
         {
             var request = new { Xml = _rawXml, Activate = true };
-            var response = await Http.PostAsJsonAsync("api/v1/pap/spifs/import", request);
+            var response = await Http.PostAsJsonAsync("pap/api/spifs/import", request);
             if (response.IsSuccessStatusCode)
             {
                 _successMessage = "SPIF imported successfully.";

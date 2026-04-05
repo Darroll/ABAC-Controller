@@ -155,6 +155,7 @@ AbacController/
 - `docs/runtime-baseline.md` — current runtime truth source
 - `docs/standards-gaps.md` — standards coverage and explicit limits
 - `docs/emailclassification-migration-guide.md` — migration notes from the EmailClassification baseline
+- `docs/smoke-test-validation.md` — exact container-based smoke steps and observed v1 validation results
 
 ## Quick start
 

@@ -8,9 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AbacController.Tests.Unit;
 
 /// <summary>
-/// Tests for AuditRepository — GetById and data mapping.
-/// Query/sorting tests are covered by integration tests (SQLite doesn't support
-/// DateTimeOffset in ORDER BY without production configuration).
+/// Tests for AuditRepository — GetById, data mapping, and SQLite-safe query ordering.
 /// </summary>
 public sealed class AuditRepositoryTests : IDisposable
 {
@@ -125,5 +123,42 @@ public sealed class AuditRepositoryTests : IDisposable
         Assert.Equal("system", result.EventType);
         Assert.Null(result.SubjectId);
         Assert.Null(result.Decision);
+    }
+
+    [Fact]
+    public async Task QueryAsync_WithSqlite_ReturnsEventsOrderedByTimestampDescending()
+    {
+        _db.AuditEvents.AddRange(
+            new AuditEventEntity { Id = Guid.NewGuid(), Timestamp = new DateTimeOffset(2026, 1, 1, 0, 0, 1, TimeSpan.Zero), EventType = "evaluation", SubjectId = "alice" },
+            new AuditEventEntity { Id = Guid.NewGuid(), Timestamp = new DateTimeOffset(2026, 1, 1, 0, 0, 3, TimeSpan.Zero), EventType = "evaluation", SubjectId = "bob" },
+            new AuditEventEntity { Id = Guid.NewGuid(), Timestamp = new DateTimeOffset(2026, 1, 1, 0, 0, 2, TimeSpan.Zero), EventType = "evaluation", SubjectId = "carol" });
+        await _db.SaveChangesAsync();
+
+        var result = await _repo.QueryAsync(new AuditQuery { Page = 1, PageSize = 10 });
+
+        Assert.Equal(3, result.TotalCount);
+        Assert.Collection(
+            result.Events,
+            evt => Assert.Equal("bob", evt.SubjectId),
+            evt => Assert.Equal("carol", evt.SubjectId),
+            evt => Assert.Equal("alice", evt.SubjectId));
+    }
+
+    [Fact]
+    public async Task GetByDecisionIdAsync_WithSqlite_ReturnsEventsOrderedByTimestampDescending()
+    {
+        const string decisionId = "decision-1";
+        _db.AuditEvents.AddRange(
+            new AuditEventEntity { Id = Guid.NewGuid(), Timestamp = new DateTimeOffset(2026, 1, 1, 0, 0, 1, TimeSpan.Zero), EventType = "evaluation", DecisionId = decisionId, SubjectId = "alice" },
+            new AuditEventEntity { Id = Guid.NewGuid(), Timestamp = new DateTimeOffset(2026, 1, 1, 0, 0, 3, TimeSpan.Zero), EventType = "evaluation", DecisionId = decisionId, SubjectId = "bob" },
+            new AuditEventEntity { Id = Guid.NewGuid(), Timestamp = new DateTimeOffset(2026, 1, 1, 0, 0, 2, TimeSpan.Zero), EventType = "evaluation", DecisionId = "decision-2", SubjectId = "other" });
+        await _db.SaveChangesAsync();
+
+        var result = await _repo.GetByDecisionIdAsync(decisionId);
+
+        Assert.Collection(
+            result,
+            evt => Assert.Equal("bob", evt.SubjectId),
+            evt => Assert.Equal("alice", evt.SubjectId));
     }
 }

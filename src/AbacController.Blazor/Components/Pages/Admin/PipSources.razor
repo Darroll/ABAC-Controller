@@ -234,7 +234,7 @@ else
     {
         try
         {
-            _sources = await Http.GetFromJsonAsync<List<PipSourceRow>>("api/v1/pip/sources");
+            _sources = await Http.GetFromJsonAsync<List<PipSourceRow>>("pip/api/sources");
         }
         catch (Exception ex)
         {
@@ -304,7 +304,7 @@ else
                 _form.CacheMaxEntries
             };
 
-            var response = await Http.PutAsJsonAsync($"api/v1/pip/sources/{_form.Id}", payload);
+            var response = await Http.PutAsJsonAsync($"pip/api/sources/{_form.Id}", payload);
             if (response.IsSuccessStatusCode)
             {
                 _showForm = false;
@@ -332,7 +332,7 @@ else
         _deleting = true;
         try
         {
-            await Http.DeleteAsync($"api/v1/pip/sources/{id}");
+            await Http.DeleteAsync($"pip/api/sources/{id}");
             await LoadSources();
         }
         catch (Exception ex)
@@ -350,7 +350,7 @@ else
         _testing = true;
         try
         {
-            var response = await Http.PostAsync($"api/v1/pip/sources/{id}/test", null);
+            var response = await Http.PostAsync($"pip/api/sources/{id}/test", null);
             var body = await response.Content.ReadAsStringAsync();
             _testResults[id] = response.IsSuccessStatusCode
                 ? $"✓ Test completed: {body}"

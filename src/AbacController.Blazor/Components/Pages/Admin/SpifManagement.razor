@@ -163,7 +163,7 @@ else
     {
         try
         {
-            _spifs = await Http.GetFromJsonAsync<List<SpifRow>>("api/v1/pap/spifs");
+            _spifs = await Http.GetFromJsonAsync<List<SpifRow>>("pap/api/spifs");
         }
         catch (Exception ex)
         {
@@ -198,7 +198,7 @@ else
             var xml = await reader.ReadToEndAsync();
 
             var request = new { Xml = xml, Activate = true, SetAsDefault = _setAsDefault };
-            var response = await Http.PostAsJsonAsync("api/v1/pap/spifs/import", request);
+            var response = await Http.PostAsJsonAsync("pap/api/spifs/import", request);
             if (response.IsSuccessStatusCode)
             {
                 _uploadSuccess = "SPIF imported successfully.";
@@ -226,7 +226,7 @@ else
         _deleting = true;
         try
         {
-            await Http.DeleteAsync($"api/v1/pap/spifs/{id}");
+            await Http.DeleteAsync($"pap/api/spifs/{id}");
             await LoadSpifs();
         }
         catch (Exception ex)

@@ -36,11 +36,24 @@ public sealed class AuditRepository : IAuditReader
             q = q.Where(e => e.Decision == query.Decision);
 
         var totalCount = await q.CountAsync(ct);
-        var events = await q
-            .OrderByDescending(e => e.Timestamp)
-            .Skip((query.Page - 1) * query.PageSize)
-            .Take(query.PageSize)
-            .ToListAsync(ct);
+
+        List<AuditEventEntity> events;
+        if (_db.Database.IsSqlite())
+        {
+            events = (await q.ToListAsync(ct))
+                .OrderByDescending(static e => e.Timestamp)
+                .Skip((query.Page - 1) * query.PageSize)
+                .Take(query.PageSize)
+                .ToList();
+        }
+        else
+        {
+            events = await q
+                .OrderByDescending(e => e.Timestamp)
+                .Skip((query.Page - 1) * query.PageSize)
+                .Take(query.PageSize)
+                .ToListAsync(ct);
+        }
 
         return new AuditQueryResult
         {
@@ -67,11 +80,24 @@ public sealed class AuditRepository : IAuditReader
     /// </summary>
     public async Task<List<AuditEvent>> GetByDecisionIdAsync(string decisionId, CancellationToken ct = default)
     {
-        var entities = await _db.AuditEvents
+        var query = _db.AuditEvents
             .AsNoTracking()
-            .Where(e => e.DecisionId == decisionId)
-            .OrderByDescending(e => e.Timestamp)
-            .ToListAsync(ct);
+            .Where(e => e.DecisionId == decisionId);
+
+        List<AuditEventEntity> entities;
+        if (_db.Database.IsSqlite())
+        {
+            entities = (await query.ToListAsync(ct))
+                .OrderByDescending(static e => e.Timestamp)
+                .ToList();
+        }
+        else
+        {
+            entities = await query
+                .OrderByDescending(e => e.Timestamp)
+                .ToListAsync(ct);
+        }
+
         return entities.Select(MapToDomain).ToList();
     }
 

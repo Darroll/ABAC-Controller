@@ -266,7 +266,7 @@ else
     {
         try
         {
-            _policySets = await Http.GetFromJsonAsync<List<PolicySetRow>>("api/v1/pap/policy-sets");
+            _policySets = await Http.GetFromJsonAsync<List<PolicySetRow>>("pap/api/policy-sets");
         }
         catch (Exception ex)
         {
@@ -322,7 +322,7 @@ else
                 isActive = _psIsActive
             };
 
-            var response = await Http.PutAsJsonAsync($"api/v1/pap/policy-sets/{_psId}", body);
+            var response = await Http.PutAsJsonAsync($"pap/api/policy-sets/{_psId}", body);
             if (!response.IsSuccessStatusCode)
             {
                 _psError = $"Save failed: {await response.Content.ReadAsStringAsync()}";
@@ -346,7 +346,7 @@ else
     {
         try
         {
-            await Http.DeleteAsync($"api/v1/pap/policy-sets/{id}");
+            await Http.DeleteAsync($"pap/api/policy-sets/{id}");
             await LoadPolicySetsAsync();
         }
         catch (Exception ex)
@@ -389,7 +389,7 @@ else
                 format = _policyFormat
             };
 
-            var policyResponse = await Http.PutAsJsonAsync($"api/v1/pap/policies/{_policyId}", policyBody);
+            var policyResponse = await Http.PutAsJsonAsync($"pap/api/policies/{_policyId}", policyBody);
             if (!policyResponse.IsSuccessStatusCode)
             {
                 _policyError = $"Policy creation failed: {await policyResponse.Content.ReadAsStringAsync()}";
@@ -400,7 +400,7 @@ else
             if (!string.IsNullOrWhiteSpace(_policyContent))
             {
                 var versionBody = new { content = _policyContent, activate = true };
-                var versionResponse = await Http.PostAsJsonAsync($"api/v1/pap/policies/{_policyId}/versions", versionBody);
+                var versionResponse = await Http.PostAsJsonAsync($"pap/api/policies/{_policyId}/versions", versionBody);
                 if (!versionResponse.IsSuccessStatusCode)
                 {
                     _policyError = $"Version creation failed: {await versionResponse.Content.ReadAsStringAsync()}";
@@ -425,7 +425,7 @@ else
     {
         try
         {
-            await Http.DeleteAsync($"api/v1/pap/policies/{id}");
+            await Http.DeleteAsync($"pap/api/policies/{id}");
             await LoadPolicySetsAsync();
         }
         catch (Exception ex)
