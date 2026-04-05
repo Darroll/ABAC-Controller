@@ -16,9 +16,7 @@ public sealed class CorrelationIdMiddleware
         _next = next;
     }
 
-    /// <summary>
-    /// Executes invoke Async.
-    /// </summary>
+    /// <summary>Assigns or propagates a correlation identifier for the current request.</summary>
     public async Task InvokeAsync(HttpContext context)
     {
         var correlationId = context.Request.Headers.TryGetValue(HeaderName, out var existing)

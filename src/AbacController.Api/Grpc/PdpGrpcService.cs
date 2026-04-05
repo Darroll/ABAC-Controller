@@ -8,12 +8,9 @@ namespace AbacController.Api.Grpc;
 
 [Authorize(Policy = "Evaluate")]
 /// <summary>
-/// gRPC service implementation for the Pdp API.
+/// Implements the PDP gRPC surface for single, batch, and explained evaluations.
 /// </summary>
 [EnableRateLimiting("pdp")]
-/// <summary>
-/// A PdpGrpcService class.
-/// </summary>
 public sealed class PdpGrpcService : PdpApi.PdpApiBase
 {
     private readonly IPdpEngine _pdpEngine;
@@ -25,9 +22,7 @@ public sealed class PdpGrpcService : PdpApi.PdpApiBase
         _metrics = metrics;
     }
 
-    /// <summary>
-    /// Executes evaluate.
-    /// </summary>
+    /// <summary>Evaluates a single authorization request.</summary>
     public override async Task<EvaluateResponseMessage> Evaluate(EvaluateRequestMessage request, ServerCallContext context)
     {
         var result = await _pdpEngine.EvaluateAsync(ProtoMapper.ToDomain(request), context.CancellationToken);
@@ -35,9 +30,7 @@ public sealed class PdpGrpcService : PdpApi.PdpApiBase
         return ProtoMapper.ToProto(result);
     }
 
-    /// <summary>
-    /// Executes evaluate Batch.
-    /// </summary>
+    /// <summary>Evaluates a batch of authorization requests.</summary>
     public override async Task<EvaluateBatchResponseMessage> EvaluateBatch(EvaluateBatchRequestMessage request, ServerCallContext context)
     {
         var result = await _pdpEngine.EvaluateBatchAsync(ProtoMapper.ToDomain(request), context.CancellationToken);
@@ -51,9 +44,7 @@ public sealed class PdpGrpcService : PdpApi.PdpApiBase
     }
 
     [Authorize(Policy = "EvaluateExplain")]
-    /// <summary>
-    /// Executes evaluate Explain.
-    /// </summary>
+    /// <summary>Evaluates a request and returns the corresponding decision trace.</summary>
     public override async Task<ExplainedEvaluateResponseMessage> EvaluateExplain(EvaluateRequestMessage request, ServerCallContext context)
     {
         var result = await _pdpEngine.EvaluateExplainAsync(ProtoMapper.ToDomain(request), context.CancellationToken);

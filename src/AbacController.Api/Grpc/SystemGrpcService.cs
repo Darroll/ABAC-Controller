@@ -8,12 +8,9 @@ using Microsoft.AspNetCore.Authorization;
 namespace AbacController.Api.Grpc;
 
 /// <summary>
-/// gRPC service implementation for the System API.
+/// Implements the system gRPC surface for runtime status, SPIF registration visibility, and audit queries.
 /// </summary>
 [Authorize(Policy = "SysRead")]
-/// <summary>
-/// A SystemGrpcService class.
-/// </summary>
 public sealed class SystemGrpcService : SystemApi.SystemApiBase
 {
     private readonly AppRuntimeState _runtimeState;
@@ -33,9 +30,7 @@ public sealed class SystemGrpcService : SystemApi.SystemApiBase
         _auditReader = auditReader;
     }
 
-    /// <summary>
-    /// Executes get Status.
-    /// </summary>
+    /// <summary>Returns runtime status and registered label codec information.</summary>
     public override Task<GetStatusResponseMessage> GetStatus(GetStatusRequestMessage request, ServerCallContext context)
     {
         var response = new GetStatusResponseMessage
@@ -48,9 +43,7 @@ public sealed class SystemGrpcService : SystemApi.SystemApiBase
         return Task.FromResult(response);
     }
 
-    /// <summary>
-    /// Executes list Registered Spifs.
-    /// </summary>
+    /// <summary>Lists registered SPIF policy OIDs.</summary>
     public override Task<ListRegisteredSpifsResponseMessage> ListRegisteredSpifs(ListRegisteredSpifsRequestMessage request, ServerCallContext context)
     {
         var response = new ListRegisteredSpifsResponseMessage();
@@ -59,9 +52,7 @@ public sealed class SystemGrpcService : SystemApi.SystemApiBase
     }
 
     [Authorize(Policy = "AuditRead")]
-    /// <summary>
-    /// Executes query Audit.
-    /// </summary>
+    /// <summary>Queries audit events using the provided filter and pagination arguments.</summary>
     public override async Task<QueryAuditResponseMessage> QueryAudit(QueryAuditRequestMessage request, ServerCallContext context)
     {
         var query = new AuditQuery

@@ -25,9 +25,7 @@ public sealed class ApiMetrics
     private long _policyChangeEvents;
     private long _simulationEvaluations;
 
-    /// <summary>
-    /// Executes record Evaluation.
-    /// </summary>
+    /// <summary>Records a single authorization evaluation and its duration.</summary>
     public void RecordEvaluation(Decision decision, TimeSpan evaluationTime)
     {
         Interlocked.Increment(ref _totalEvaluations);
@@ -51,46 +49,34 @@ public sealed class ApiMetrics
         }
     }
 
-    /// <summary>
-    /// Executes record Batch Evaluation.
-    /// </summary>
+    /// <summary>Records the number of members processed within a batch evaluation request.</summary>
     public void RecordBatchEvaluation(int count)
     {
         Interlocked.Add(ref _batchEvaluations, count);
     }
 
-    /// <summary>
-    /// Executes record Cache Hit.
-    /// </summary>
+    /// <summary>Records a decision-cache hit.</summary>
     public void RecordCacheHit() => Interlocked.Increment(ref _cacheHits);
-    /// <summary>
-    /// Executes record Cache Miss.
-    /// </summary>
+
+    /// <summary>Records a decision-cache miss.</summary>
     public void RecordCacheMiss() => Interlocked.Increment(ref _cacheMisses);
-    /// <summary>
-    /// Executes record Cache Bypass.
-    /// </summary>
+
+    /// <summary>Records an evaluation that explicitly bypassed the decision cache.</summary>
     public void RecordCacheBypass() => Interlocked.Increment(ref _cacheBypass);
-    /// <summary>
-    /// Executes record Pip Resolution.
-    /// </summary>
+
+    /// <summary>Records a successful PIP attribute resolution attempt.</summary>
     public void RecordPipResolution() => Interlocked.Increment(ref _pipResolutions);
-    /// <summary>
-    /// Executes record Pip Failure.
-    /// </summary>
+
+    /// <summary>Records a failed PIP attribute resolution attempt.</summary>
     public void RecordPipFailure() => Interlocked.Increment(ref _pipFailures);
-    /// <summary>
-    /// Executes record Policy Change.
-    /// </summary>
+
+    /// <summary>Records a policy administration change event.</summary>
     public void RecordPolicyChange() => Interlocked.Increment(ref _policyChangeEvents);
-    /// <summary>
-    /// Executes record Simulation.
-    /// </summary>
+
+    /// <summary>Records a simulation or dry-run evaluation.</summary>
     public void RecordSimulation() => Interlocked.Increment(ref _simulationEvaluations);
 
-    /// <summary>
-    /// Executes render Prometheus.
-    /// </summary>
+    /// <summary>Renders the current in-memory metrics snapshot using Prometheus text exposition format.</summary>
     public string RenderPrometheus(AppRuntimeStateSnapshot snapshot)
     {
         var builder = new StringBuilder();
@@ -157,6 +143,6 @@ public sealed class ApiMetrics
 }
 
 /// <summary>
-/// An AppRuntimeStateSnapshot record struct.
+/// Captures the coarse runtime state exported alongside application metrics.
 /// </summary>
 public readonly record struct AppRuntimeStateSnapshot(bool StartupCompleted, bool Ready);

@@ -5,11 +5,9 @@ namespace AbacController.Api.Runtime;
 /// </summary>
 public sealed class AppRuntimeState
 {
-    /// <summary>Gets or sets the startup Completed.</summary>
+    /// <summary>Gets a value indicating whether startup has completed.</summary>
     public bool StartupCompleted { get; private set; }
 
-    /// <summary>
-    /// Executes mark Startup Completed.
-    /// </summary>
+    /// <summary>Marks application startup as complete.</summary>
     public void MarkStartupCompleted() => StartupCompleted = true;
 }

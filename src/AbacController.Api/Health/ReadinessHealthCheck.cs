@@ -12,9 +12,7 @@ public sealed class ReadinessHealthCheck(
     AppRuntimeState runtimeState,
     AbacDbContext dbContext) : IHealthCheck
 {
-    /// <summary>
-    /// Executes check Health Async.
-    /// </summary>
+    /// <summary>Reports readiness based on startup completion and database connectivity.</summary>
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)

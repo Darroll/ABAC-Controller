@@ -8,12 +8,9 @@ using Microsoft.EntityFrameworkCore;
 namespace AbacController.Api.Grpc;
 
 /// <summary>
-/// gRPC service implementation for the Pep API.
+/// Implements the PEP gRPC surface for enforcement-point administration, label processing, and metadata binding.
 /// </summary>
 [Authorize(Policy = "PepRead")]
-/// <summary>
-/// A PepGrpcService class.
-/// </summary>
 public sealed class PepGrpcService : PepApi.PepApiBase
 {
     private readonly AbacDbContext _dbContext;
@@ -39,9 +36,7 @@ public sealed class PepGrpcService : PepApi.PepApiBase
         _metadataBinder = metadataBinder;
     }
 
-    /// <summary>
-    /// Executes list Enforcement Points.
-    /// </summary>
+    /// <summary>Lists registered enforcement points.</summary>
     public override async Task<ListEnforcementPointsResponseMessage> ListEnforcementPoints(ListEnforcementPointsRequestMessage request, ServerCallContext context)
     {
         var entities = await _dbContext.EnforcementPoints
@@ -55,9 +50,7 @@ public sealed class PepGrpcService : PepApi.PepApiBase
     }
 
     [Authorize(Policy = "PepAdmin")]
-    /// <summary>
-    /// Executes upsert Enforcement Point.
-    /// </summary>
+    /// <summary>Creates an enforcement point or updates an existing one.</summary>
     public override async Task<EnforcementPointMessage> UpsertEnforcementPoint(UpsertEnforcementPointRequestMessage request, ServerCallContext context)
     {
         if (request.EnforcementPoint is null || string.IsNullOrWhiteSpace(request.EnforcementPoint.Id))
@@ -87,9 +80,7 @@ public sealed class PepGrpcService : PepApi.PepApiBase
     }
 
     [Authorize(Policy = "PepAdmin")]
-    /// <summary>
-    /// Executes delete Enforcement Point.
-    /// </summary>
+    /// <summary>Deletes a registered enforcement point.</summary>
     public override async Task<OperationStatusMessage> DeleteEnforcementPoint(DeleteEnforcementPointRequestMessage request, ServerCallContext context)
     {
         var existing = await _dbContext.EnforcementPoints.FindAsync([request.Id], context.CancellationToken);
@@ -104,9 +95,7 @@ public sealed class PepGrpcService : PepApi.PepApiBase
     }
 
     [Authorize(Policy = "PepLabel")]
-    /// <summary>
-    /// Executes decode Label.
-    /// </summary>
+    /// <summary>Decodes label content using the requested or default codec.</summary>
     public override Task<DecodeLabelResponseMessage> DecodeLabel(DecodeLabelRequestMessage request, ServerCallContext context)
     {
         var codec = ResolveCodec(request.CodecId);
@@ -128,9 +117,7 @@ public sealed class PepGrpcService : PepApi.PepApiBase
     }
 
     [Authorize(Policy = "PepLabel")]
-    /// <summary>
-    /// Executes encode Label.
-    /// </summary>
+    /// <summary>Encodes a security label and returns the rendered content plus generated marking text.</summary>
     public override Task<EncodeLabelResponseMessage> EncodeLabel(EncodeLabelRequestMessage request, ServerCallContext context)
     {
         var codec = ResolveCodec(request.CodecId);
@@ -161,9 +148,7 @@ public sealed class PepGrpcService : PepApi.PepApiBase
     }
 
     [Authorize(Policy = "PepLabel")]
-    /// <summary>
-    /// Executes validate Label.
-    /// </summary>
+    /// <summary>Validates a security label against the resolved SPIF.</summary>
     public override Task<ValidateLabelResponseMessage> ValidateLabel(ValidateLabelRequestMessage request, ServerCallContext context)
     {
         if (request.Label is null)
@@ -221,9 +206,7 @@ public sealed class PepGrpcService : PepApi.PepApiBase
     }
 
     [Authorize(Policy = "PepLabel")]
-    /// <summary>
-    /// Executes bind Metadata.
-    /// </summary>
+    /// <summary>Builds a metadata envelope from label XML and payload content.</summary>
     public override Task<BindMetadataResponseMessage> BindMetadata(BindMetadataRequestMessage request, ServerCallContext context)
     {
         try
@@ -248,9 +231,7 @@ public sealed class PepGrpcService : PepApi.PepApiBase
     }
 
     [Authorize(Policy = "PepLabel")]
-    /// <summary>
-    /// Executes unbind Metadata.
-    /// </summary>
+    /// <summary>Extracts label XML and payload content from a bound metadata envelope.</summary>
     public override Task<UnbindMetadataResponseMessage> UnbindMetadata(UnbindMetadataRequestMessage request, ServerCallContext context)
     {
         try
@@ -270,9 +251,7 @@ public sealed class PepGrpcService : PepApi.PepApiBase
         }
     }
 
-    /// <summary>
-    /// Executes list Codecs.
-    /// </summary>
+    /// <summary>Lists available label codec identifiers.</summary>
     public override Task<ListCodecsResponseMessage> ListCodecs(ListCodecsRequestMessage request, ServerCallContext context)
     {
         var response = new ListCodecsResponseMessage();
