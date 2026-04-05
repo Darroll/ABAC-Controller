@@ -328,6 +328,11 @@ public sealed class DatabasePipSourceCatalog : IPipSourceCatalog
     {
         private readonly string _message;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="InvalidPipSource"/> class for a source definition that could not be materialized.
+        /// </summary>
+        /// <param name="entity">The source entity that failed validation or configuration parsing.</param>
+        /// <param name="message">The reason the source is considered invalid.</param>
         public InvalidPipSource(PipSourceEntity entity, string message)
         {
             SourceId = entity.Id;
@@ -337,14 +342,40 @@ public sealed class DatabasePipSourceCatalog : IPipSourceCatalog
             _message = message;
         }
 
+        /// <summary>
+        /// Gets the configured source type for the invalid source entry.
+        /// </summary>
         public string SourceType { get; }
+
+        /// <summary>
+        /// Gets the identifier of the invalid source entry.
+        /// </summary>
         public string SourceId { get; }
+
+        /// <summary>
+        /// Gets the attributes the source declared it can provide.
+        /// </summary>
         public IReadOnlySet<string> ProvidesAttributes { get; }
+
+        /// <summary>
+        /// Gets the configured source priority.
+        /// </summary>
         public int Priority { get; }
 
+        /// <summary>
+        /// Returns a failed resolution result explaining that the source configuration is invalid.
+        /// </summary>
+        /// <param name="request">The attribute resolution request.</param>
+        /// <param name="ct">A cancellation token.</param>
+        /// <returns>A failed attribute resolution result.</returns>
         public Task<AttributeResolutionResult> ResolveAsync(AttributeResolutionRequest request, CancellationToken ct = default)
             => Task.FromResult(AttributeResolutionResult.Failed($"Source '{SourceId}' is invalid: {_message}"));
 
+        /// <summary>
+        /// Returns an unhealthy health check result for the invalid source configuration.
+        /// </summary>
+        /// <param name="ct">A cancellation token.</param>
+        /// <returns>An unhealthy source health result.</returns>
         public Task<SourceHealthResult> TestConnectivityAsync(CancellationToken ct = default)
             => Task.FromResult(new SourceHealthResult
             {
