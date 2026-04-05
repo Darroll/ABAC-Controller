@@ -1,19 +1,39 @@
 # USAGE
 
-## Quick start flow
+## Typical operator flow
 
-1. Start the API with development auth enabled.
-2. Import a SPIF.
+1. Start the service.
+2. Import a SPIF for the tenant.
 3. Create a policy set.
 4. Create a policy.
 5. Create and activate a policy version.
-6. Evaluate access through AuthZEN or gRPC.
+6. Evaluate requests through AuthZEN, XACML JSON, or gRPC.
+7. Inspect audit, PIP health, metrics, and policy/version state.
 
-## Import a SPIF
+---
+
+## 1) Start the API
+
+```bash
+ABAC_Auth__EnableDevelopmentAuth=true \
+ABAC_Database__ConnectionString="Data Source=abac-controller.db" \
+~/.dotnet/dotnet run --project src/AbacController.Api/AbacController.Api.csproj
+```
+
+Optional tenant header used throughout the examples:
+
+```bash
+TENANT_HEADER='X-Tenant-Id: tenant-a'
+```
+
+---
+
+## 2) Import a SPIF
 
 ```bash
 curl -X POST http://localhost:8080/pap/api/spifs/import \
   -H 'Content-Type: application/json' \
+  -H "$TENANT_HEADER" \
   -d @- <<'JSON'
 {
   "xml": "<SPIF xmlns=\"urn:nato:stanag:4774:confidentialitymetadatalabel:1:0\" schemaVersion=\"3.0\"><securityPolicyId id=\"1.2.3.4\" name=\"TEST\"/><securityClassifications><securityClassification name=\"SECRET\" lacv=\"3\" hierarchy=\"3\"/></securityClassifications></SPIF>",
@@ -24,26 +44,48 @@ curl -X POST http://localhost:8080/pap/api/spifs/import \
 JSON
 ```
 
-## Create a policy set
+### Export a SPIF
+
+```bash
+curl -H "$TENANT_HEADER" \
+  http://localhost:8080/pap/api/spifs/{spifId}/export
+```
+
+### List tenant SPIFs
+
+```bash
+curl -H "$TENANT_HEADER" \
+  http://localhost:8080/pap/api/spifs
+```
+
+---
+
+## 3) Create a policy set
 
 ```bash
 curl -X PUT http://localhost:8080/pap/api/policy-sets/ps1 \
   -H 'Content-Type: application/json' \
+  -H "$TENANT_HEADER" \
   -d '{
     "id": "ps1",
     "name": "Default Policy Set",
-    "description": "Default policy set",
+    "description": "Tenant A default policy set",
     "combiningAlgorithm": "deny-overrides",
     "isActive": true,
     "policies": []
   }'
 ```
 
-## Create a policy
+Supported usage patterns include combining algorithms such as `deny-overrides` and `permit-overrides` depending on your policy model.
+
+---
+
+## 4) Create a policy
 
 ```bash
 curl -X PUT http://localhost:8080/pap/api/policies/policy1 \
   -H 'Content-Type: application/json' \
+  -H "$TENANT_HEADER" \
   -d '{
     "id": "policy1",
     "policySetId": "ps1",
@@ -53,11 +95,14 @@ curl -X PUT http://localhost:8080/pap/api/policies/policy1 \
   }'
 ```
 
-## Create a policy version
+---
+
+## 5) Create and activate a policy version
 
 ```bash
 curl -X POST http://localhost:8080/pap/api/policies/policy1/versions \
   -H 'Content-Type: application/json' \
+  -H "$TENANT_HEADER" \
   -d '{
     "content": "{\"id\":\"rule1\",\"effect\":\"Permit\",\"conditions\":[{\"path\":\"subject.department\",\"equals\":\"engineering\",\"caseInsensitive\":true},{\"path\":\"action.name\",\"equals\":\"read\",\"caseInsensitive\":true},{\"path\":\"resource.type\",\"equals\":\"document\",\"caseInsensitive\":true}]}",
     "createdBy": "local-dev",
@@ -65,11 +110,40 @@ curl -X POST http://localhost:8080/pap/api/policies/policy1/versions \
   }'
 ```
 
-## Evaluate with AuthZEN
+### List versions
+
+```bash
+curl -H "$TENANT_HEADER" \
+  http://localhost:8080/pap/api/policies/policy1/versions
+```
+
+### Diff two versions
+
+```bash
+curl -H "$TENANT_HEADER" \
+  http://localhost:8080/pap/api/policies/policy1/versions/{leftVersionId}/diff/{rightVersionId}
+```
+
+### Roll back to an earlier version
+
+```bash
+curl -X POST http://localhost:8080/pap/api/policies/policy1/versions/{versionId}/rollback \
+  -H 'Content-Type: application/json' \
+  -H "$TENANT_HEADER" \
+  -d '{
+    "createdBy": "local-dev",
+    "reason": "rollback after bad rollout"
+  }'
+```
+
+---
+
+## 6) Evaluate with AuthZEN
 
 ```bash
 curl -X POST http://localhost:8080/access/v1/evaluation \
   -H 'Content-Type: application/json' \
+  -H "$TENANT_HEADER" \
   -d '{
     "requestId": "req-1",
     "subject": {
@@ -100,13 +174,151 @@ curl -X POST http://localhost:8080/access/v1/evaluation \
   }'
 ```
 
-## Metadata binding
+Response shape:
 
-Bind:
+```json
+{
+  "decision": true,
+  "context": {
+    "id": "...",
+    "reason_admin": "Permitted by policy-set:ps1, policy:policy1@v1"
+  }
+}
+```
+
+---
+
+## 7) Batch evaluation
+
+```bash
+curl -X POST http://localhost:8080/access/v1/evaluations \
+  -H 'Content-Type: application/json' \
+  -H "$TENANT_HEADER" \
+  -d '{
+    "evaluations": [
+      {
+        "requestId": "batch-1",
+        "subject": { "type": "user", "id": "user-123", "properties": { "department": "engineering" } },
+        "action": { "name": "read", "properties": {} },
+        "resource": { "type": "document", "id": "doc-1", "properties": {} }
+      },
+      {
+        "requestId": "batch-2",
+        "subject": { "type": "user", "id": "user-999", "properties": { "department": "finance" } },
+        "action": { "name": "read", "properties": {} },
+        "resource": { "type": "document", "id": "doc-2", "properties": {} }
+      }
+    ]
+  }'
+```
+
+---
+
+## 8) Explain evaluation
+
+```bash
+curl -X POST http://localhost:8080/pdp/api/evaluate/explain \
+  -H 'Content-Type: application/json' \
+  -H "$TENANT_HEADER" \
+  -d '{
+    "requestId": "explain-1",
+    "subject": { "id": "user-123", "attributes": { "department": "engineering" } },
+    "action": { "name": "read" },
+    "resource": { "id": "doc-123", "type": "document" }
+  }'
+```
+
+Use this when you need decision traces rather than a simple permit/deny answer.
+
+---
+
+## 9) Simulation mode
+
+Simulation evaluates without polluting the normal decision cache and without treating the run like a normal production evaluation path.
+
+```bash
+curl -X POST http://localhost:8080/pdp/api/evaluate/simulate \
+  -H 'Content-Type: application/json' \
+  -H "$TENANT_HEADER" \
+  -d '{
+    "requestId": "sim-1",
+    "subject": { "type": "user", "id": "user-123", "properties": { "department": "engineering" } },
+    "action": { "name": "delete", "properties": {} },
+    "resource": { "type": "document", "id": "doc-123", "properties": {} }
+  }'
+```
+
+Good for impact analysis before policy activation.
+
+---
+
+## 10) Async evaluation with webhook callback
+
+```bash
+curl -X POST http://localhost:8080/pdp/api/evaluate/async \
+  -H 'Content-Type: application/json' \
+  -H "$TENANT_HEADER" \
+  -d '{
+    "requestId": "async-1",
+    "subject": { "type": "user", "id": "user-123", "properties": {} },
+    "action": { "name": "read", "properties": {} },
+    "resource": { "type": "document", "id": "doc-123", "properties": {} },
+    "callbackUrl": "https://example.com/webhooks/abac",
+    "callbackHeaders": {
+      "Authorization": "Bearer callback-token"
+    }
+  }'
+```
+
+Check status later:
+
+```bash
+curl http://localhost:8080/pdp/api/evaluate/async/{evaluationId}/status
+```
+
+---
+
+## 11) Evaluate using XACML JSON input
+
+```bash
+curl -X POST http://localhost:8080/pdp/api/evaluate/xacml-json \
+  -H 'Content-Type: application/json' \
+  -H "$TENANT_HEADER" \
+  -d '{
+    "Request": {
+      "AccessSubject": { "Attribute": [{ "AttributeId": "subject.id", "Value": "user-123" }] },
+      "Action": { "Attribute": [{ "AttributeId": "action.id", "Value": "read" }] },
+      "Resource": { "Attribute": [{ "AttributeId": "resource.id", "Value": "doc-123" }] }
+    }
+  }'
+```
+
+---
+
+## 12) Search AuthZEN entity history
+
+```bash
+curl -X POST http://localhost:8080/access/v1/subjects \
+  -H 'Content-Type: application/json' \
+  -H "$TENANT_HEADER" \
+  -d '{ "query": "user-", "limit": 10 }'
+```
+
+Equivalent endpoints exist for:
+
+- `/access/v1/resources`
+- `/access/v1/actions`
+
+---
+
+## 13) Metadata binding
+
+### Bind a label and payload
 
 ```bash
 curl -X POST http://localhost:8080/pep/api/metadata/bind \
   -H 'Content-Type: application/json' \
+  -H "$TENANT_HEADER" \
   -d '{
     "bindingId": "bind-1",
     "labelXml": "<securityLabel />",
@@ -115,45 +327,167 @@ curl -X POST http://localhost:8080/pep/api/metadata/bind \
   }'
 ```
 
-Unbind:
+### Unbind an envelope
 
 ```bash
 curl -X POST http://localhost:8080/pep/api/metadata/unbind \
   -H 'Content-Type: application/json' \
+  -H "$TENANT_HEADER" \
   -d '{ "envelopeXml": "..." }'
 ```
 
-## Discovery and system endpoints
+### List available metadata codecs
 
-- `GET /.well-known/authzen-configuration`
-- `GET /system/api/info`
-- `GET /system/api/config`
-- `GET /system/api/enforcement-points`
-- `GET /system/api/audit`
-- `GET /pap/api/audit`
-- `GET /pip/api/health`
-- `GET /pip/api/health/cached`
+```bash
+curl -H "$TENANT_HEADER" \
+  http://localhost:8080/pep/api/metadata/codecs
+```
 
-## Extra admin examples
+---
 
-### Check policy conflicts
+## 14) PIP source administration
+
+### List sources
+
+```bash
+curl -H "$TENANT_HEADER" \
+  http://localhost:8080/pip/api/sources
+```
+
+### Upsert a source
+
+```bash
+curl -X PUT http://localhost:8080/pip/api/sources/hr-static \
+  -H 'Content-Type: application/json' \
+  -H "$TENANT_HEADER" \
+  -d '{
+    "id": "hr-static",
+    "type": "static",
+    "priority": 10,
+    "enabled": true,
+    "configurationJson": "{\"department\":\"engineering\"}"
+  }'
+```
+
+### Test a source
+
+```bash
+curl -X POST -H "$TENANT_HEADER" \
+  http://localhost:8080/pip/api/sources/hr-static/test
+```
+
+### Run health checks
+
+```bash
+curl -H "$TENANT_HEADER" \
+  http://localhost:8080/pip/api/health
+```
+
+### Read cached health
+
+```bash
+curl -H "$TENANT_HEADER" \
+  http://localhost:8080/pip/api/health/cached
+```
+
+### Invalidate PIP cache for one subject
+
+```bash
+curl -X POST -H "$TENANT_HEADER" \
+  http://localhost:8080/pip/api/cache/invalidate/user-123
+```
+
+### Invalidate all PIP cache entries
+
+```bash
+curl -X POST -H "$TENANT_HEADER" \
+  http://localhost:8080/pip/api/cache/invalidate-all
+```
+
+---
+
+## 15) Policy conflict checking
 
 ```bash
 curl -X POST http://localhost:8080/pap/api/policies/check-conflicts \
   -H 'Content-Type: application/json' \
+  -H "$TENANT_HEADER" \
   -d '{
     "content": "{\"id\":\"candidate\",\"effect\":\"Deny\",\"conditions\":[{\"path\":\"action.name\",\"equals\":\"delete\"}]}"
   }'
 ```
 
-### View cached PIP health
+---
+
+## 16) Audit and system views
+
+### Tenant-scoped policy/admin audit
 
 ```bash
-curl http://localhost:8080/pip/api/health/cached
+curl -H "$TENANT_HEADER" \
+  'http://localhost:8080/pap/api/audit?page=1&pageSize=25'
 ```
 
-### Query the full system audit stream
+### System-wide audit query surface
 
 ```bash
-curl 'http://localhost:8080/system/api/audit?page=1&pageSize=25'
+curl -H "$TENANT_HEADER" \
+  'http://localhost:8080/system/api/audit?page=1&pageSize=25'
 ```
+
+### Get one audit event
+
+```bash
+curl -H "$TENANT_HEADER" \
+  http://localhost:8080/system/api/audit/{id}
+```
+
+### Runtime status/config
+
+```bash
+curl -H "$TENANT_HEADER" http://localhost:8080/system/api/info
+curl -H "$TENANT_HEADER" http://localhost:8080/system/api/config
+```
+
+### Enforcement points
+
+```bash
+curl -H "$TENANT_HEADER" http://localhost:8080/system/api/enforcement-points
+```
+
+---
+
+## 17) Metrics and health
+
+```bash
+curl http://localhost:8080/metrics
+curl http://localhost:8080/health/live
+curl http://localhost:8080/health/ready
+curl http://localhost:8080/health/startup
+```
+
+---
+
+## 18) API key authentication example
+
+```bash
+curl -X POST http://localhost:8080/access/v1/evaluation \
+  -H 'Content-Type: application/json' \
+  -H 'X-API-Key: super-secret-key' \
+  -d '{
+    "requestId": "apikey-1",
+    "subject": { "type": "user", "id": "user-123", "properties": {} },
+    "action": { "name": "read", "properties": {} },
+    "resource": { "type": "document", "id": "doc-123", "properties": {} }
+  }'
+```
+
+---
+
+## 19) Rate limiting behavior
+
+PDP-facing evaluation routes are rate-limited. When limits are exceeded, the API returns:
+
+- `429 Too Many Requests`
+
+Use this to validate configuration during ops testing by temporarily lowering the limits.
