@@ -11,6 +11,9 @@ namespace AbacController.Api.Grpc;
 /// gRPC service implementation for the System API.
 /// </summary>
 [Authorize(Policy = "SysRead")]
+/// <summary>
+/// A SystemGrpcService class.
+/// </summary>
 public sealed class SystemGrpcService : SystemApi.SystemApiBase
 {
     private readonly AppRuntimeState _runtimeState;
@@ -30,6 +33,9 @@ public sealed class SystemGrpcService : SystemApi.SystemApiBase
         _auditReader = auditReader;
     }
 
+    /// <summary>
+    /// Executes get Status.
+    /// </summary>
     public override Task<GetStatusResponseMessage> GetStatus(GetStatusRequestMessage request, ServerCallContext context)
     {
         var response = new GetStatusResponseMessage
@@ -42,6 +48,9 @@ public sealed class SystemGrpcService : SystemApi.SystemApiBase
         return Task.FromResult(response);
     }
 
+    /// <summary>
+    /// Executes list Registered Spifs.
+    /// </summary>
     public override Task<ListRegisteredSpifsResponseMessage> ListRegisteredSpifs(ListRegisteredSpifsRequestMessage request, ServerCallContext context)
     {
         var response = new ListRegisteredSpifsResponseMessage();
@@ -50,6 +59,9 @@ public sealed class SystemGrpcService : SystemApi.SystemApiBase
     }
 
     [Authorize(Policy = "AuditRead")]
+    /// <summary>
+    /// Executes query Audit.
+    /// </summary>
     public override async Task<QueryAuditResponseMessage> QueryAudit(QueryAuditRequestMessage request, ServerCallContext context)
     {
         var query = new AuditQuery

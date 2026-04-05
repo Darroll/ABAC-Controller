@@ -20,8 +20,11 @@ public sealed class LdapPipSource : IPipSource, IDisposable
     private readonly TimeSpan _cacheTtl;
 
     public string SourceType => "ldap";
+    /// <summary>Gets the source Id.</summary>
     public string SourceId { get; }
+    /// <summary>Gets the provides Attributes.</summary>
     public IReadOnlySet<string> ProvidesAttributes { get; }
+    /// <summary>Gets the priority.</summary>
     public int Priority { get; }
 
     public LdapPipSource(
@@ -48,6 +51,9 @@ public sealed class LdapPipSource : IPipSource, IDisposable
         _cacheTtl = cacheTtl ?? TimeSpan.FromSeconds(300);
     }
 
+    /// <summary>
+    /// Executes resolve Async.
+    /// </summary>
     public async Task<AttributeResolutionResult> ResolveAsync(
         AttributeResolutionRequest request,
         CancellationToken ct = default)
@@ -62,6 +68,9 @@ public sealed class LdapPipSource : IPipSource, IDisposable
         }
     }
 
+    /// <summary>
+    /// Executes test Connectivity Async.
+    /// </summary>
     public async Task<SourceHealthResult> TestConnectivityAsync(CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();
@@ -195,6 +204,9 @@ public sealed class LdapPipSource : IPipSource, IDisposable
             .Replace("\0", "\\00", StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Executes dispose.
+    /// </summary>
     public void Dispose()
     {
         GC.SuppressFinalize(this);

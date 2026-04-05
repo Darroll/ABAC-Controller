@@ -11,6 +11,9 @@ namespace AbacController.Api.Grpc;
 /// gRPC service implementation for the Pap API.
 /// </summary>
 [Authorize(Policy = "PolicyRead")]
+/// <summary>
+/// A PapGrpcService class.
+/// </summary>
 public sealed class PapGrpcService : PapApi.PapApiBase
 {
     private readonly IPolicyRepository _policyRepository;
@@ -22,6 +25,9 @@ public sealed class PapGrpcService : PapApi.PapApiBase
         _dbContext = dbContext;
     }
 
+    /// <summary>
+    /// Executes list Policy Sets.
+    /// </summary>
     public override async Task<ListPolicySetsResponseMessage> ListPolicySets(ListPolicySetsRequestMessage request, ServerCallContext context)
     {
         var policySets = await _policyRepository.GetPolicySetsAsync(context.CancellationToken);
@@ -30,6 +36,9 @@ public sealed class PapGrpcService : PapApi.PapApiBase
         return response;
     }
 
+    /// <summary>
+    /// Executes get Policy Set.
+    /// </summary>
     public override async Task<GetPolicySetResponseMessage> GetPolicySet(GetPolicySetRequestMessage request, ServerCallContext context)
     {
         var policySet = await _policyRepository.GetPolicySetAsync(request.Id, context.CancellationToken);
@@ -53,6 +62,9 @@ public sealed class PapGrpcService : PapApi.PapApiBase
     }
 
     [Authorize(Policy = "PolicyWrite")]
+    /// <summary>
+    /// Executes upsert Policy Set.
+    /// </summary>
     public override async Task<PolicySetSummaryMessage> UpsertPolicySet(UpsertPolicySetRequestMessage request, ServerCallContext context)
     {
         if (request.PolicySet is null || string.IsNullOrWhiteSpace(request.PolicySet.Id))
@@ -69,6 +81,9 @@ public sealed class PapGrpcService : PapApi.PapApiBase
         return ProtoMapper.ToProto(saved);
     }
 
+    /// <summary>
+    /// Executes list Policy Versions.
+    /// </summary>
     public override async Task<ListPolicyVersionsResponseMessage> ListPolicyVersions(ListPolicyVersionsRequestMessage request, ServerCallContext context)
     {
         var versions = await _policyRepository.GetVersionsAsync(request.PolicyId, context.CancellationToken);
@@ -77,6 +92,9 @@ public sealed class PapGrpcService : PapApi.PapApiBase
         return response;
     }
 
+    /// <summary>
+    /// Executes list Spifs.
+    /// </summary>
     public override async Task<ListSpifsResponseMessage> ListSpifs(ListSpifsRequestMessage request, ServerCallContext context)
     {
         var entities = await _dbContext.Spifs

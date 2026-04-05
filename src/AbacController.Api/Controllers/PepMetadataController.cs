@@ -7,8 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace AbacController.Api.Controllers;
 
 /// <summary>
-/// Minimal PEP metadata binding endpoints for wrapping/unwrapping STANAG 4774
-/// labels in a STANAG 4778-style envelope.
+/// Exposes PEP metadata binding endpoints for wrapping and unwrapping STANAG 4774 labels in a STANAG 4778-style envelope.
 /// </summary>
 [ApiController]
 [Route("pep/api/metadata")]
@@ -24,7 +23,7 @@ public sealed class PepMetadataController : ControllerBase
         _codecs = codecs;
     }
 
-    /// <summary>Bind a STANAG 4774 label and payload into a STANAG 4778 metadata envelope.</summary>
+    /// <summary>Builds a metadata envelope from label and payload inputs.</summary>
     [HttpPost("bind")]
     [Authorize(Policy = "PepLabel")]
     public ActionResult<MetadataEnvelopeResponse> Bind([FromBody] BindMetadataRequest request)
@@ -50,7 +49,7 @@ public sealed class PepMetadataController : ControllerBase
         return Ok(new MetadataEnvelopeResponse { EnvelopeXml = envelopeXml });
     }
 
-    /// <summary>Unbind a STANAG 4778 metadata envelope into its label and payload components.</summary>
+    /// <summary>Extracts label and payload data from a metadata envelope.</summary>
     [HttpPost("unbind")]
     [Authorize(Policy = "PepLabel")]
     public ActionResult<UnboundMetadataResponse> Unbind([FromBody] UnbindMetadataRequest request)
@@ -74,7 +73,7 @@ public sealed class PepMetadataController : ControllerBase
         });
     }
 
-    /// <summary>List registered label codec identifiers.</summary>
+    /// <summary>Lists the registered label codec identifiers available to the PEP surface.</summary>
     [HttpGet("codecs")]
     [Authorize(Policy = "PepRead")]
     public ActionResult<IReadOnlyList<string>> GetCodecs()

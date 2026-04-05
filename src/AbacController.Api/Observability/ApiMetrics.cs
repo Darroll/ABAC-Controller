@@ -25,6 +25,9 @@ public sealed class ApiMetrics
     private long _policyChangeEvents;
     private long _simulationEvaluations;
 
+    /// <summary>
+    /// Executes record Evaluation.
+    /// </summary>
     public void RecordEvaluation(Decision decision, TimeSpan evaluationTime)
     {
         Interlocked.Increment(ref _totalEvaluations);
@@ -48,19 +51,46 @@ public sealed class ApiMetrics
         }
     }
 
+    /// <summary>
+    /// Executes record Batch Evaluation.
+    /// </summary>
     public void RecordBatchEvaluation(int count)
     {
         Interlocked.Add(ref _batchEvaluations, count);
     }
 
+    /// <summary>
+    /// Executes record Cache Hit.
+    /// </summary>
     public void RecordCacheHit() => Interlocked.Increment(ref _cacheHits);
+    /// <summary>
+    /// Executes record Cache Miss.
+    /// </summary>
     public void RecordCacheMiss() => Interlocked.Increment(ref _cacheMisses);
+    /// <summary>
+    /// Executes record Cache Bypass.
+    /// </summary>
     public void RecordCacheBypass() => Interlocked.Increment(ref _cacheBypass);
+    /// <summary>
+    /// Executes record Pip Resolution.
+    /// </summary>
     public void RecordPipResolution() => Interlocked.Increment(ref _pipResolutions);
+    /// <summary>
+    /// Executes record Pip Failure.
+    /// </summary>
     public void RecordPipFailure() => Interlocked.Increment(ref _pipFailures);
+    /// <summary>
+    /// Executes record Policy Change.
+    /// </summary>
     public void RecordPolicyChange() => Interlocked.Increment(ref _policyChangeEvents);
+    /// <summary>
+    /// Executes record Simulation.
+    /// </summary>
     public void RecordSimulation() => Interlocked.Increment(ref _simulationEvaluations);
 
+    /// <summary>
+    /// Executes render Prometheus.
+    /// </summary>
     public string RenderPrometheus(AppRuntimeStateSnapshot snapshot)
     {
         var builder = new StringBuilder();
@@ -126,4 +156,7 @@ public sealed class ApiMetrics
     }
 }
 
+/// <summary>
+/// An AppRuntimeStateSnapshot record struct.
+/// </summary>
 public readonly record struct AppRuntimeStateSnapshot(bool StartupCompleted, bool Ready);

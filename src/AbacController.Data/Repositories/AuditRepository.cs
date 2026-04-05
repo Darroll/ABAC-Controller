@@ -14,6 +14,9 @@ public sealed class AuditRepository : IAuditReader
 
     public AuditRepository(AbacDbContext db) => _db = db;
 
+    /// <summary>
+    /// Executes query Async.
+    /// </summary>
     public async Task<AuditQueryResult> QueryAsync(AuditQuery query, CancellationToken ct = default)
     {
         var q = _db.AuditEvents.AsNoTracking().AsQueryable();
@@ -47,6 +50,9 @@ public sealed class AuditRepository : IAuditReader
         };
     }
 
+    /// <summary>
+    /// Executes get By Id Async.
+    /// </summary>
     public async Task<AuditEvent?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         var entity = await _db.AuditEvents
@@ -55,6 +61,9 @@ public sealed class AuditRepository : IAuditReader
         return entity is null ? null : MapToDomain(entity);
     }
 
+    /// <summary>
+    /// Executes get By Decision Id Async.
+    /// </summary>
     public async Task<List<AuditEvent>> GetByDecisionIdAsync(string decisionId, CancellationToken ct = default)
     {
         var entities = await _db.AuditEvents

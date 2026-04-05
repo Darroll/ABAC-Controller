@@ -9,6 +9,9 @@ namespace AbacController.Pap;
 /// </summary>
 public sealed class RejectingXmlSignatureVerifier : IXmlSignatureVerifier
 {
+    /// <summary>
+    /// Executes verify.
+    /// </summary>
     public SignatureVerificationResult Verify(XDocument document, string? keyIdentifier = null)
     {
         ArgumentNullException.ThrowIfNull(document);
@@ -32,6 +35,9 @@ public sealed class RejectingXmlSignatureVerifier : IXmlSignatureVerifier
 /// </summary>
 public sealed class NoOpXmlSignatureVerifier : IXmlSignatureVerifier
 {
+    /// <summary>
+    /// Executes verify.
+    /// </summary>
     public SignatureVerificationResult Verify(XDocument document, string? keyIdentifier = null)
         => SignatureVerificationResult.Skipped(
             "XML-DSig verification bypassed by NoOpXmlSignatureVerifier.");

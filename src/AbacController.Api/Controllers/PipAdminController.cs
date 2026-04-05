@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AbacController.Api.Controllers;
 
 /// <summary>
-/// PIP (Policy Information Point) administration endpoints for managing attribute sources.
+/// Exposes PIP administration endpoints for source management, health reporting, and cache control.
 /// </summary>
 [ApiController]
 [Route("pip/api")]
@@ -25,13 +25,13 @@ public sealed class PipAdminController : ControllerBase
         _healthMonitor = healthMonitor;
     }
 
-    /// <summary>List all registered PIP sources.</summary>
+    /// <summary>Lists all registered PIP sources.</summary>
     [HttpGet("sources")]
     [Authorize(Policy = "PipRead")]
     public async Task<ActionResult<List<PipSourceEntity>>> ListSources(CancellationToken ct)
         => Ok(await _dbContext.PipSources.AsNoTracking().OrderBy(x => x.Id).ToListAsync(ct));
 
-    /// <summary>Get a PIP source by ID.</summary>
+    /// <summary>Gets a PIP source by identifier.</summary>
     [HttpGet("sources/{id}")]
     [Authorize(Policy = "PipRead")]
     public async Task<ActionResult<PipSourceEntity>> GetSource(string id, CancellationToken ct)
@@ -40,7 +40,7 @@ public sealed class PipAdminController : ControllerBase
         return source is null ? NotFound() : Ok(source);
     }
 
-    /// <summary>Create or update a PIP source configuration.</summary>
+    /// <summary>Creates a new PIP source configuration or updates an existing one.</summary>
     [HttpPut("sources/{id}")]
     [Authorize(Policy = "PipAdmin")]
     public async Task<ActionResult<PipSourceEntity>> UpsertSource(string id, [FromBody] PipSourceEntity source, CancellationToken ct)
@@ -72,7 +72,7 @@ public sealed class PipAdminController : ControllerBase
         return Ok(existing);
     }
 
-    /// <summary>Delete a PIP source.</summary>
+    /// <summary>Deletes a PIP source.</summary>
     [HttpDelete("sources/{id}")]
     [Authorize(Policy = "PipAdmin")]
     public async Task<IActionResult> DeleteSource(string id, CancellationToken ct)
@@ -86,7 +86,7 @@ public sealed class PipAdminController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>Test connectivity to a PIP source.</summary>
+    /// <summary>Returns the currently available connectivity-check status for a PIP source.</summary>
     [HttpPost("sources/{id}/test")]
     [Authorize(Policy = "PipAdmin")]
     public async Task<ActionResult<object>> TestSource(string id, CancellationToken ct)
@@ -104,9 +104,7 @@ public sealed class PipAdminController : ControllerBase
         });
     }
 
-    /// <summary>
-    /// Check health of all registered PIP sources.
-    /// </summary>
+    /// <summary>Checks the health of all registered PIP sources.</summary>
     [HttpGet("health")]
     [Authorize(Policy = "PipRead")]
     public async Task<ActionResult<object>> CheckHealth(CancellationToken ct)
@@ -122,9 +120,7 @@ public sealed class PipAdminController : ControllerBase
         });
     }
 
-    /// <summary>
-    /// Get last known health status without re-checking.
-    /// </summary>
+    /// <summary>Returns the last cached health status for all PIP sources without running a new check.</summary>
     [HttpGet("health/cached")]
     [Authorize(Policy = "PipRead")]
     public ActionResult<object> GetCachedHealth()
@@ -140,9 +136,7 @@ public sealed class PipAdminController : ControllerBase
         });
     }
 
-    /// <summary>
-    /// Invalidate the PIP attribute cache for a specific subject.
-    /// </summary>
+    /// <summary>Invalidates the PIP attribute cache for a specific subject identifier.</summary>
     [HttpPost("cache/invalidate/{subjectId}")]
     [Authorize(Policy = "PipAdmin")]
     public ActionResult InvalidateCache(string subjectId, [FromServices] IPipCacheManager cacheManager)
@@ -151,9 +145,7 @@ public sealed class PipAdminController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>
-    /// Invalidate the entire PIP attribute cache.
-    /// </summary>
+    /// <summary>Invalidates the entire PIP attribute cache.</summary>
     [HttpPost("cache/invalidate-all")]
     [Authorize(Policy = "PipAdmin")]
     public ActionResult InvalidateAllCache([FromServices] IPipCacheManager cacheManager)

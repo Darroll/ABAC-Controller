@@ -11,6 +11,9 @@ namespace AbacController.Api.Grpc;
 /// gRPC service implementation for the Pep API.
 /// </summary>
 [Authorize(Policy = "PepRead")]
+/// <summary>
+/// A PepGrpcService class.
+/// </summary>
 public sealed class PepGrpcService : PepApi.PepApiBase
 {
     private readonly AbacDbContext _dbContext;
@@ -36,6 +39,9 @@ public sealed class PepGrpcService : PepApi.PepApiBase
         _metadataBinder = metadataBinder;
     }
 
+    /// <summary>
+    /// Executes list Enforcement Points.
+    /// </summary>
     public override async Task<ListEnforcementPointsResponseMessage> ListEnforcementPoints(ListEnforcementPointsRequestMessage request, ServerCallContext context)
     {
         var entities = await _dbContext.EnforcementPoints
@@ -49,6 +55,9 @@ public sealed class PepGrpcService : PepApi.PepApiBase
     }
 
     [Authorize(Policy = "PepAdmin")]
+    /// <summary>
+    /// Executes upsert Enforcement Point.
+    /// </summary>
     public override async Task<EnforcementPointMessage> UpsertEnforcementPoint(UpsertEnforcementPointRequestMessage request, ServerCallContext context)
     {
         if (request.EnforcementPoint is null || string.IsNullOrWhiteSpace(request.EnforcementPoint.Id))
@@ -78,6 +87,9 @@ public sealed class PepGrpcService : PepApi.PepApiBase
     }
 
     [Authorize(Policy = "PepAdmin")]
+    /// <summary>
+    /// Executes delete Enforcement Point.
+    /// </summary>
     public override async Task<OperationStatusMessage> DeleteEnforcementPoint(DeleteEnforcementPointRequestMessage request, ServerCallContext context)
     {
         var existing = await _dbContext.EnforcementPoints.FindAsync([request.Id], context.CancellationToken);
@@ -92,6 +104,9 @@ public sealed class PepGrpcService : PepApi.PepApiBase
     }
 
     [Authorize(Policy = "PepLabel")]
+    /// <summary>
+    /// Executes decode Label.
+    /// </summary>
     public override Task<DecodeLabelResponseMessage> DecodeLabel(DecodeLabelRequestMessage request, ServerCallContext context)
     {
         var codec = ResolveCodec(request.CodecId);
@@ -113,6 +128,9 @@ public sealed class PepGrpcService : PepApi.PepApiBase
     }
 
     [Authorize(Policy = "PepLabel")]
+    /// <summary>
+    /// Executes encode Label.
+    /// </summary>
     public override Task<EncodeLabelResponseMessage> EncodeLabel(EncodeLabelRequestMessage request, ServerCallContext context)
     {
         var codec = ResolveCodec(request.CodecId);
@@ -143,6 +161,9 @@ public sealed class PepGrpcService : PepApi.PepApiBase
     }
 
     [Authorize(Policy = "PepLabel")]
+    /// <summary>
+    /// Executes validate Label.
+    /// </summary>
     public override Task<ValidateLabelResponseMessage> ValidateLabel(ValidateLabelRequestMessage request, ServerCallContext context)
     {
         if (request.Label is null)
@@ -200,6 +221,9 @@ public sealed class PepGrpcService : PepApi.PepApiBase
     }
 
     [Authorize(Policy = "PepLabel")]
+    /// <summary>
+    /// Executes bind Metadata.
+    /// </summary>
     public override Task<BindMetadataResponseMessage> BindMetadata(BindMetadataRequestMessage request, ServerCallContext context)
     {
         try
@@ -224,6 +248,9 @@ public sealed class PepGrpcService : PepApi.PepApiBase
     }
 
     [Authorize(Policy = "PepLabel")]
+    /// <summary>
+    /// Executes unbind Metadata.
+    /// </summary>
     public override Task<UnbindMetadataResponseMessage> UnbindMetadata(UnbindMetadataRequestMessage request, ServerCallContext context)
     {
         try
@@ -243,6 +270,9 @@ public sealed class PepGrpcService : PepApi.PepApiBase
         }
     }
 
+    /// <summary>
+    /// Executes list Codecs.
+    /// </summary>
     public override Task<ListCodecsResponseMessage> ListCodecs(ListCodecsRequestMessage request, ServerCallContext context)
     {
         var response = new ListCodecsResponseMessage();

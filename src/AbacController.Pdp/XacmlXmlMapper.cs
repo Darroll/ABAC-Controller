@@ -22,26 +22,44 @@ public static class XacmlXmlMapper
     /// <summary>Standard XACML attribute URN prefixes.</summary>
     private static class XacmlUrns
     {
+        /// <summary>SubjectCategory constant.</summary>
         public const string SubjectCategory = "urn:oasis:names:tc:xacml:1.0:subject-category:access-subject";
+        /// <summary>ResourceCategory constant.</summary>
         public const string ResourceCategory = "urn:oasis:names:tc:xacml:3.0:attribute-category:resource";
+        /// <summary>ActionCategory constant.</summary>
         public const string ActionCategory = "urn:oasis:names:tc:xacml:3.0:attribute-category:action";
+        /// <summary>EnvironmentCategory constant.</summary>
         public const string EnvironmentCategory = "urn:oasis:names:tc:xacml:3.0:attribute-category:environment";
 
+        /// <summary>SubjectIdAttr constant.</summary>
         public const string SubjectIdAttr = "urn:oasis:names:tc:xacml:1.0:subject:subject-id";
+        /// <summary>SubjectTypeAttr constant.</summary>
         public const string SubjectTypeAttr = "urn:oasis:names:tc:xacml:1.0:subject:subject-type";
+        /// <summary>ResourceIdAttr constant.</summary>
         public const string ResourceIdAttr = "urn:oasis:names:tc:xacml:1.0:resource:resource-id";
+        /// <summary>ResourceTypeAttr constant.</summary>
         public const string ResourceTypeAttr = "urn:oasis:names:tc:xacml:1.0:resource:resource-type";
+        /// <summary>ActionIdAttr constant.</summary>
         public const string ActionIdAttr = "urn:oasis:names:tc:xacml:1.0:action:action-id";
 
+        /// <summary>StringDataType constant.</summary>
         public const string StringDataType = "http://www.w3.org/2001/XMLSchema#string";
+        /// <summary>BooleanDataType constant.</summary>
         public const string BooleanDataType = "http://www.w3.org/2001/XMLSchema#boolean";
+        /// <summary>IntegerDataType constant.</summary>
         public const string IntegerDataType = "http://www.w3.org/2001/XMLSchema#integer";
+        /// <summary>DoubleDataType constant.</summary>
         public const string DoubleDataType = "http://www.w3.org/2001/XMLSchema#double";
 
+        /// <summary>StringEqual constant.</summary>
         public const string StringEqual = "urn:oasis:names:tc:xacml:1.0:function:string-equal";
+        /// <summary>BooleanEqual constant.</summary>
         public const string BooleanEqual = "urn:oasis:names:tc:xacml:1.0:function:boolean-equal";
+        /// <summary>IntegerEqual constant.</summary>
         public const string IntegerEqual = "urn:oasis:names:tc:xacml:1.0:function:integer-equal";
+        /// <summary>StringIsIn constant.</summary>
         public const string StringIsIn = "urn:oasis:names:tc:xacml:1.0:function:string-is-in";
+        /// <summary>AnyOf constant.</summary>
         public const string AnyOf = "urn:oasis:names:tc:xacml:1.0:function:any-of";
     }
 

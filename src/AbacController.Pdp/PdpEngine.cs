@@ -499,6 +499,7 @@ public sealed class PdpEngine : IPdpEngine
 
     private sealed class NullTenantContext : ITenantContext
     {
+        /// <summary>Gets the Instance field.</summary>
         public static readonly NullTenantContext Instance = new();
 
         public string? TenantId => null;

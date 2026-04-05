@@ -20,8 +20,11 @@ public sealed class OidcPipSource : IPipSource
     private readonly TimeSpan _cacheTtl;
 
     public string SourceType => "oidc";
+    /// <summary>Gets the source Id.</summary>
     public string SourceId { get; }
+    /// <summary>Gets the provides Attributes.</summary>
     public IReadOnlySet<string> ProvidesAttributes { get; }
+    /// <summary>Gets the priority.</summary>
     public int Priority { get; }
 
     /// <param name="sourceId">Source instance ID.</param>
@@ -47,6 +50,9 @@ public sealed class OidcPipSource : IPipSource
         ProvidesAttributes = claimMapping.Values.ToHashSet(StringComparer.Ordinal);
     }
 
+    /// <summary>
+    /// Executes resolve Async.
+    /// </summary>
     public async Task<AttributeResolutionResult> ResolveAsync(
         AttributeResolutionRequest request, CancellationToken ct = default)
     {
@@ -108,6 +114,9 @@ public sealed class OidcPipSource : IPipSource
         }
     }
 
+    /// <summary>
+    /// Executes test Connectivity Async.
+    /// </summary>
     public async Task<SourceHealthResult> TestConnectivityAsync(CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();

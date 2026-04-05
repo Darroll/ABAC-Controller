@@ -12,8 +12,11 @@ public sealed class StaticPipSource : IPipSource
     private readonly Dictionary<string, Dictionary<string, object>> _staticValues;
 
     public string SourceType => "static";
+    /// <summary>Gets the source Id.</summary>
     public string SourceId { get; }
+    /// <summary>Gets the provides Attributes.</summary>
     public IReadOnlySet<string> ProvidesAttributes { get; }
+    /// <summary>Gets the priority.</summary>
     public int Priority { get; }
 
     public StaticPipSource(
@@ -29,6 +32,9 @@ public sealed class StaticPipSource : IPipSource
             .ToHashSet();
     }
 
+    /// <summary>
+    /// Executes resolve Async.
+    /// </summary>
     public Task<AttributeResolutionResult> ResolveAsync(
         AttributeResolutionRequest request, CancellationToken ct = default)
     {
@@ -57,6 +63,9 @@ public sealed class StaticPipSource : IPipSource
         return Task.FromResult(AttributeResolutionResult.Succeeded(values));
     }
 
+    /// <summary>
+    /// Executes test Connectivity Async.
+    /// </summary>
     public Task<SourceHealthResult> TestConnectivityAsync(CancellationToken ct = default)
         => Task.FromResult(new SourceHealthResult
         {

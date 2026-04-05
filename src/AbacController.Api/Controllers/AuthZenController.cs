@@ -16,7 +16,7 @@ using System.Collections.Concurrent;
 namespace AbacController.Api.Controllers;
 
 /// <summary>
-/// AuthZEN 1.0 REST endpoints for access evaluation.
+/// Exposes AuthZEN-compatible REST endpoints for access evaluation, discovery, and related lookup operations.
 /// </summary>
 [ApiController]
 public class AuthZenController : ControllerBase
@@ -38,8 +38,7 @@ public class AuthZenController : ControllerBase
     }
 
     /// <summary>
-    /// AuthZEN 1.0 single evaluation.
-    /// POST /access/v1/evaluation
+    /// Evaluates a single AuthZEN access request.
     /// </summary>
     [HttpPost("/access/v1/evaluation")]
     [Authorize(Policy = "Evaluate")]
@@ -77,8 +76,7 @@ public class AuthZenController : ControllerBase
     }
 
     /// <summary>
-    /// AuthZEN 1.0 batch evaluation.
-    /// POST /access/v1/evaluations
+    /// Evaluates a batch of AuthZEN access requests.
     /// </summary>
     [HttpPost("/access/v1/evaluations")]
     [Authorize(Policy = "Evaluate")]
@@ -115,9 +113,7 @@ public class AuthZenController : ControllerBase
     }
 
     /// <summary>
-    /// Simulation/dry-run endpoint. Evaluates as normal but marks result as simulated.
-    /// Does not affect metrics, audit, or caching.
-    /// POST /pdp/api/evaluate/simulate
+    /// Evaluates a request in simulation mode without affecting normal metrics, audit, or cache state.
     /// </summary>
     [HttpPost("/pdp/api/evaluate/simulate")]
     [Authorize(Policy = "EvaluateExplain")]
@@ -165,8 +161,7 @@ public class AuthZenController : ControllerBase
     }
 
     /// <summary>
-    /// Decision explanation endpoint. Returns full evaluation trace.
-    /// POST /pdp/api/evaluate/explain
+    /// Evaluates a request and returns the detailed policy trace used to reach the decision.
     /// </summary>
     [HttpPost("/pdp/api/evaluate/explain")]
     [Authorize(Policy = "EvaluateExplain")]
@@ -207,9 +202,7 @@ public class AuthZenController : ControllerBase
     }
 
     /// <summary>
-    /// Async evaluation — queues an evaluation for background processing and
-    /// delivers the result via webhook callback.
-    /// POST /pdp/api/evaluate/async
+    /// Queues an evaluation for background processing and delivers the result to the configured callback URL.
     /// </summary>
     [HttpPost("/pdp/api/evaluate/async")]
     [Authorize(Policy = "Evaluate")]
@@ -241,8 +234,7 @@ public class AuthZenController : ControllerBase
     }
 
     /// <summary>
-    /// Check the status of an async evaluation.
-    /// GET /pdp/api/evaluate/async/{evaluationId}/status
+    /// Returns the current status of a previously queued asynchronous evaluation.
     /// </summary>
     [HttpGet("/pdp/api/evaluate/async/{evaluationId}/status")]
     [Authorize(Policy = "Evaluate")]
@@ -275,8 +267,7 @@ public class AuthZenController : ControllerBase
     }
 
     /// <summary>
-    /// AuthZEN 1.0 discovery endpoint.
-    /// GET /.well-known/authzen-configuration
+    /// Returns the AuthZEN discovery document advertised by this server.
     /// </summary>
     [AllowAnonymous]
     [HttpGet("/.well-known/authzen-configuration")]
@@ -299,8 +290,7 @@ public class AuthZenController : ControllerBase
     }
 
     /// <summary>
-    /// XACML JSON profile single evaluation.
-    /// POST /access/v1/xacml-json
+    /// Evaluates a single request expressed using the XACML JSON profile.
     /// </summary>
     [HttpPost("/access/v1/xacml-json")]
     [Authorize(Policy = "Evaluate")]
@@ -319,8 +309,7 @@ public class AuthZenController : ControllerBase
     }
 
     /// <summary>
-    /// Search subjects from audit history.
-    /// POST /access/v1/subjects
+    /// Searches subject identifiers and types observed in audit history.
     /// </summary>
     [HttpPost("/access/v1/subjects")]
     [Authorize(Policy = "Evaluate")]
@@ -345,8 +334,7 @@ public class AuthZenController : ControllerBase
     }
 
     /// <summary>
-    /// Search resources from audit history.
-    /// POST /access/v1/resources
+    /// Searches resource identifiers and types observed in audit history.
     /// </summary>
     [HttpPost("/access/v1/resources")]
     [Authorize(Policy = "Evaluate")]
@@ -371,8 +359,7 @@ public class AuthZenController : ControllerBase
     }
 
     /// <summary>
-    /// Search actions from audit history.
-    /// POST /access/v1/actions
+    /// Searches action names observed in audit history.
     /// </summary>
     [HttpPost("/access/v1/actions")]
     [Authorize(Policy = "Evaluate")]

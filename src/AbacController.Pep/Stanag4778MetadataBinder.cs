@@ -23,6 +23,9 @@ public sealed class Stanag4778MetadataBinder : IStanag4778MetadataBinder
             ?? throw new InvalidOperationException("STANAG 4774 XML label codec is required for metadata binding.");
     }
 
+    /// <summary>
+    /// Executes bind.
+    /// </summary>
     public string Bind(MetadataBindingEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(envelope);
@@ -48,6 +51,9 @@ public sealed class Stanag4778MetadataBinder : IStanag4778MetadataBinder
         return document.ToString(SaveOptions.DisableFormatting);
     }
 
+    /// <summary>
+    /// Executes unbind.
+    /// </summary>
     public MetadataUnbindResult Unbind(string envelopeXml)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(envelopeXml);

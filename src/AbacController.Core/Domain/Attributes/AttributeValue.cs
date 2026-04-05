@@ -97,7 +97,10 @@ public sealed record AttributeResolutionResult
 /// </summary>
 public sealed record SourceHealthResult
 {
+    /// <summary>Gets or sets the healthy.</summary>
     public required bool Healthy { get; init; }
+    /// <summary>Gets or sets the message.</summary>
     public string? Message { get; init; }
+    /// <summary>Gets or sets the response Time.</summary>
     public TimeSpan? ResponseTime { get; init; }
 }

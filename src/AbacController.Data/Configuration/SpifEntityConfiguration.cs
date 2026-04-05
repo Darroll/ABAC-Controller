@@ -9,6 +9,9 @@ namespace AbacController.Data.Configuration;
 /// </summary>
 public class SpifEntityConfiguration : IEntityTypeConfiguration<SpifEntity>
 {
+    /// <summary>
+    /// Executes configure.
+    /// </summary>
     public void Configure(EntityTypeBuilder<SpifEntity> builder)
     {
         builder.ToTable("Spifs");
@@ -21,8 +24,14 @@ public class SpifEntityConfiguration : IEntityTypeConfiguration<SpifEntity>
     }
 }
 
+/// <summary>
+/// A PolicySetEntityConfiguration class.
+/// </summary>
 public class PolicySetEntityConfiguration : IEntityTypeConfiguration<PolicySetEntity>
 {
+    /// <summary>
+    /// Executes configure.
+    /// </summary>
     public void Configure(EntityTypeBuilder<PolicySetEntity> builder)
     {
         builder.ToTable("PolicySets");
@@ -34,8 +43,14 @@ public class PolicySetEntityConfiguration : IEntityTypeConfiguration<PolicySetEn
     }
 }
 
+/// <summary>
+/// A PolicyEntityConfiguration class.
+/// </summary>
 public class PolicyEntityConfiguration : IEntityTypeConfiguration<PolicyEntity>
 {
+    /// <summary>
+    /// Executes configure.
+    /// </summary>
     public void Configure(EntityTypeBuilder<PolicyEntity> builder)
     {
         builder.ToTable("Policies");
@@ -46,8 +61,14 @@ public class PolicyEntityConfiguration : IEntityTypeConfiguration<PolicyEntity>
     }
 }
 
+/// <summary>
+/// A PolicyVersionEntityConfiguration class.
+/// </summary>
 public class PolicyVersionEntityConfiguration : IEntityTypeConfiguration<PolicyVersionEntity>
 {
+    /// <summary>
+    /// Executes configure.
+    /// </summary>
     public void Configure(EntityTypeBuilder<PolicyVersionEntity> builder)
     {
         builder.ToTable("PolicyVersions");
@@ -57,8 +78,14 @@ public class PolicyVersionEntityConfiguration : IEntityTypeConfiguration<PolicyV
     }
 }
 
+/// <summary>
+/// A PipSourceEntityConfiguration class.
+/// </summary>
 public class PipSourceEntityConfiguration : IEntityTypeConfiguration<PipSourceEntity>
 {
+    /// <summary>
+    /// Executes configure.
+    /// </summary>
     public void Configure(EntityTypeBuilder<PipSourceEntity> builder)
     {
         builder.ToTable("PipSources");
@@ -68,8 +95,14 @@ public class PipSourceEntityConfiguration : IEntityTypeConfiguration<PipSourceEn
     }
 }
 
+/// <summary>
+/// An EnforcementPointEntityConfiguration class.
+/// </summary>
 public class EnforcementPointEntityConfiguration : IEntityTypeConfiguration<EnforcementPointEntity>
 {
+    /// <summary>
+    /// Executes configure.
+    /// </summary>
     public void Configure(EntityTypeBuilder<EnforcementPointEntity> builder)
     {
         builder.ToTable("EnforcementPoints");
@@ -80,8 +113,14 @@ public class EnforcementPointEntityConfiguration : IEntityTypeConfiguration<Enfo
     }
 }
 
+/// <summary>
+/// An AuditEventEntityConfiguration class.
+/// </summary>
 public class AuditEventEntityConfiguration : IEntityTypeConfiguration<AuditEventEntity>
 {
+    /// <summary>
+    /// Executes configure.
+    /// </summary>
     public void Configure(EntityTypeBuilder<AuditEventEntity> builder)
     {
         builder.ToTable("AuditEvents");
@@ -94,8 +133,14 @@ public class AuditEventEntityConfiguration : IEntityTypeConfiguration<AuditEvent
     }
 }
 
+/// <summary>
+/// A ConfigurationEntryEntityConfiguration class.
+/// </summary>
 public class ConfigurationEntryEntityConfiguration : IEntityTypeConfiguration<ConfigurationEntryEntity>
 {
+    /// <summary>
+    /// Executes configure.
+    /// </summary>
     public void Configure(EntityTypeBuilder<ConfigurationEntryEntity> builder)
     {
         builder.ToTable("Configuration");

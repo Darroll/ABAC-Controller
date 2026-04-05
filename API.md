@@ -30,8 +30,14 @@
 - `GET /pap/api/policies/{id}/versions`
 - `POST /pap/api/policies/{id}/versions`
 - `POST /pap/api/policies/{id}/versions/{versionId}/activate`
+- `GET /pap/api/policies/{id}/versions/{leftVersionId}/diff/{rightVersionId}`
+- `POST /pap/api/policies/{id}/versions/{versionId}/rollback`
 - `GET /pap/api/spifs`
 - `POST /pap/api/spifs/import`
+- `DELETE /pap/api/spifs/{id}`
+- `GET /pap/api/spifs/{id}/export`
+- `POST /pap/api/policies/check-conflicts`
+- `GET /pap/api/audit`
 
 ### PIP endpoints
 
@@ -40,6 +46,10 @@
 - `PUT /pip/api/sources/{id}`
 - `DELETE /pip/api/sources/{id}`
 - `POST /pip/api/sources/{id}/test`
+- `GET /pip/api/health`
+- `GET /pip/api/health/cached`
+- `POST /pip/api/cache/invalidate/{subjectId}`
+- `POST /pip/api/cache/invalidate-all`
 
 ### PEP metadata endpoints
 
@@ -52,6 +62,8 @@
 - `GET /system/api/info`
 - `GET /system/api/config`
 - `GET /system/api/enforcement-points`
+- `GET /system/api/audit`
+- `GET /system/api/audit/{id}`
 
 ### Health and metrics
 
@@ -74,9 +86,25 @@ Representative HTTP transcoding routes:
 - `POST /pdp/grpc/evaluate/batch`
 - `POST /pdp/grpc/evaluate/explain`
 - `GET /pap/grpc/policy-sets`
+- `GET /pap/grpc/policy-sets/{id}`
+- `GET /pap/grpc/policies/{policy_id}/versions`
+- `GET /pap/grpc/spifs`
 - `GET /pip/grpc/sources`
+- `PUT /pip/grpc/sources/{source.id}`
+- `DELETE /pip/grpc/sources/{id}`
+- `POST /pip/grpc/resolve`
 - `GET /pep/grpc/enforcement-points`
+- `PUT /pep/grpc/enforcement-points/{enforcement_point.id}`
+- `DELETE /pep/grpc/enforcement-points/{id}`
+- `POST /pep/grpc/labels/decode`
+- `POST /pep/grpc/labels/encode`
+- `POST /pep/grpc/labels/validate`
+- `POST /pep/grpc/metadata/bind`
+- `POST /pep/grpc/metadata/unbind`
+- `GET /pep/grpc/metadata/codecs`
 - `GET /system/grpc/status`
+- `GET /system/grpc/spifs/registered`
+- `POST /system/grpc/audit/query`
 
 See `protos/` for source contracts.
 
@@ -131,4 +159,5 @@ Common patterns:
 
 - gRPC runs on a dedicated HTTP/2 listener on port `8081`
 - REST runs on port `8080`
+- controller-based REST routes and JSON-transcoded protobuf routes both remain active
 - audit persistence is asynchronous but durable once flushed by the background writer

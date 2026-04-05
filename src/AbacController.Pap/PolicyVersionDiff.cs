@@ -6,6 +6,9 @@ namespace AbacController.Pap;
 /// </summary>
 public static class PolicyVersionDiff
 {
+    /// <summary>
+    /// Executes compare.
+    /// </summary>
     public static PolicyDiffResult Compare(string oldContent, string newContent)
     {
         var oldLines = NormalizeLines(oldContent);
@@ -113,18 +116,32 @@ public static class PolicyVersionDiff
     }
 }
 
+/// <summary>
+/// A PolicyDiffResult record.
+/// </summary>
 public sealed record PolicyDiffResult
 {
+    /// <summary>Gets or sets the old Line Count.</summary>
     public required int OldLineCount { get; init; }
+    /// <summary>Gets or sets the new Line Count.</summary>
     public required int NewLineCount { get; init; }
+    /// <summary>Gets or sets the has Changes.</summary>
     public required bool HasChanges { get; init; }
+    /// <summary>Gets or sets the operations.</summary>
     public required List<PolicyDiffOperation> Operations { get; init; }
 }
 
+/// <summary>
+/// A PolicyDiffOperation record.
+/// </summary>
 public sealed record PolicyDiffOperation
 {
+    /// <summary>Gets or sets the operation.</summary>
     public required string Operation { get; init; }
+    /// <summary>Gets or sets the old Line Number.</summary>
     public int? OldLineNumber { get; init; }
+    /// <summary>Gets or sets the new Line Number.</summary>
     public int? NewLineNumber { get; init; }
+    /// <summary>Gets or sets the content.</summary>
     public required string Content { get; init; }
 }

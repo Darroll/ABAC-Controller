@@ -17,8 +17,11 @@ public sealed class RestPipSource : IPipSource
     private readonly TimeSpan _cacheTtl;
 
     public string SourceType => "rest";
+    /// <summary>Gets the source Id.</summary>
     public string SourceId { get; }
+    /// <summary>Gets the provides Attributes.</summary>
     public IReadOnlySet<string> ProvidesAttributes { get; }
+    /// <summary>Gets the priority.</summary>
     public int Priority { get; }
 
     public RestPipSource(
@@ -37,6 +40,9 @@ public sealed class RestPipSource : IPipSource
         _cacheTtl = cacheTtl ?? TimeSpan.FromSeconds(300);
     }
 
+    /// <summary>
+    /// Executes resolve Async.
+    /// </summary>
     public async Task<AttributeResolutionResult> ResolveAsync(
         AttributeResolutionRequest request, CancellationToken ct = default)
     {
@@ -84,6 +90,9 @@ public sealed class RestPipSource : IPipSource
         }
     }
 
+    /// <summary>
+    /// Executes test Connectivity Async.
+    /// </summary>
     public async Task<SourceHealthResult> TestConnectivityAsync(CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();

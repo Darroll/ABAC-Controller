@@ -11,6 +11,9 @@ namespace AbacController.Api.Grpc;
 /// gRPC service implementation for the Pip API.
 /// </summary>
 [Authorize(Policy = "PipRead")]
+/// <summary>
+/// A PipGrpcService class.
+/// </summary>
 public sealed class PipGrpcService : PipApi.PipApiBase
 {
     private readonly AbacDbContext _dbContext;
@@ -22,6 +25,9 @@ public sealed class PipGrpcService : PipApi.PipApiBase
         _pipResolver = pipResolver;
     }
 
+    /// <summary>
+    /// Executes list Sources.
+    /// </summary>
     public override async Task<ListSourcesResponseMessage> ListSources(ListSourcesRequestMessage request, ServerCallContext context)
     {
         var sources = await _dbContext.PipSources
@@ -35,6 +41,9 @@ public sealed class PipGrpcService : PipApi.PipApiBase
     }
 
     [Authorize(Policy = "PipAdmin")]
+    /// <summary>
+    /// Executes upsert Source.
+    /// </summary>
     public override async Task<PipSourceMessage> UpsertSource(UpsertSourceRequestMessage request, ServerCallContext context)
     {
         if (request.Source is null || string.IsNullOrWhiteSpace(request.Source.Id))
@@ -67,6 +76,9 @@ public sealed class PipGrpcService : PipApi.PipApiBase
     }
 
     [Authorize(Policy = "PipAdmin")]
+    /// <summary>
+    /// Executes delete Source.
+    /// </summary>
     public override async Task<OperationStatusMessage> DeleteSource(DeleteSourceRequestMessage request, ServerCallContext context)
     {
         var existing = await _dbContext.PipSources.FindAsync([request.Id], context.CancellationToken);
@@ -80,6 +92,9 @@ public sealed class PipGrpcService : PipApi.PipApiBase
         return new OperationStatusMessage { Success = true, Message = $"Deleted PIP source '{request.Id}'." };
     }
 
+    /// <summary>
+    /// Executes resolve.
+    /// </summary>
     public override async Task<ResolveAttributesResponseMessage> Resolve(ResolveAttributesRequestMessage request, ServerCallContext context)
     {
         var result = await _pipResolver.ResolveAsync(new AttributeResolutionRequest

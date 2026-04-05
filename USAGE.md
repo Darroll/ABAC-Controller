@@ -129,3 +129,31 @@ curl -X POST http://localhost:8080/pep/api/metadata/unbind \
 - `GET /system/api/info`
 - `GET /system/api/config`
 - `GET /system/api/enforcement-points`
+- `GET /system/api/audit`
+- `GET /pap/api/audit`
+- `GET /pip/api/health`
+- `GET /pip/api/health/cached`
+
+## Extra admin examples
+
+### Check policy conflicts
+
+```bash
+curl -X POST http://localhost:8080/pap/api/policies/check-conflicts \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "content": "{\"id\":\"candidate\",\"effect\":\"Deny\",\"conditions\":[{\"path\":\"action.name\",\"equals\":\"delete\"}]}"
+  }'
+```
+
+### View cached PIP health
+
+```bash
+curl http://localhost:8080/pip/api/health/cached
+```
+
+### Query the full system audit stream
+
+```bash
+curl 'http://localhost:8080/system/api/audit?page=1&pageSize=25'
+```

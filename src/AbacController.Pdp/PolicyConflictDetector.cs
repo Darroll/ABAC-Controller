@@ -163,7 +163,9 @@ public static class PolicyConflictDetector
 
     private sealed class ParsedCondition
     {
+        /// <summary>Gets or sets the path.</summary>
         public string? Path { get; init; }
+        /// <summary>Gets or sets the equals Value.</summary>
         public JsonElement? EqualsValue { get; init; }
     }
 }
@@ -173,11 +175,18 @@ public static class PolicyConflictDetector
 /// </summary>
 public sealed record PolicyConflict
 {
+    /// <summary>Gets or sets the candidate Rule Id.</summary>
     public required string CandidateRuleId { get; init; }
+    /// <summary>Gets or sets the candidate Effect.</summary>
     public required string CandidateEffect { get; init; }
+    /// <summary>Gets or sets the existing Policy Set Id.</summary>
     public required string ExistingPolicySetId { get; init; }
+    /// <summary>Gets or sets the existing Policy Id.</summary>
     public required string ExistingPolicyId { get; init; }
+    /// <summary>Gets or sets the existing Rule Id.</summary>
     public required string ExistingRuleId { get; init; }
+    /// <summary>Gets or sets the existing Effect.</summary>
     public required string ExistingEffect { get; init; }
+    /// <summary>Gets or sets the reason.</summary>
     public required string Reason { get; init; }
 }

@@ -257,6 +257,9 @@ public sealed class XmlStanag4774Codec : ILabelCodec
         private readonly HashSet<LacvValue> _bits = [];
         private readonly HashSet<LacvValue> _enumeratedValues = [];
 
+        /// <summary>
+        /// Executes add Category.
+        /// </summary>
         public void AddCategory(LabelCategory category)
         {
             _categories.Add(category);
@@ -270,6 +273,9 @@ public sealed class XmlStanag4774Codec : ILabelCodec
             }
         }
 
+        /// <summary>
+        /// Executes build.
+        /// </summary>
         public LabelCategoryTag Build() => new()
         {
             Name = name,

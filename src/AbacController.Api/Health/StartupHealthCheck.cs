@@ -8,6 +8,9 @@ namespace AbacController.Api.Health;
 /// </summary>
 public sealed class StartupHealthCheck(AppRuntimeState runtimeState) : IHealthCheck
 {
+    /// <summary>
+    /// Executes check Health Async.
+    /// </summary>
     public Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)

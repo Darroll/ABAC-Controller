@@ -264,9 +264,13 @@ public sealed class PepDecisionCache
 
     private sealed class CacheEntry
     {
+        /// <summary>Gets or sets the result.</summary>
         public required EvaluationResult Result { get; init; }
+        /// <summary>Gets or sets the created At.</summary>
         public required DateTimeOffset CreatedAt { get; init; }
+        /// <summary>Gets or sets the expires At.</summary>
         public required DateTimeOffset ExpiresAt { get; init; }
+        /// <summary>Gets or sets the last Accessed At.</summary>
         public DateTimeOffset LastAccessedAt { get; set; }
         public string? SubjectId => Result.RequestId; // Use for subject-based invalidation
     }

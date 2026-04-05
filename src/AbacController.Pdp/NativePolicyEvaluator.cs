@@ -12,6 +12,9 @@ namespace AbacController.Pdp;
 /// </summary>
 internal static class NativePolicyEvaluator
 {
+    /// <summary>
+    /// Executes compute Version Fingerprint.
+    /// </summary>
     public static string ComputeVersionFingerprint(
         IReadOnlyList<PolicySet> policySets,
         string? requestedVersion)
@@ -35,6 +38,9 @@ internal static class NativePolicyEvaluator
         return parts.Count == 0 ? "-" : string.Join(';', parts);
     }
 
+    /// <summary>
+    /// Executes collect Required Subject Attributes.
+    /// </summary>
     public static IReadOnlySet<string> CollectRequiredSubjectAttributes(
         IReadOnlyList<PolicySet> policySets,
         string? requestedVersion)
@@ -66,6 +72,9 @@ internal static class NativePolicyEvaluator
         return attributes;
     }
 
+    /// <summary>
+    /// Executes evaluate.
+    /// </summary>
     public static PolicyEvaluationOutcome Evaluate(
         EvaluationRequest request,
         IReadOnlyList<PolicySet> policySets,

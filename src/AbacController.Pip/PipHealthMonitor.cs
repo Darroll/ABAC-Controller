@@ -80,11 +80,18 @@ public sealed class PipHealthMonitor
 /// </summary>
 public sealed record PipSourceStatus
 {
+    /// <summary>Gets or sets the source Id.</summary>
     public required string SourceId { get; init; }
+    /// <summary>Gets or sets the source Type.</summary>
     public required string SourceType { get; init; }
+    /// <summary>Gets or sets the healthy.</summary>
     public required bool Healthy { get; init; }
+    /// <summary>Gets or sets the message.</summary>
     public string? Message { get; init; }
+    /// <summary>Gets or sets the response Time.</summary>
     public TimeSpan? ResponseTime { get; init; }
+    /// <summary>Gets or sets the last Checked.</summary>
     public DateTimeOffset LastChecked { get; init; }
+    /// <summary>Gets or sets the provides Attributes.</summary>
     public List<string> ProvidesAttributes { get; init; } = [];
 }

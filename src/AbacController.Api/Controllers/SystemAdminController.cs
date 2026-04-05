@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AbacController.Api.Controllers;
 
 /// <summary>
-/// System administration endpoints for status, configuration, and enforcement point management.
+/// Exposes system administration endpoints for runtime status, non-sensitive configuration, enforcement points, and audit access.
 /// </summary>
 [ApiController]
 [Route("system/api")]
@@ -43,9 +43,7 @@ public sealed class SystemAdminController : ControllerBase
         _auditReader = auditReader;
     }
 
-    /// <summary>
-    /// Get system status information.
-    /// </summary>
+    /// <summary>Returns runtime status information for the current host instance.</summary>
     [HttpGet("info")]
     [Authorize(Policy = "SysRead")]
     public ActionResult<object> GetStatus()
@@ -58,7 +56,7 @@ public sealed class SystemAdminController : ControllerBase
             registeredPolicyOids = _spifRegistry.GetRegisteredPolicyOids()
         });
 
-    /// <summary>Get system configuration (non-sensitive values only).</summary>
+    /// <summary>Returns non-sensitive runtime configuration values.</summary>
     [HttpGet("config")]
     [Authorize(Policy = "SysAdmin")]
     public ActionResult<object> GetConfig()
@@ -72,18 +70,14 @@ public sealed class SystemAdminController : ControllerBase
             rateLimit = new { _options.RateLimiting.PdpPermitLimit, _options.RateLimiting.WindowSeconds }
         });
 
-    /// <summary>
-    /// List registered enforcement points.
-    /// </summary>
+    /// <summary>Lists registered enforcement points.</summary>
     [HttpGet("enforcement-points")]
     [Authorize(Policy = "SysRead")]
     public async Task<ActionResult<object>> ListEnforcementPoints(CancellationToken ct)
         => Ok(await _dbContext.EnforcementPoints.AsNoTracking().OrderBy(x => x.Id).ToListAsync(ct));
 
     /// <summary>
-    /// Query all audit events with filtering and pagination.
-    /// Unlike the PAP audit endpoint which only shows policy changes,
-    /// this returns all event types (evaluations, policy changes, system events, etc.).
+    /// Queries the full audit stream with filtering and pagination.
     /// </summary>
     [HttpGet("audit")]
     [Authorize(Policy = "AuditRead")]
@@ -114,9 +108,7 @@ public sealed class SystemAdminController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>
-    /// Get a single audit event by ID.
-    /// </summary>
+    /// <summary>Gets a single audit event by identifier.</summary>
     [HttpGet("audit/{id:guid}")]
     [Authorize(Policy = "AuditRead")]
     public async Task<ActionResult<AuditEvent>> GetAuditEvent(Guid id, CancellationToken ct)

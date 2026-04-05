@@ -23,6 +23,7 @@ public sealed class FilePipSource : IPipSource
     private HashSet<string> _providesAttributes = new(StringComparer.Ordinal);
 
     public string SourceType => "file";
+    /// <summary>Gets the source Id.</summary>
     public string SourceId { get; }
     public IReadOnlySet<string> ProvidesAttributes
     {
@@ -32,6 +33,7 @@ public sealed class FilePipSource : IPipSource
             lock (_lock) return _providesAttributes;
         }
     }
+    /// <summary>Gets the priority.</summary>
     public int Priority { get; }
 
     public FilePipSource(string sourceId, int priority, string filePath, TimeSpan? cacheTtl = null)
@@ -42,6 +44,9 @@ public sealed class FilePipSource : IPipSource
         _cacheTtl = cacheTtl ?? TimeSpan.FromSeconds(600);
     }
 
+    /// <summary>
+    /// Executes resolve Async.
+    /// </summary>
     public Task<AttributeResolutionResult> ResolveAsync(
         AttributeResolutionRequest request, CancellationToken ct = default)
     {
@@ -75,6 +80,9 @@ public sealed class FilePipSource : IPipSource
         return Task.FromResult(AttributeResolutionResult.Succeeded(values));
     }
 
+    /// <summary>
+    /// Executes test Connectivity Async.
+    /// </summary>
     public Task<SourceHealthResult> TestConnectivityAsync(CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();

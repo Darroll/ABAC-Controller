@@ -11,6 +11,9 @@ internal static class SpifSchemas
 {
     private static readonly Lazy<XmlSchemaSet> Schemas = new(CreateSchemaSet);
 
+    /// <summary>
+    /// Executes create Validation Set.
+    /// </summary>
     public static XmlSchemaSet CreateValidationSet() => Schemas.Value;
 
     private static XmlSchemaSet CreateSchemaSet()
