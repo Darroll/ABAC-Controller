@@ -10,12 +10,14 @@ namespace AbacController.Pip;
 public sealed class PipHealthMonitor
 {
     private readonly IEnumerable<IPipSource> _sources;
+    private readonly IPipSourceCatalog? _sourceCatalog;
     private readonly ConcurrentDictionary<string, PipSourceStatus> _statuses = new(StringComparer.Ordinal);
 
     /// <summary>Initializes a new instance of the <see cref="PipHealthMonitor"/> class.</summary>
-    public PipHealthMonitor(IEnumerable<IPipSource> sources)
+    public PipHealthMonitor(IPipSourceCatalog? sourceCatalog = null, IEnumerable<IPipSource>? sources = null)
     {
-        _sources = sources;
+        _sourceCatalog = sourceCatalog;
+        _sources = sources ?? [];
     }
 
     /// <summary>
@@ -23,7 +25,8 @@ public sealed class PipHealthMonitor
     /// </summary>
     public async Task<IReadOnlyList<PipSourceStatus>> CheckAllAsync(CancellationToken ct = default)
     {
-        var tasks = _sources.Select(async source =>
+        var sources = await GetSourcesAsync(ct);
+        var tasks = sources.Select(async source =>
         {
             var status = await CheckSourceAsync(source, ct);
             _statuses[source.SourceId] = status;
@@ -31,6 +34,22 @@ public sealed class PipHealthMonitor
         });
 
         return (await Task.WhenAll(tasks)).ToList();
+    }
+
+    /// <summary>
+    /// Check health of a single PIP source.
+    /// </summary>
+    public async Task<PipSourceStatus?> CheckSourceAsync(string sourceId, CancellationToken ct = default)
+    {
+        var source = (await GetSourcesAsync(ct)).FirstOrDefault(s => string.Equals(s.SourceId, sourceId, StringComparison.Ordinal));
+        if (source is null)
+        {
+            return null;
+        }
+
+        var status = await CheckSourceAsync(source, ct);
+        _statuses[source.SourceId] = status;
+        return status;
     }
 
     /// <summary>
@@ -44,6 +63,16 @@ public sealed class PipHealthMonitor
     /// </summary>
     public PipSourceStatus? GetStatus(string sourceId)
         => _statuses.TryGetValue(sourceId, out var status) ? status : null;
+
+    private async Task<IReadOnlyList<IPipSource>> GetSourcesAsync(CancellationToken ct)
+    {
+        if (_sourceCatalog is not null)
+        {
+            return await _sourceCatalog.GetSourcesAsync(ct);
+        }
+
+        return _sources.ToList();
+    }
 
     private static async Task<PipSourceStatus> CheckSourceAsync(IPipSource source, CancellationToken ct)
     {

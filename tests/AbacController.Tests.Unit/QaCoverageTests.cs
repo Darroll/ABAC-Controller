@@ -182,7 +182,7 @@ public sealed class QaCoverageTests
             priority: 2,
             providesAttributes: new HashSet<string>(StringComparer.Ordinal) { "department" },
             values: new Dictionary<string, object?> { ["department"] = "FIN" });
-        var resolver = new PipResolver([source2, source1], cache);
+        var resolver = new PipResolver(cache, sources: [source2, source1]);
 
         var request = new AttributeResolutionRequest
         {

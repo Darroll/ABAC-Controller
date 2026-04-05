@@ -354,7 +354,7 @@ curl -H "$TENANT_HEADER" \
   http://localhost:8080/pip/api/sources
 ```
 
-### Upsert a source
+### Upsert a static source
 
 ```bash
 curl -X PUT http://localhost:8080/pip/api/sources/hr-static \
@@ -362,18 +362,52 @@ curl -X PUT http://localhost:8080/pip/api/sources/hr-static \
   -H "$TENANT_HEADER" \
   -d '{
     "id": "hr-static",
-    "type": "static",
+    "name": "HR Static",
+    "sourceType": "static",
+    "configJson": "{\"subjects\":{\"user-123\":{\"department\":\"engineering\",\"securityClearance\":{\"policyOid\":\"1.2.3.4\",\"classificationLacvs\":[3]}}}}",
+    "providesAttributes": "department,securityClearance",
     "priority": 10,
-    "enabled": true,
-    "configurationJson": "{\"department\":\"engineering\"}"
+    "isRequired": false,
+    "cacheEnabled": true,
+    "cacheTtlSeconds": 300,
+    "cacheMaxEntries": 1000
   }'
 ```
+
+Static source config also accepts a wildcard/default form when you want the same attributes for any subject:
+
+```json
+{
+  "attributes": {
+    "department": "engineering"
+  }
+}
+```
+
+Supported source config keys by `sourceType`:
+
+- `static`: `subjects` or `attributes`
+- `file`: `filePath` or `path`
+- `rest`: `urlTemplate` or `url`
+- `oidc`: `userInfoEndpoint` plus `claimMapping`
+- `ldap`: `host`, `baseDn`, `subjectIdAttribute` and optional `port`, `useSsl`, `username`, `password`
 
 ### Test a source
 
 ```bash
 curl -X POST -H "$TENANT_HEADER" \
   http://localhost:8080/pip/api/sources/hr-static/test
+```
+
+The response reports live connectivity or config validity for that persisted source definition, for example:
+
+```json
+{
+  "id": "hr-static",
+  "sourceType": "static",
+  "healthy": true,
+  "message": "Static source always healthy"
+}
 ```
 
 ### Run health checks

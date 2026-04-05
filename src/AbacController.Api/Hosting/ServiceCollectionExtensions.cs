@@ -60,9 +60,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<HttpTenantContext>());
         services.AddSingleton<TenantSpifRegistryStore>();
         services.AddScoped<ISpifRegistry, TenantSpifRegistry>();
-        services.AddSingleton<IPipResolver, PipResolver>();
+        services.AddScoped<IPipSourceCatalog, DatabasePipSourceCatalog>();
+        services.AddScoped<IPipResolver, PipResolver>();
         services.AddSingleton<IPipCacheManager, PipCacheManager>();
-        services.AddSingleton<PipHealthMonitor>();
+        services.AddScoped<PipHealthMonitor>();
         services.AddSingleton<LabelValidator>();
         services.AddSingleton<IStanag4778MetadataBinder, Stanag4778MetadataBinder>();
         services.AddSingleton<AuditWriter>();

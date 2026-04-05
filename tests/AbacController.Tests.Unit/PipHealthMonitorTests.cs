@@ -15,7 +15,7 @@ public sealed class PipHealthMonitorTests
             new FakePipSource("source-2", "rest", false)
         };
 
-        var monitor = new PipHealthMonitor(sources);
+        var monitor = new PipHealthMonitor(sources: sources);
         var statuses = await monitor.CheckAllAsync();
 
         Assert.Equal(2, statuses.Count);
@@ -27,7 +27,7 @@ public sealed class PipHealthMonitorTests
     public async Task GetStatuses_ReturnsCachedResults()
     {
         var sources = new IPipSource[] { new FakePipSource("src", "static", true) };
-        var monitor = new PipHealthMonitor(sources);
+        var monitor = new PipHealthMonitor(sources: sources);
 
         // Initially empty
         Assert.Empty(monitor.GetStatuses());
@@ -48,7 +48,7 @@ public sealed class PipHealthMonitorTests
             new FakePipSource("src-b", "rest", false)
         };
 
-        var monitor = new PipHealthMonitor(sources);
+        var monitor = new PipHealthMonitor(sources: sources);
         await monitor.CheckAllAsync();
 
         var status = monitor.GetStatus("src-a");

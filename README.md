@@ -156,6 +156,7 @@ AbacController/
 - `docs/standards-gaps.md` — standards coverage and explicit limits
 - `docs/emailclassification-migration-guide.md` — migration notes from the EmailClassification baseline
 - `docs/smoke-test-validation.md` — exact container-based smoke steps and observed v1 validation results
+- `docs/release-readiness.md` — deployment-oriented v1 release checklist, validation baseline, and operator notes
 
 ## Quick start
 
@@ -181,9 +182,9 @@ ABAC_Database__ConnectionString="Data Source=abac-controller.db" \
 
 ## Current test baseline
 
-- **272 unit tests**
-- **17 integration tests**
-- **289 total tests**
+- **288 unit tests**
+- **21 integration tests**
+- **309 total tests**
 
 ## Highlights in the HTTP surface
 

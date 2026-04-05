@@ -23,7 +23,7 @@ public sealed class PipResolverTests
         cache.Set("static-1", "user-1", value, TimeSpan.FromMinutes(5));
 
         var source = new TestPipSource("static-1", 1, new HashSet<string> { "department" }, _ => throw new Xunit.Sdk.XunitException("Should not be called"));
-        var resolver = new PipResolver([source], cache);
+        var resolver = new PipResolver(cache, sources: [source]);
 
         var result = await resolver.ResolveAsync(new AttributeResolutionRequest
         {
@@ -41,7 +41,7 @@ public sealed class PipResolverTests
     [Fact]
     public async Task ResolveAsync_FetchesFromSource_WhenCacheMissOccurs()
     {
-        var source = new TestPipSource("source-1", 1, new HashSet<string> { "department" }, request =>
+        var source = new TestPipSource("source-1", 1, new HashSet<string> { "department" }, _ =>
             Task.FromResult(AttributeResolutionResult.Succeeded([
                 new AttributeValue
                 {
@@ -55,7 +55,7 @@ public sealed class PipResolverTests
                 }
             ])));
 
-        var resolver = new PipResolver([source], new PipCacheManager());
+        var resolver = new PipResolver(new PipCacheManager(), sources: [source]);
 
         var result = await resolver.ResolveAsync(new AttributeResolutionRequest
         {
@@ -74,7 +74,7 @@ public sealed class PipResolverTests
     [Fact]
     public async Task ResolveAsync_UsesPriorityOrder_AndStopsWhenSatisfied()
     {
-        var first = new TestPipSource("first", 1, new HashSet<string> { "department" }, request =>
+        var first = new TestPipSource("first", 1, new HashSet<string> { "department" }, _ =>
             Task.FromResult(AttributeResolutionResult.Succeeded([
                 new AttributeValue
                 {
@@ -88,7 +88,7 @@ public sealed class PipResolverTests
             ])));
         var second = new TestPipSource("second", 2, new HashSet<string> { "department" }, _ => throw new Xunit.Sdk.XunitException("Should not be called"));
 
-        var resolver = new PipResolver([second, first], new PipCacheManager());
+        var resolver = new PipResolver(new PipCacheManager(), sources: [second, first]);
         var result = await resolver.ResolveAsync(new AttributeResolutionRequest
         {
             SubjectId = "user-1",
@@ -105,7 +105,7 @@ public sealed class PipResolverTests
     public async Task ResolveAsync_SourceThrows_FallsBackToNextSource()
     {
         var broken = new TestPipSource("broken", 1, new HashSet<string> { "department" }, _ => throw new InvalidOperationException("boom"));
-        var fallback = new TestPipSource("fallback", 2, new HashSet<string> { "department" }, request =>
+        var fallback = new TestPipSource("fallback", 2, new HashSet<string> { "department" }, _ =>
             Task.FromResult(AttributeResolutionResult.Succeeded([
                 new AttributeValue
                 {
@@ -118,7 +118,7 @@ public sealed class PipResolverTests
                 }
             ])));
 
-        var resolver = new PipResolver([broken, fallback], new PipCacheManager());
+        var resolver = new PipResolver(new PipCacheManager(), sources: [broken, fallback]);
         var result = await resolver.ResolveAsync(new AttributeResolutionRequest
         {
             SubjectId = "user-1",
@@ -138,7 +138,7 @@ public sealed class PipResolverTests
         var source = new TestPipSource("source-1", 1, new HashSet<string> { "department" }, _ =>
             Task.FromResult(AttributeResolutionResult.Succeeded([])));
 
-        var resolver = new PipResolver([source], new PipCacheManager());
+        var resolver = new PipResolver(new PipCacheManager(), sources: [source]);
         var result = await resolver.ResolveAsync(new AttributeResolutionRequest
         {
             SubjectId = "user-1",
@@ -149,6 +149,48 @@ public sealed class PipResolverTests
         Assert.False(result.Success);
         Assert.Contains("department", result.Missing);
         Assert.Contains("clearance", result.Missing);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_UsesCatalogSources_WhenCatalogProvided()
+    {
+        var source = new TestPipSource("catalog-source", 1, new HashSet<string> { "department" }, _ =>
+            Task.FromResult(AttributeResolutionResult.Succeeded([
+                new AttributeValue
+                {
+                    Name = "department",
+                    Category = AttributeCategory.Subject,
+                    Value = "engineering",
+                    SourceId = "catalog-source",
+                    SourceType = "test",
+                    FetchedAt = DateTimeOffset.UtcNow
+                }
+            ])));
+
+        var resolver = new PipResolver(new PipCacheManager(), new TestCatalog(source));
+        var result = await resolver.ResolveAsync(new AttributeResolutionRequest
+        {
+            SubjectId = "user-1",
+            SubjectType = "user",
+            RequestedAttributes = ["department"]
+        });
+
+        Assert.True(result.Success);
+        Assert.Equal("engineering", result.Values.Single().Value);
+        Assert.Equal(1, source.ResolveCalls);
+    }
+
+    private sealed class TestCatalog : IPipSourceCatalog
+    {
+        private readonly IReadOnlyList<IPipSource> _sources;
+
+        public TestCatalog(params IPipSource[] sources)
+        {
+            _sources = sources;
+        }
+
+        public Task<IReadOnlyList<IPipSource>> GetSourcesAsync(CancellationToken ct = default)
+            => Task.FromResult(_sources);
     }
 
     private sealed class TestPipSource : IPipSource

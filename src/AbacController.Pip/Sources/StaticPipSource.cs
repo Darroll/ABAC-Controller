@@ -55,7 +55,8 @@ public sealed class StaticPipSource : IPipSource
     {
         var values = new List<AttributeValue>();
 
-        if (_staticValues.TryGetValue(request.SubjectId, out var subjectAttrs))
+        if (_staticValues.TryGetValue(request.SubjectId, out var subjectAttrs)
+            || _staticValues.TryGetValue("*", out subjectAttrs))
         {
             foreach (var attrName in request.RequestedAttributes)
             {

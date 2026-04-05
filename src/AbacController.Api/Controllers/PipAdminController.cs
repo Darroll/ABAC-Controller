@@ -86,7 +86,7 @@ public sealed class PipAdminController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>Returns the currently available connectivity-check status for a PIP source.</summary>
+    /// <summary>Runs a connectivity test for a specific persisted PIP source.</summary>
     [HttpPost("sources/{id}/test")]
     [Authorize(Policy = "PipAdmin")]
     public async Task<ActionResult<object>> TestSource(string id, CancellationToken ct)
@@ -95,12 +95,19 @@ public sealed class PipAdminController : ControllerBase
         if (source is null)
             return NotFound();
 
+        var status = await _healthMonitor.CheckSourceAsync(id, ct);
+        if (status is null)
+            return NotFound();
+
         return Ok(new
         {
-            source.Id,
-            source.SourceType,
-            healthy = false,
-            message = "Connectivity test endpoint present; runtime connector-specific active test not wired for persisted sources yet."
+            id = status.SourceId,
+            sourceType = status.SourceType,
+            healthy = status.Healthy,
+            message = status.Message,
+            responseTimeMs = status.ResponseTime?.TotalMilliseconds,
+            lastChecked = status.LastChecked,
+            providesAttributes = status.ProvidesAttributes
         });
     }
 

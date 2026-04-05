@@ -81,13 +81,12 @@ curl -X POST http://127.0.0.1:18080/pip/api/sources/<smoke-id>/test
 Observed result:
 
 - `200 OK`
-- Response message:
-  - `Connectivity test endpoint present; runtime connector-specific active test not wired for persisted sources yet.`
+- Response body reported source health details (`healthy`, `message`, response time, and provided attributes)
 
 Interpretation:
 
 - Route works end-to-end and is UI-usable.
-- Current persisted-source test behavior is a placeholder/availability check, not a connector-specific live probe.
+- Persisted-source test behavior now runs the runtime source health path instead of returning a placeholder message.
 
 ### 4. Import, list, and export a SPIF
 
