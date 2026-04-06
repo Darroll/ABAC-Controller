@@ -1,7 +1,7 @@
 namespace AbacController.Core.Constants;
 
 /// <summary>
-/// XML namespace constants for SPIF parsing.
+/// XML namespace constants for SPIF parsing and standards-conformant metadata binding.
 /// </summary>
 public static class SpifNamespaces
 {
@@ -17,6 +17,12 @@ public static class SpifNamespaces
     /// <summary>STANAG 4774 Confidentiality Label namespace.</summary>
     public const string Stanag4774 = "urn:nato:stanag:4774:confidentialitymetadatalabel:1:0";
 
-    /// <summary>STANAG 4778 Metadata Binding namespace.</summary>
-    public const string Stanag4778 = "urn:nato:stanag:4778:metadatabindingmechanism:1:0";
+    /// <summary>
+    /// STANAG 4778 Binding Information namespace (ADatP-4778.2 Ed A V1).
+    /// Used as the root namespace for all Binding Data Objects (BDOs).
+    /// </summary>
+    public const string Stanag4778 = "urn:nato:stanag:4778:bindinginformation:1:0";
+
+    /// <summary>W3C XML MIME namespace; used for xmime:contentType on DataReference elements.</summary>
+    public const string Xmime = "http://www.w3.org/2005/05/xmlmime";
 }
