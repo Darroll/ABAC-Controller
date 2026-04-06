@@ -58,6 +58,19 @@ public sealed class Stanag4778MetadataBinder : IStanag4778MetadataBinder
         var bindingId = string.IsNullOrWhiteSpace(envelope.BindingId)
             ? "mb-" + Guid.NewGuid().ToString("N")
             : envelope.BindingId;
+
+        // Validate caller-supplied BindingId is a valid XML NCName to prevent malformed xml:id attributes.
+        if (!string.IsNullOrWhiteSpace(envelope.BindingId))
+        {
+            try { System.Xml.XmlConvert.VerifyNCName(envelope.BindingId); }
+            catch (System.Xml.XmlException ex)
+            {
+                throw new ArgumentException(
+                    $"BindingId '{envelope.BindingId}' is not a valid XML NCName and cannot be used as xml:id. " +
+                    "Use only letters, digits, hyphens, underscores, and dots; the first character must be a letter or underscore.",
+                    nameof(envelope), ex);
+            }
+        }
         var metadataId = "md-" + Guid.NewGuid().ToString("N");
         var dataObjectId = "do-" + Guid.NewGuid().ToString("N");
 
@@ -100,13 +113,14 @@ public sealed class Stanag4778MetadataBinder : IStanag4778MetadataBinder
         var root = document.Root
             ?? throw new InvalidOperationException("BDO XML is missing a root element.");
 
-        return root.Name.LocalName switch
+        if (root.Name == BindingNs + "BindingInformation")
         {
-            "BindingInformation" => UnbindBdo(root),
-            _ => throw new InvalidOperationException(
-                $"Unrecognised BDO root element '{root.Name.LocalName}'. " +
-                $"Expected 'BindingInformation' in namespace '{SpifNamespaces.Stanag4778}'.")
-        };
+            return UnbindBdo(root);
+        }
+
+        throw new InvalidOperationException(
+            $"Unrecognised BDO root element '{root.Name.LocalName}' in namespace '{root.Name.NamespaceName}'. " +
+            $"Expected 'BindingInformation' in namespace '{SpifNamespaces.Stanag4778}'.");
     }
 
     // Parses the conformant STANAG 4778 BDO format.
@@ -118,6 +132,7 @@ public sealed class Stanag4778MetadataBinder : IStanag4778MetadataBinder
             ?? throw new InvalidOperationException("BDO does not contain a MetadataBinding element.");
 
         var bindingId = binding.Attribute(XmlNs + "id")?.Value
+            // Fallback: accept unqualified 'id' attribute from implementations that omit the xml: namespace prefix.
             ?? binding.Attributes().FirstOrDefault(static a => a.Name.LocalName == "id")?.Value;
 
         var metadataElement = binding.Elements()
@@ -172,6 +187,7 @@ public sealed class Stanag4778MetadataBinder : IStanag4778MetadataBinder
         var dataObject = root.Elements(BindingNs + "DataObject")
             .FirstOrDefault(e =>
                 e.Attribute(XmlNs + "id")?.Value == refId ||
+                // Fallback: accept unqualified 'id' attribute from implementations that omit the xml: namespace prefix.
                 e.Attributes().FirstOrDefault(static a => a.Name.LocalName == "id")?.Value == refId)
             ?? throw new InvalidOperationException(
                 $"BDO does not contain a DataObject with xml:id='{refId}' referenced by DataReference URI='{uri}'.");

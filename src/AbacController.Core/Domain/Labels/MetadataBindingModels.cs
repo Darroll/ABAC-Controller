@@ -12,6 +12,9 @@ public sealed record MetadataBindingEnvelope
     public string? BindingId { get; init; }
 
     /// <summary>Creation timestamp for the envelope.</summary>
+    /// <remarks>Not persisted in the STANAG 4778 BDO wire format. On unbind, this
+    /// field returns <see cref="DateTimeOffset.UtcNow"/>. Timestamps belong in the
+    /// STANAG 4774 label's CreationDateTime element, not in the BDO envelope.</remarks>
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
 
     /// <summary>Encoded STANAG 4774 label XML carried in the envelope.</summary>
