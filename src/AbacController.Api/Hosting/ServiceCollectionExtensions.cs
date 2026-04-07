@@ -76,6 +76,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPolicyRepository, PolicyRepository>();
         services.AddScoped<IAuditReader, AuditRepository>();
         services.AddScoped<IApplicationRepository, ApplicationRepository>();
+        services.AddScoped<IEntitlementRepository, EntitlementRepository>();
+        services.AddScoped<IEntitlementResolver, EntitlementResolver>();
         services.AddScoped<IClassificationQueryEngine, ClassificationQueryEngine>();
 
         // Async evaluation support
@@ -253,6 +255,10 @@ public static class ServiceCollectionExtensions
             AddScopePolicy(options, "SysAdmin", Scopes.SysAdmin);
             AddScopePolicy(options, "ClassificationQuery", Scopes.ClassificationQuery);
             AddScopePolicy(options, "ApplicationAdmin", Scopes.ApplicationAdmin);
+            AddScopePolicy(options, "EntitlementAdmin", Scopes.EntitlementAdmin);
+            AddScopePolicy(options, "RecipientCheck", Scopes.RecipientCheck);
+            AddScopePolicy(options, "WebhookAdmin", Scopes.WebhookAdmin);
+            AddScopePolicy(options, "AuditMirrorWrite", Scopes.AuditMirrorWrite);
         });
     }
 

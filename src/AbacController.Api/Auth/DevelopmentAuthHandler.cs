@@ -45,7 +45,13 @@ public sealed class DevelopmentAuthHandler : AuthenticationHandler<Authenticatio
             Scopes.PepLabel,
             Scopes.AuditRead,
             Scopes.SysRead,
-            Scopes.SysAdmin)));
+            Scopes.SysAdmin,
+            Scopes.ClassificationQuery,
+            Scopes.ApplicationAdmin,
+            Scopes.EntitlementAdmin,
+            Scopes.RecipientCheck,
+            Scopes.WebhookAdmin,
+            Scopes.AuditMirrorWrite)));
 
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, DevelopmentAuthenticationDefaults.SchemeName);

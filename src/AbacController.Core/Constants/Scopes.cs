@@ -49,4 +49,16 @@ public static class Scopes
 
     /// <summary>Scope for administering application registrations.</summary>
     public const string ApplicationAdmin = "abac:application:admin";
+
+    /// <summary>Scope for administering baseline/group/user entitlement grants and denies.</summary>
+    public const string EntitlementAdmin = "abac:entitlement:admin";
+
+    /// <summary>Scope for submitting recipient clearance check requests.</summary>
+    public const string RecipientCheck = "abac:recipient:check";
+
+    /// <summary>Scope for administering webhook subscriptions.</summary>
+    public const string WebhookAdmin = "abac:webhook:admin";
+
+    /// <summary>Scope for mirroring external audit events into ABAC's audit store.</summary>
+    public const string AuditMirrorWrite = "abac:audit:mirror:write";
 }
