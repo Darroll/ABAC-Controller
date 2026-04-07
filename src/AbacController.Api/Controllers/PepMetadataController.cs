@@ -122,15 +122,22 @@ public sealed class PepMetadataController : ControllerBase
             return BadRequest("bindingDataHeaderValue is required.");
         }
 
-        var bdoXml = _headerCodec.Decode(request.BindingDataHeaderValue);
-        var result = _binder.Unbind(bdoXml);
-
-        return Ok(new UnbindHttpMetadataResponse
+        try
         {
-            BindingId = result.Envelope.BindingId,
-            LabelXml = result.Envelope.LabelXml,
-            Label = result.Label
-        });
+            var bdoXml = _headerCodec.Decode(request.BindingDataHeaderValue);
+            var result = _binder.Unbind(bdoXml);
+
+            return Ok(new UnbindHttpMetadataResponse
+            {
+                BindingId = result.Envelope.BindingId,
+                LabelXml = result.Envelope.LabelXml,
+                Label = result.Label
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     /// <summary>Lists the registered label codec identifiers available to the PEP surface.</summary>
@@ -248,7 +255,10 @@ public sealed class UnbindHttpMetadataRequest
     public string? BindingDataHeaderValue { get; set; }
 }
 
-/// <summary>Response containing the security label extracted from a Binding-Data HTTP header.</summary>
+/// <summary>
+/// Response containing the security label extracted from a Binding-Data HTTP header.
+/// MediaType and payload are omitted — the protected data is the HTTP entity body.
+/// </summary>
 public sealed class UnbindHttpMetadataResponse
 {
     /// <summary>Binding identifier from the BDO, if present.</summary>
