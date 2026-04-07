@@ -8,11 +8,11 @@
 
 ## STANAG 4778
 
-`Stanag4778MetadataBinder` produces and consumes a **Phase 0 conformant BDO** (Binding Data Object) per ADatP-4778.2 Edition A Version 1 (December 2020).
+`Stanag4778MetadataBinder` produces and consumes conformant STANAG 4778 BDOs per ADatP-4778.2 Edition A Version 1 (December 2020).
 
-### Phase 0 — BDO wire format (implemented)
+### Phase 0 — Inline BDO wire format (implemented)
 
-The BDO root element and namespace are now structurally correct:
+Correct BDO root element and namespace with inline binary payload (local extension):
 
 ```
 BindingInformation  (urn:nato:stanag:4778:bindinginformation:1:0)
@@ -25,27 +25,44 @@ BindingInformation  (urn:nato:stanag:4778:bindinginformation:1:0)
     [base64-encoded payload]
 ```
 
-`*` `DataObject` is a local extension element. ADatP-4778.2 has no defined element for inline binary payloads. Full spec conformance for binary data requires Phase 1 detached binding (external URI + digest).
+`*` `DataObject` is a local extension element (not in spec). Full spec conformance for binary data requires Phase 1+ detached binding.
 
-- All identifiers use `xml:id` (standard XML ID form matching Chapter 12 SPIF examples)
-- Caller-supplied `BindingId` values are validated as valid XML NCNames
-- `xmime:contentType` on `DataReference` carries the payload media type when present
-- `Unbind` rejects documents with the wrong root namespace, external `DataReference` URIs, missing `Metadata`, or missing `DataObject`
-- API surface unchanged: `POST /pep/api/metadata/bind` and `POST /pep/api/metadata/unbind`
+API: `POST /pep/api/metadata/bind`, `POST /pep/api/metadata/unbind`
 
-### Phase 1+ — not yet implemented
+### Phase 1 — HTTP Binding Profile (implemented)
+
+REST Binding Profile (ADatP-4778.2 Chapter 7). Null-URI detached BDO for the HTTP entity body:
+
+```
+BindingInformation
+  MetadataBindingContainer
+    MetadataBinding  @xml:id
+      Metadata       @xml:id
+        [STANAG 4774 originatorConfidentialityLabel XML]
+      DataReference  @URI=""  @xmime:contentType="message/http"
+```
+
+`DataReference URI=""` semantically binds the label to the HTTP entity body. No `DataObject` — the data is carried by the transport. The BDO is placed in the `Binding-Data:` HTTP header:
+
+```
+Binding-Data: binding-type="urn:nato:stanag:4778:bindinginformation:1:0";
+              binding-data-object="<base64 encoded BDO>"
+```
+
+`BindingDataHeaderCodec` handles the header encode/decode. Malformed header input returns HTTP 400.
+
+API: `POST /pep/api/metadata/bind-http`, `POST /pep/api/metadata/unbind-http`
+
+### Phase 2+ — not yet implemented
 
 | Feature | Phase | Notes |
 |---------|-------|-------|
-| Detached binding (external URI + digest) | 1 | Binary data carried outside the BDO via `DataReference` with a real URI and integrity digest |
-| SPIF embedding (`PolicyInformation`) | 1 | Embed or reference the governing SPIF inside the BDO |
-| REST `Binding-Data` header | 1 | Detached BDO transport via HTTP header per ADatP-4778.2 §8 |
-| XML-DSig envelope signing (`ds:Signature`) | 2 | Sign the `MetadataBinding` element using `mb:Id` reference targets |
+| External URI + XMLDSIG Manifest/digest | 2 | Binary data referenced by URI (e.g., `./file.bin`) requires a `ds:Manifest` with `DigestValue`; SHA-384 is mandatory |
+| XML-DSig envelope signing (`ds:Signature`) | 2 | Sign the `MetadataBinding` element; uses `mb:Id` reference targets per crypto annexes |
+| BDO embedded in SPIF extensions | 3 | A BDO goes *inside* `spif:extensions` to label the SPIF document itself (PAP concern, not binder) |
 | Multiple `MetadataBinding` per container | 3 | One BDO carrying labels for multiple data objects |
 | `MetadataReference` (external label link) | 3 | Point to a label stored outside the BDO |
 | Conformance test suite | 4 | Interoperability testing against reference implementations |
-
-This is production-quality Phase 0 BDO support. It is not a claim of full ADatP-4778.2 interoperability coverage.
 
 ## XML SPIF validation
 
