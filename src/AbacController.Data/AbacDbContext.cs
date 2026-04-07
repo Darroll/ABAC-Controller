@@ -53,6 +53,12 @@ public class AbacDbContext : DbContext
     /// <summary>Queued webhook deliveries (outbox pattern).</summary>
     public DbSet<WebhookEventEntity> WebhookEvents => Set<WebhookEventEntity>();
 
+    /// <summary>First-class ABAC groups (independent of any external directory).</summary>
+    public DbSet<AbacGroupEntity> AbacGroups => Set<AbacGroupEntity>();
+
+    /// <summary>Membership rows attaching user ids or external group ids to ABAC groups.</summary>
+    public DbSet<AbacGroupMembershipEntity> AbacGroupMemberships => Set<AbacGroupMembershipEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AbacDbContext).Assembly);

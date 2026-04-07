@@ -79,6 +79,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IApplicationRepository, ApplicationRepository>();
         services.AddScoped<IEntitlementRepository, EntitlementRepository>();
         services.AddScoped<IEntitlementResolver, EntitlementResolver>();
+        services.AddScoped<IAbacGroupRepository, AbacGroupRepository>();
+        services.AddSingleton<IGroupMembershipCache, GroupMembershipCache>();
+        services.AddScoped<IGroupMembershipResolver, GroupMembershipResolver>();
         services.AddScoped<IClassificationQueryEngine, ClassificationQueryEngine>();
 
         // Webhook publisher + dispatcher
@@ -270,6 +273,7 @@ public static class ServiceCollectionExtensions
             AddScopePolicy(options, "RecipientCheck", Scopes.RecipientCheck);
             AddScopePolicy(options, "WebhookAdmin", Scopes.WebhookAdmin);
             AddScopePolicy(options, "AuditMirrorWrite", Scopes.AuditMirrorWrite);
+            AddScopePolicy(options, "GroupAdmin", Scopes.GroupAdmin);
         });
     }
 

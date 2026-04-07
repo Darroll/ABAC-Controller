@@ -61,4 +61,7 @@ public static class Scopes
 
     /// <summary>Scope for mirroring external audit events into ABAC's audit store.</summary>
     public const string AuditMirrorWrite = "abac:audit:mirror:write";
+
+    /// <summary>Scope for managing ABAC groups and their direct/inherited membership.</summary>
+    public const string GroupAdmin = "abac:group:admin";
 }

@@ -19,6 +19,13 @@ public static class WebhookEventTypes
 
     /// <summary>An application registration was created or updated.</summary>
     public const string ApplicationUpdated = "application.updated";
+
+    /// <summary>
+    /// An ABAC group was created/deleted, or its membership changed. Subscribers
+    /// (e.g. Email Classification's classification cache) should drop any cached
+    /// per-subject visibility because effective group memberships may have moved.
+    /// </summary>
+    public const string AbacGroupChanged = "abac_group.changed";
 }
 
 /// <summary>
