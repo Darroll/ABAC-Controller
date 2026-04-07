@@ -87,7 +87,7 @@ public sealed class BindingDataHeaderCodec
             var eq = segment.IndexOf('=');
             if (eq < 0) continue;
             var name = segment[..eq].Trim();
-            var value = segment[(eq + 1)..].Trim().Trim('"');
+            var value = segment[(eq + 1)..].Trim().Trim('"').Trim();
             if (!string.IsNullOrEmpty(name))
                 result[name] = value;
         }

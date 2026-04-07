@@ -106,4 +106,18 @@ public sealed class BindingDataHeaderCodecTests
 
         Assert.Throws<InvalidOperationException>(() => _codec.Decode(badBase64));
     }
+
+    [Fact]
+    public void Encode_Throws_ArgumentException_For_Null_Or_Whitespace_Input()
+    {
+        Assert.Throws<ArgumentNullException>(() => _codec.Encode(null!));
+        Assert.Throws<ArgumentException>(() => _codec.Encode("   "));
+    }
+
+    [Fact]
+    public void Decode_Throws_ArgumentException_For_Null_Or_Whitespace_Input()
+    {
+        Assert.Throws<ArgumentNullException>(() => _codec.Decode(null!));
+        Assert.Throws<ArgumentException>(() => _codec.Decode("   "));
+    }
 }
