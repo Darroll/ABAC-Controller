@@ -9,7 +9,7 @@ namespace AbacController.Pep;
 /// Metadata binding service implementing the STANAG 4778 Binding Data Object (BDO) format
 /// as specified in ADatP-4778.2 Edition A Version 1 (December 2020).
 ///
-/// BDO structure:
+/// BDO structure (inline / Phase 0):
 ///   BindingInformation (urn:nato:stanag:4778:bindinginformation:1:0)
 ///     MetadataBindingContainer
 ///       MetadataBinding @xml:id
@@ -19,9 +19,14 @@ namespace AbacController.Pep;
 ///     DataObject @xml:id @encoding="base64"
 ///       [base64-encoded payload]
 ///
-/// Note: DataObject is a local extension element. ADatP-4778.2 has no defined element
-/// for carrying inline binary payloads. Full spec conformance for binary data requires
-/// Phase 1 detached binding (external URI + digest).
+/// BDO structure (detached / Phase 1 — HTTP body binding):
+///   BindingInformation
+///     MetadataBindingContainer
+///       MetadataBinding @xml:id
+///         Metadata @xml:id
+///           [STANAG 4774 label XML]
+///         DataReference @URI="" @xmime:contentType="message/http"
+///   (no DataObject — data is the HTTP entity body)
 /// </summary>
 public sealed class Stanag4778MetadataBinder : IStanag4778MetadataBinder
 {
@@ -42,6 +47,7 @@ public sealed class Stanag4778MetadataBinder : IStanag4778MetadataBinder
 
     /// <summary>
     /// Binds a STANAG 4774 label and opaque payload into a conformant STANAG 4778 BDO.
+    /// The payload is carried inline as a base64-encoded DataObject element (Phase 0 / local extension).
     /// </summary>
     public string Bind(MetadataBindingEnvelope envelope)
     {
@@ -53,24 +59,7 @@ public sealed class Stanag4778MetadataBinder : IStanag4778MetadataBinder
         var labelRoot = labelDocument.Root
             ?? throw new InvalidOperationException("Label XML is missing a root element.");
 
-        // Generate xml:id values. MetadataBinding xml:id reuses caller's BindingId if provided
-        // (caller is responsible for supplying a valid XML Name); otherwise generate a prefixed UUID.
-        var bindingId = string.IsNullOrWhiteSpace(envelope.BindingId)
-            ? "mb-" + Guid.NewGuid().ToString("N")
-            : envelope.BindingId;
-
-        // Validate caller-supplied BindingId is a valid XML NCName to prevent malformed xml:id attributes.
-        if (!string.IsNullOrWhiteSpace(envelope.BindingId))
-        {
-            try { System.Xml.XmlConvert.VerifyNCName(envelope.BindingId); }
-            catch (System.Xml.XmlException ex)
-            {
-                throw new ArgumentException(
-                    $"BindingId '{envelope.BindingId}' is not a valid XML NCName and cannot be used as xml:id. " +
-                    "Use only letters, digits, hyphens, underscores, and dots; the first character must be a letter or underscore.",
-                    nameof(envelope), ex);
-            }
-        }
+        var bindingId = ResolveBindingId(envelope.BindingId);
         var metadataId = "md-" + Guid.NewGuid().ToString("N");
         var dataObjectId = "do-" + Guid.NewGuid().ToString("N");
 
@@ -103,7 +92,50 @@ public sealed class Stanag4778MetadataBinder : IStanag4778MetadataBinder
     }
 
     /// <summary>
+    /// Binds a STANAG 4774 label to an externally-located data object (no inline payload).
+    /// Produces a BDO with <c>DataReference URI="{dataUri}"</c> and no DataObject element.
+    /// For the HTTP entity body binding profile use <c>dataUri=""</c> and
+    /// <c>contentType="message/http"</c> per ADatP-4778.2 Chapter 7.
+    /// </summary>
+    public string BindDetached(string labelXml, string dataUri, string? contentType, string? bindingId = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(labelXml);
+        ArgumentNullException.ThrowIfNull(dataUri); // empty string is valid (null URI = HTTP body)
+
+        var labelDocument = XDocument.Parse(labelXml, LoadOptions.PreserveWhitespace);
+        var labelRoot = labelDocument.Root
+            ?? throw new InvalidOperationException("Label XML is missing a root element.");
+
+        var resolvedBindingId = ResolveBindingId(bindingId);
+        var metadataId = "md-" + Guid.NewGuid().ToString("N");
+
+        var dataRefAttributes = new List<XAttribute>
+        {
+            new XAttribute("URI", dataUri)
+        };
+        if (!string.IsNullOrWhiteSpace(contentType))
+        {
+            dataRefAttributes.Add(new XAttribute(XmimeNs + "contentType", contentType));
+        }
+
+        var document = new XDocument(
+            new XElement(BindingNs + "BindingInformation",
+                new XAttribute(XNamespace.Xmlns + "mb", BindingNs),
+                new XAttribute(XNamespace.Xmlns + "xmime", XmimeNs),
+                new XElement(BindingNs + "MetadataBindingContainer",
+                    new XElement(BindingNs + "MetadataBinding",
+                        new XAttribute(XmlNs + "id", resolvedBindingId),
+                        new XElement(BindingNs + "Metadata",
+                            new XAttribute(XmlNs + "id", metadataId),
+                            new XElement(labelRoot)),
+                        new XElement(BindingNs + "DataReference", dataRefAttributes)))));
+
+        return document.ToString(SaveOptions.DisableFormatting);
+    }
+
+    /// <summary>
     /// Extracts the label and payload from a conformant STANAG 4778 BDO.
+    /// Supports inline DataObject (Phase 0) and null-URI detached binding (Phase 1).
     /// </summary>
     public MetadataUnbindResult Unbind(string envelopeXml)
     {
@@ -145,8 +177,8 @@ public sealed class Stanag4778MetadataBinder : IStanag4778MetadataBinder
         var dataRef = binding.Elements()
             .FirstOrDefault(static e => e.Name.LocalName == "DataReference");
 
-        // Resolve the DataReference URI to a DataObject in the BDO.
-        var (payload, mediaType) = ResolveDataObject(root, dataRef);
+        // Resolve the DataReference URI to a payload.
+        var (payload, mediaType) = ResolvePayload(root, dataRef);
 
         var labelXml = labelElement.ToString(SaveOptions.DisableFormatting);
         var decodeResult = _labelCodec.Decode(labelXml);
@@ -165,7 +197,11 @@ public sealed class Stanag4778MetadataBinder : IStanag4778MetadataBinder
     }
 
     // Resolves a DataReference element to payload bytes and media type.
-    private static (byte[] payload, string? mediaType) ResolveDataObject(XElement root, XElement? dataRef)
+    // Supports:
+    //   URI=""      → null-URI / HTTP entity body binding (Phase 1): returns empty payload
+    //   URI="#id"   → same-document DataObject reference (Phase 0): decodes inline base64
+    //   URI="other" → external reference (Phase 2+): throws InvalidOperationException
+    private static (byte[] payload, string? mediaType) ResolvePayload(XElement root, XElement? dataRef)
     {
         if (dataRef is null)
         {
@@ -173,16 +209,32 @@ public sealed class Stanag4778MetadataBinder : IStanag4778MetadataBinder
         }
 
         var uri = dataRef.Attribute("URI")?.Value ?? string.Empty;
+        var mediaType = dataRef.Attributes().FirstOrDefault(static a => a.Name.LocalName == "contentType")?.Value;
 
-        if (!uri.StartsWith('#'))
+        if (uri.Length == 0)
         {
-            // External URI — not supported in Phase 0 (detached binding is Phase 1).
-            throw new InvalidOperationException(
-                $"DataReference URI '{uri}' is an external reference. " +
-                "Only fragment references (same-document DataObject) are supported in this implementation.");
+            // Null-URI (URI=""): detached binding — data is carried in the transport layer (e.g., HTTP entity body).
+            // Return empty payload; the caller's transport context carries the actual data.
+            return ([], mediaType);
         }
 
-        var refId = uri.TrimStart('#');
+        if (uri.StartsWith('#'))
+        {
+            // Fragment reference: same-document DataObject (Phase 0 local extension).
+            return ResolveDataObject(root, uri, mediaType);
+        }
+
+        // Non-empty, non-fragment URI: external reference requires a Manifest/DigestValue (Phase 2 XMLDSIG).
+        throw new InvalidOperationException(
+            $"DataReference URI '{uri}' is an external reference. " +
+            "Only fragment (#) and null (\"\") URI references are supported. " +
+            "External URI binding requires Phase 2 XMLDSIG Manifest support.");
+    }
+
+    // Resolves a fragment URI to a sibling DataObject element and decodes its base64 payload.
+    private static (byte[] payload, string? mediaType) ResolveDataObject(XElement root, string fragmentUri, string? mediaType)
+    {
+        var refId = fragmentUri.TrimStart('#');
         // Search direct children of root only to avoid false matches inside nested XML payloads.
         var dataObject = root.Elements(BindingNs + "DataObject")
             .FirstOrDefault(e =>
@@ -190,14 +242,31 @@ public sealed class Stanag4778MetadataBinder : IStanag4778MetadataBinder
                 // Fallback: accept unqualified 'id' attribute from implementations that omit the xml: namespace prefix.
                 e.Attributes().FirstOrDefault(static a => a.Name.LocalName == "id")?.Value == refId)
             ?? throw new InvalidOperationException(
-                $"BDO does not contain a DataObject with xml:id='{refId}' referenced by DataReference URI='{uri}'.");
+                $"BDO does not contain a DataObject with xml:id='{refId}' referenced by DataReference URI='{fragmentUri}'.");
 
         var payloadBase64 = dataObject.Value.Trim();
         var payload = string.IsNullOrEmpty(payloadBase64) ? [] : Convert.FromBase64String(payloadBase64);
 
-        var mediaType = dataRef.Attributes()
-            .FirstOrDefault(static a => a.Name.LocalName == "contentType")?.Value;
-
         return (payload, mediaType);
+    }
+
+    // Validates and returns the bindingId, auto-generating a prefixed UUID if null/empty.
+    private static string ResolveBindingId(string? bindingId)
+    {
+        if (string.IsNullOrWhiteSpace(bindingId))
+        {
+            return "mb-" + Guid.NewGuid().ToString("N");
+        }
+
+        try { System.Xml.XmlConvert.VerifyNCName(bindingId); }
+        catch (System.Xml.XmlException ex)
+        {
+            throw new ArgumentException(
+                $"BindingId '{bindingId}' is not a valid XML NCName and cannot be used as xml:id. " +
+                "Use only letters, digits, hyphens, underscores, and dots; the first character must be a letter or underscore.",
+                nameof(bindingId), ex);
+        }
+
+        return bindingId;
     }
 }
