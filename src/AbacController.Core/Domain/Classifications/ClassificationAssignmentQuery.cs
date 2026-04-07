@@ -50,6 +50,15 @@ public sealed record ClassificationAssignmentQuery
 
     /// <summary>Target a specific policy set for native policy evaluation.</summary>
     public string? PolicySetId { get; init; }
+
+    /// <summary>
+    /// When true, the engine applies the entitlement filter layer
+    /// (baseline/group/user grants and denies) after the clearance check.
+    /// Defaults to false so callers that don't use entitlements behave unchanged.
+    /// Apps like Email Classification set this to true on every call so the tenant
+    /// baseline and per-user overrides are honoured.
+    /// </summary>
+    public bool EnforceEntitlements { get; init; }
 }
 
 /// <summary>
