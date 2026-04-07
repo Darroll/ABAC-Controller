@@ -416,6 +416,7 @@ public sealed class Stanag4778MetadataBinderTests
         var (binder, spifIndex, codec) = CreateBinder();
         var label = MakeLabel();
         var encoded = codec.Encode(label, spifIndex);
+        Assert.True(encoded.IsSuccess, encoded.Error);
 
         var xml = binder.BindDetached(encoded.EncodedString!, dataUri: "", contentType: "message/http");
         var doc = XDocument.Parse(xml);
@@ -429,6 +430,7 @@ public sealed class Stanag4778MetadataBinderTests
         var (binder, spifIndex, codec) = CreateBinder();
         var label = MakeLabel();
         var encoded = codec.Encode(label, spifIndex);
+        Assert.True(encoded.IsSuccess, encoded.Error);
 
         var xml = binder.BindDetached(encoded.EncodedString!, dataUri: "", contentType: "message/http");
         var doc = XDocument.Parse(xml);
@@ -443,6 +445,7 @@ public sealed class Stanag4778MetadataBinderTests
         var (binder, spifIndex, codec) = CreateBinder();
         var label = MakeLabel();
         var encoded = codec.Encode(label, spifIndex);
+        Assert.True(encoded.IsSuccess, encoded.Error);
 
         var xml = binder.BindDetached(encoded.EncodedString!, dataUri: "", contentType: "message/http");
         var doc = XDocument.Parse(xml);
@@ -462,6 +465,7 @@ public sealed class Stanag4778MetadataBinderTests
         var (binder, spifIndex, codec) = CreateBinder();
         var label = MakeLabel();
         var encoded = codec.Encode(label, spifIndex);
+        Assert.True(encoded.IsSuccess, encoded.Error);
 
         var xml = binder.BindDetached(encoded.EncodedString!, dataUri: "", contentType: "message/http", bindingId: "http-bind-001");
         var doc = XDocument.Parse(xml);
@@ -480,6 +484,7 @@ public sealed class Stanag4778MetadataBinderTests
         var (binder, spifIndex, codec) = CreateBinder();
         var label = MakeLabel();
         var encoded = codec.Encode(label, spifIndex);
+        Assert.True(encoded.IsSuccess, encoded.Error);
 
         var xml = binder.BindDetached(encoded.EncodedString!, dataUri: "", contentType: "message/http");
         var result = binder.Unbind(xml);
