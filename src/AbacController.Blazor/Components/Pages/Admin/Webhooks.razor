@@ -1,0 +1,259 @@
+@*
+    Component: Webhooks
+    Purpose: Manage webhook subscriptions and view delivery history. Used by
+             operators to register the Email Classification API's callback URL
+             and troubleshoot failed deliveries.
+    Route: /webhooks
+    Dependencies: HttpClient.
+*@
+@page "/webhooks"
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<h2>Webhooks</h2>
+<p class="text-muted" style="margin-top:-0.5rem; margin-bottom:1.5rem; font-size:0.95rem;">
+    Register callback URLs to receive HMAC-signed events (SPIF, policy, entitlement and
+    application changes).
+</p>
+
+@if (_errorMessage is not null)
+{
+    <div class="alert alert-danger py-2">@_errorMessage</div>
+}
+@if (_createdSecret is not null)
+{
+    <div class="alert alert-warning py-2">
+        <strong>New subscription secret (shown once):</strong>
+        <code>@_createdSecret</code> — store it securely.
+        <button class="btn btn-sm btn-link float-end py-0" @onclick="() => _createdSecret = null">Dismiss</button>
+    </div>
+}
+
+<div class="card mb-3">
+    <div class="card-header"><strong>Create subscription</strong></div>
+    <div class="card-body">
+        <div class="row g-2">
+            <div class="col-md-6">
+                <label class="form-label small">Callback URL <span class="text-danger">*</span></label>
+                <input class="form-control form-control-sm" @bind="_form.CallbackUrl"
+                       placeholder="https://email-api.example.com/internal/abac-events" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small">Event types (comma-separated, * = all)</label>
+                <input class="form-control form-control-sm" @bind="_form.EventTypes"
+                       placeholder="spif.imported,assignment.changed" />
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-success btn-sm w-100"
+                        disabled="@string.IsNullOrWhiteSpace(_form.CallbackUrl)"
+                        @onclick="Create">Register</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between">
+        <strong>Subscriptions</strong>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="Load">Refresh</button>
+    </div>
+    <div class="card-body p-0">
+        @if (_subscriptions is null)
+        {
+            <div class="p-3 text-muted">No data loaded.</div>
+        }
+        else if (_subscriptions.Count == 0)
+        {
+            <div class="p-3 text-muted">No webhook subscriptions.</div>
+        }
+        else
+        {
+            <table class="table table-sm table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>Id</th>
+                        <th>Callback</th>
+                        <th>Event types</th>
+                        <th>Active</th>
+                        <th>Last delivery</th>
+                        <th style="width: 160px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var sub in _subscriptions)
+                {
+                    <tr>
+                        <td><code>@sub.Id.ToString("N").Substring(0, 8)</code></td>
+                        <td><small>@sub.CallbackUrl</small></td>
+                        <td><small>@sub.EventTypes</small></td>
+                        <td>@(sub.Active ? "✓" : "✗")</td>
+                        <td>@(sub.LastDeliveryAt?.ToString("u") ?? "—")</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-secondary me-1"
+                                    @onclick="() => LoadEvents(sub.Id)">Events</button>
+                            <button class="btn btn-sm btn-outline-danger"
+                                    @onclick="() => Delete(sub.Id)">Delete</button>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@if (_events is not null)
+{
+    <div class="card">
+        <div class="card-header d-flex justify-content-between">
+            <strong>Recent events for @_activeSubscription.ToString("N").Substring(0, 8)</strong>
+            <button class="btn btn-sm btn-link py-0" @onclick="() => { _events = null; _activeSubscription = Guid.Empty; }">Close</button>
+        </div>
+        <div class="card-body p-0">
+            @if (_events.Count == 0)
+            {
+                <div class="p-3 text-muted">No events.</div>
+            }
+            else
+            {
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Created</th>
+                            <th>Event</th>
+                            <th>Status</th>
+                            <th>Attempts</th>
+                            <th>Last error</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var e in _events)
+                    {
+                        <tr>
+                            <td><small>@e.CreatedAt.ToString("u")</small></td>
+                            <td><code>@e.EventType</code></td>
+                            <td>@e.Status</td>
+                            <td>@e.Attempts</td>
+                            <td><small class="text-danger">@(e.LastError ?? "")</small></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<SubscriptionView>? _subscriptions;
+    private List<EventView>? _events;
+    private Guid _activeSubscription;
+    private string? _errorMessage;
+    private string? _createdSecret;
+    private CreateForm _form = new();
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        _errorMessage = null;
+        try
+        {
+            _subscriptions = await Http.GetFromJsonAsync<List<SubscriptionView>>("pap/api/webhooks") ?? [];
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Load failed: {ex.Message}";
+            _subscriptions = [];
+        }
+    }
+
+    private async Task Create()
+    {
+        _errorMessage = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("pap/api/webhooks", new
+            {
+                callbackUrl = _form.CallbackUrl,
+                eventTypes = string.IsNullOrWhiteSpace(_form.EventTypes) ? "*" : _form.EventTypes,
+                active = true
+            });
+            response.EnsureSuccessStatusCode();
+            var created = await response.Content.ReadFromJsonAsync<CreateResponse>();
+            _createdSecret = created?.Secret;
+            _form = new();
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Create failed: {ex.Message}";
+        }
+    }
+
+    private async Task Delete(Guid id)
+    {
+        _errorMessage = null;
+        try
+        {
+            var response = await Http.DeleteAsync($"pap/api/webhooks/{id}");
+            response.EnsureSuccessStatusCode();
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Delete failed: {ex.Message}";
+        }
+    }
+
+    private async Task LoadEvents(Guid id)
+    {
+        _errorMessage = null;
+        try
+        {
+            _activeSubscription = id;
+            _events = await Http.GetFromJsonAsync<List<EventView>>(
+                $"pap/api/webhooks/{id}/events?max=100") ?? [];
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Events load failed: {ex.Message}";
+            _events = [];
+        }
+    }
+
+    public sealed class SubscriptionView
+    {
+        public Guid Id { get; set; }
+        public string? TenantId { get; set; }
+        public string CallbackUrl { get; set; } = "";
+        public string EventTypes { get; set; } = "*";
+        public bool Active { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset? LastDeliveryAt { get; set; }
+    }
+
+    public sealed class CreateResponse
+    {
+        public SubscriptionView? Subscription { get; set; }
+        public string? Secret { get; set; }
+    }
+
+    public sealed class EventView
+    {
+        public Guid Id { get; set; }
+        public Guid SubscriptionId { get; set; }
+        public string EventType { get; set; } = "";
+        public string Status { get; set; } = "";
+        public int Attempts { get; set; }
+        public string? LastError { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset? DeliveredAt { get; set; }
+    }
+
+    private sealed class CreateForm
+    {
+        public string CallbackUrl { get; set; } = "";
+        public string EventTypes { get; set; } = "*";
+    }
+}

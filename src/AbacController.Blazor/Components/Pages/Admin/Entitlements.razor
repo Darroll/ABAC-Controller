@@ -1,0 +1,179 @@
+@*
+    Component: Entitlements
+    Purpose: Manage tenant baseline entitlements (the centre of the hybrid
+             assignment model shared with Email Classification). Group and user
+             overrides are managed via the same /pap/api/entitlements endpoints
+             and can be added here later.
+    Route: /entitlements
+    Dependencies: HttpClient.
+*@
+@page "/entitlements"
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<h2>Entitlements</h2>
+<p class="text-muted" style="margin-top:-0.5rem; margin-bottom:1.5rem; font-size:0.95rem;">
+    Tenant baseline entitlements for SPIF policies and classifications.
+    Applied during classification queries when <code>EnforceEntitlements = true</code>.
+</p>
+
+<div class="row g-2 mb-3">
+    <div class="col-md-4">
+        <label class="form-label small">Tenant Id</label>
+        <input class="form-control form-control-sm" @bind="_tenantId" @bind:event="oninput" placeholder="tenant-a" />
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-sm btn-primary w-100" @onclick="LoadBaseline">Reload</button>
+    </div>
+</div>
+
+@if (_errorMessage is not null)
+{
+    <div class="alert alert-danger py-2">@_errorMessage</div>
+}
+
+<div class="card mb-3">
+    <div class="card-header">
+        <strong>Add baseline entitlement</strong>
+    </div>
+    <div class="card-body">
+        <div class="row g-2">
+            <div class="col-md-4">
+                <label class="form-label small">Policy OID <span class="text-danger">*</span></label>
+                <input class="form-control form-control-sm" @bind="_form.PolicyOid" placeholder="2.16.840.1.101.2.1.8.2.1" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Classification LACV (optional)</label>
+                <input class="form-control form-control-sm" type="number" @bind="_form.ClassificationLacv" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Tag set OID (optional)</label>
+                <input class="form-control form-control-sm" @bind="_form.TagSetOid" />
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-success btn-sm w-100"
+                        disabled="@(string.IsNullOrWhiteSpace(_tenantId) || string.IsNullOrWhiteSpace(_form.PolicyOid))"
+                        @onclick="AddBaseline">Add</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <strong>Current baseline</strong>
+        <span class="text-muted ms-2">@(_rows?.Count ?? 0) entries</span>
+    </div>
+    <div class="card-body p-0">
+        @if (_rows is null)
+        {
+            <div class="p-3 text-muted">No data loaded.</div>
+        }
+        else if (_rows.Count == 0)
+        {
+            <div class="p-3 text-muted">No baseline entitlements for this tenant.</div>
+        }
+        else
+        {
+            <table class="table table-sm table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>Policy OID</th>
+                        <th>Classification LACV</th>
+                        <th>Tag set OID</th>
+                        <th style="width: 100px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var row in _rows)
+                {
+                    <tr>
+                        <td><code>@row.PolicyOid</code></td>
+                        <td>@(row.ClassificationLacv?.ToString() ?? "—")</td>
+                        <td>@(row.TagSetOid ?? "—")</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-danger"
+                                    @onclick="() => RemoveBaseline(row)">Remove</button>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@code {
+    private string _tenantId = "";
+    private string? _errorMessage;
+    private List<BaselineRow>? _rows;
+    private BaselineForm _form = new();
+
+    private async Task LoadBaseline()
+    {
+        _errorMessage = null;
+        if (string.IsNullOrWhiteSpace(_tenantId)) { _rows = []; return; }
+        try
+        {
+            _rows = await Http.GetFromJsonAsync<List<BaselineRow>>(
+                $"pap/api/entitlements/{Uri.EscapeDataString(_tenantId)}/baseline") ?? [];
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Load failed: {ex.Message}";
+            _rows = [];
+        }
+    }
+
+    private async Task AddBaseline()
+    {
+        _errorMessage = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                $"pap/api/entitlements/{Uri.EscapeDataString(_tenantId)}/baseline",
+                new { policyOid = _form.PolicyOid, classificationLacv = _form.ClassificationLacv, tagSetOid = _form.TagSetOid });
+            response.EnsureSuccessStatusCode();
+            _form = new();
+            await LoadBaseline();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Add failed: {ex.Message}";
+        }
+    }
+
+    private async Task RemoveBaseline(BaselineRow row)
+    {
+        _errorMessage = null;
+        try
+        {
+            var query = $"?policyOid={Uri.EscapeDataString(row.PolicyOid)}";
+            if (row.ClassificationLacv.HasValue)
+                query += $"&classificationLacv={row.ClassificationLacv.Value}";
+
+            var response = await Http.DeleteAsync(
+                $"pap/api/entitlements/{Uri.EscapeDataString(_tenantId)}/baseline{query}");
+            response.EnsureSuccessStatusCode();
+            await LoadBaseline();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Remove failed: {ex.Message}";
+        }
+    }
+
+    public sealed class BaselineRow
+    {
+        public string PolicyOid { get; set; } = "";
+        public int? ClassificationLacv { get; set; }
+        public string? TagSetOid { get; set; }
+    }
+
+    private sealed class BaselineForm
+    {
+        public string PolicyOid { get; set; } = "";
+        public int? ClassificationLacv { get; set; }
+        public string? TagSetOid { get; set; }
+    }
+}
