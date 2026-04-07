@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SPIF xmlns="urn:xmlspif:spif:3.0" version="3">
+  <securityPolicyId oid="2.16.840.1.101.2.1.1.20" />
+  <spifVersionNumber value="1" />
+  <creationDate value="2026-01-01T00:00:00Z" />
+  <originator>National Archives and Records Administration</originator>
+
+  <securityClassifications>
+    <securityClassification name="CUI BASIC" lacv="1" hierarchy="1">
+      <markingData>
+        <markingPhrase phraseText="CUI" isPortionMarking="true" portionAbbreviation="CUI" />
+        <markingCode codeValue="CUI" />
+        <foregroundColor value="#ffffff" />
+        <backgroundColor value="#502B85" />
+      </markingData>
+    </securityClassification>
+
+    <securityClassification name="CUI SPECIFIED" lacv="2" hierarchy="2">
+      <markingData>
+        <markingPhrase phraseText="CUI//SP-" isPortionMarking="true" portionAbbreviation="CUI//SP-" />
+        <markingCode codeValue="CUI-SP" />
+        <foregroundColor value="#ffffff" />
+        <backgroundColor value="#502B85" />
+      </markingData>
+    </securityClassification>
+  </securityClassifications>
+
+  <securityCategoryTagSets>
+    <securityCategoryTagSet tagSetName="CUI Categories" tagSetId="2.16.840.1.101.2.1.1.20.1">
+      <securityCategoryTag tagName="PRVCY" lacv="1" tagType="informative">
+        <markingData>
+          <markingPhrase phraseText="PRIVACY" isPortionMarking="true" portionAbbreviation="PRVCY" />
+          <markingCode codeValue="PRVCY" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="EXPT" lacv="2" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="EXPORT CONTROLLED" isPortionMarking="true" portionAbbreviation="EXPT" />
+          <markingCode codeValue="EXPT" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="LES" lacv="3" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="LAW ENFORCEMENT SENSITIVE" isPortionMarking="true" portionAbbreviation="LES" />
+          <markingCode codeValue="LES" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="PHYS" lacv="4" tagType="informative">
+        <markingData>
+          <markingPhrase phraseText="PHYSICAL SECURITY" isPortionMarking="true" portionAbbreviation="PHYS" />
+          <markingCode codeValue="PHYS" />
+        </markingData>
+      </securityCategoryTag>
+    </securityCategoryTagSet>
+
+    <!-- CUI Dissemination Controls — per 32 CFR Part 2002 -->
+    <securityCategoryTagSet tagSetName="CUI Dissemination Controls"
+                            tagSetId="2.16.840.1.101.2.1.1.20.2"
+                            displayName="CUI Dissemination Controls"
+                            displayOrder="2">
+      <securityCategoryTag tagName="NOFORN" lacv="1" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="NOFORN" isPortionMarking="true" portionAbbreviation="NF" />
+          <markingCode codeValue="NF" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="FEDCON" lacv="2" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="FEDERAL CONTRACTORS ONLY" isPortionMarking="true" portionAbbreviation="FEDCON" />
+          <markingCode codeValue="FEDCON" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="DL ONLY" lacv="3" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="DISSEMINATION LIST ONLY" isPortionMarking="true" portionAbbreviation="DL ONLY" />
+          <markingCode codeValue="DL ONLY" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="REL TO" lacv="4" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="REL TO" isPortionMarking="true" portionAbbreviation="REL" />
+          <markingCode codeValue="REL" />
+        </markingData>
+      </securityCategoryTag>
+    </securityCategoryTagSet>
+  </securityCategoryTagSets>
+
+  <!-- Authority field definitions for CUI compose form -->
+  <extensions>
+    <freeFormField fieldName="authority.showForCui" fieldValue="true" />
+    <freeFormField fieldName="authority.controlledBy" fieldValue="Controlled by|text|true||Controlled By" />
+    <freeFormField fieldName="authority.cuiCategory" fieldValue="CUI category|dropdown|true||Category" />
+    <freeFormField fieldName="authority.pocName" fieldValue="Point of contact|text|true||" />
+    <freeFormField fieldName="authority.pocPhone" fieldValue="Contact phone|phone|true||" />
+  </extensions>
+</SPIF>

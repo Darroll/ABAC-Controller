@@ -31,6 +31,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Default SPIF policies seeded into the in-process registry on first
+         boot when Seed:SeedDefaultSpifs is true. See SpifSeedService. -->
+    <Content Include="data\seed-spifs\*.spif.xml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Protobuf Include="..\..\protos\abaccontroller\v1\common.proto" ProtoRoot="..\..\protos" GrpcServices="None" />
     <Protobuf Include="..\..\protos\abaccontroller\v1\pdp.proto" ProtoRoot="..\..\protos" GrpcServices="Server" />
     <Protobuf Include="..\..\protos\abaccontroller\v1\pap.proto" ProtoRoot="..\..\protos" GrpcServices="Server" />

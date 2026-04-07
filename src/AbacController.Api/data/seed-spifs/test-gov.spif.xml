@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Test Gov Organization — DoD-modeled government classification policy.
+  Mirrors US DoD classification levels and colors with a fictitious
+  Special Access Program called WAGYU BEEF for demonstration purposes.
+
+  OID: 1.2.3.4.5.6.7.1  (test arc)
+-->
+<SPIF xmlns="urn:xmlspif:spif:3.0" version="3">
+  <securityPolicyId oid="1.2.3.4.5.6.7.1" />
+  <spifVersionNumber value="1" />
+  <creationDate value="2026-01-01T00:00:00Z" />
+  <originator>Test Gov Organization</originator>
+
+  <!--
+    Classification levels modeled on US DoD (DoDM 5200.01).
+    Same 5 levels, same official Pantone-derived colors.
+  -->
+  <securityClassifications>
+    <securityClassification name="UNCLASSIFIED" lacv="1" hierarchy="1">
+      <markingData>
+        <markingPhrase phraseText="UNCLASSIFIED" isPortionMarking="true" portionAbbreviation="U" />
+        <markingCode codeValue="U" />
+        <foregroundColor value="#ffffff" />
+        <backgroundColor value="#007A33" />
+      </markingData>
+    </securityClassification>
+
+    <securityClassification name="CUI" lacv="2" hierarchy="2">
+      <markingData>
+        <markingPhrase phraseText="CONTROLLED UNCLASSIFIED INFORMATION" isPortionMarking="true" portionAbbreviation="CUI" />
+        <markingCode codeValue="CUI" />
+        <foregroundColor value="#ffffff" />
+        <backgroundColor value="#502B85" />
+      </markingData>
+    </securityClassification>
+
+    <securityClassification name="CONFIDENTIAL" lacv="3" hierarchy="3">
+      <markingData>
+        <markingPhrase phraseText="CONFIDENTIAL" isPortionMarking="true" portionAbbreviation="C" />
+        <markingCode codeValue="C" />
+        <foregroundColor value="#ffffff" />
+        <backgroundColor value="#0033A0" />
+      </markingData>
+    </securityClassification>
+
+    <securityClassification name="SECRET" lacv="4" hierarchy="4">
+      <markingData>
+        <markingPhrase phraseText="SECRET" isPortionMarking="true" portionAbbreviation="S" />
+        <markingCode codeValue="S" />
+        <foregroundColor value="#ffffff" />
+        <backgroundColor value="#C8102E" />
+      </markingData>
+    </securityClassification>
+
+    <securityClassification name="TOP SECRET" lacv="5" hierarchy="5">
+      <markingData>
+        <markingPhrase phraseText="TOP SECRET" isPortionMarking="true" portionAbbreviation="TS" />
+        <markingCode codeValue="TS" />
+        <foregroundColor value="#000000" />
+        <backgroundColor value="#FF671F" />
+      </markingData>
+    </securityClassification>
+  </securityClassifications>
+
+  <securityCategoryTagSets>
+    <!-- SCI Compartments — gated at SECRET (LACV 4) and above -->
+    <securityCategoryTagSet tagSetName="SCI Compartments"
+                            tagSetId="1.2.3.4.5.6.7.1.1"
+                            displayName="SCI Compartments"
+                            displayOrder="1"
+                            applicableClassificationMinLacv="4">
+      <securityCategoryTag tagName="HCS" lacv="1" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="HCS" isPortionMarking="true" portionAbbreviation="HCS" />
+          <markingCode codeValue="HCS" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="SI" lacv="2" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="SI" isPortionMarking="true" portionAbbreviation="SI" />
+          <markingCode codeValue="SI" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="TK" lacv="3" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="TK" isPortionMarking="true" portionAbbreviation="TK" />
+          <markingCode codeValue="TK" />
+        </markingData>
+      </securityCategoryTag>
+    </securityCategoryTagSet>
+
+    <!--
+      SAP: WAGYU BEEF — fictitious Special Access Program.
+      Gated at SECRET (LACV 4) and above.
+      Sub-compartments PRIME CUT, MARBLING, and KOBE each require the
+      WAGYU BEEF umbrella tag. KOBE additionally requires TOP SECRET.
+    -->
+    <securityCategoryTagSet tagSetName="SAP: WAGYU BEEF"
+                            tagSetId="1.2.3.4.5.6.7.1.2"
+                            displayName="SAP: WAGYU BEEF"
+                            displayOrder="2"
+                            applicableClassificationMinLacv="4">
+      <securityCategoryTag tagName="WAGYU BEEF" lacv="1" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="WAGYU BEEF" isPortionMarking="true" portionAbbreviation="WB" />
+          <markingCode codeValue="WB" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="PRIME CUT" lacv="2" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="PRIME CUT" isPortionMarking="true" portionAbbreviation="WB-PC" />
+          <markingCode codeValue="WB-PC" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="MARBLING" lacv="3" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="MARBLING" isPortionMarking="true" portionAbbreviation="WB-MB" />
+          <markingCode codeValue="WB-MB" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="KOBE" lacv="4" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="KOBE" isPortionMarking="true" portionAbbreviation="WB-KB" />
+          <markingCode codeValue="WB-KB" />
+        </markingData>
+      </securityCategoryTag>
+
+      <categoryGroup groupName="Program Access" groupType="optional"
+                     minSelections="0" maxSelections="4"
+                     displayHint="checkboxList">
+        <description>WAGYU BEEF SAP — select program umbrella first, then sub-compartments as needed.</description>
+        <tagRef lacv="1" />
+        <tagRef lacv="2" />
+        <tagRef lacv="3" />
+        <tagRef lacv="4" />
+      </categoryGroup>
+
+      <!-- PRIME CUT requires WAGYU BEEF umbrella -->
+      <categoryConstraint constraintType="coRequirement"
+                          sourceTagSetId="1.2.3.4.5.6.7.1.2" sourceTagLacv="2"
+                          targetTagSetId="1.2.3.4.5.6.7.1.2" targetTagLacv="1"
+                          severity="error">
+        <errorMessage>PRIME CUT requires the WAGYU BEEF program umbrella to be selected.</errorMessage>
+      </categoryConstraint>
+
+      <!-- MARBLING requires WAGYU BEEF umbrella -->
+      <categoryConstraint constraintType="coRequirement"
+                          sourceTagSetId="1.2.3.4.5.6.7.1.2" sourceTagLacv="3"
+                          targetTagSetId="1.2.3.4.5.6.7.1.2" targetTagLacv="1"
+                          severity="error">
+        <errorMessage>MARBLING requires the WAGYU BEEF program umbrella to be selected.</errorMessage>
+      </categoryConstraint>
+
+      <!-- KOBE requires WAGYU BEEF umbrella -->
+      <categoryConstraint constraintType="coRequirement"
+                          sourceTagSetId="1.2.3.4.5.6.7.1.2" sourceTagLacv="4"
+                          targetTagSetId="1.2.3.4.5.6.7.1.2" targetTagLacv="1"
+                          severity="error">
+        <errorMessage>KOBE requires the WAGYU BEEF program umbrella to be selected.</errorMessage>
+      </categoryConstraint>
+    </securityCategoryTagSet>
+
+    <!-- Dissemination Controls — gated at CONFIDENTIAL (LACV 3) and above -->
+    <securityCategoryTagSet tagSetName="Dissemination Controls"
+                            tagSetId="1.2.3.4.5.6.7.1.3"
+                            displayName="Dissemination Controls"
+                            displayOrder="3"
+                            applicableClassificationMinLacv="3">
+      <securityCategoryTag tagName="NOFORN" lacv="1" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="NOFORN" isPortionMarking="true" portionAbbreviation="NF" />
+          <markingCode codeValue="NF" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="REL TO" lacv="2" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="REL TO" isPortionMarking="true" portionAbbreviation="REL" />
+          <markingCode codeValue="REL" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="ORCON" lacv="3" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="ORIGINATOR CONTROLLED" isPortionMarking="true" portionAbbreviation="OC" />
+          <markingCode codeValue="OC" />
+        </markingData>
+      </securityCategoryTag>
+
+      <!-- NOFORN and REL TO are mutually exclusive -->
+      <categoryConstraint constraintType="mutualExclusion"
+                          sourceTagSetId="1.2.3.4.5.6.7.1.3" sourceTagLacv="1"
+                          targetTagSetId="1.2.3.4.5.6.7.1.3" targetTagLacv="2"
+                          severity="error">
+        <errorMessage>NOFORN and REL TO cannot be selected together — NOFORN prohibits foreign release.</errorMessage>
+      </categoryConstraint>
+    </securityCategoryTagSet>
+
+    <!-- Releasable Nations — gated at CONFIDENTIAL (LACV 3) and above -->
+    <securityCategoryTagSet tagSetName="Releasable Nations"
+                            tagSetId="1.2.3.4.5.6.7.1.4"
+                            displayName="Releasable Nations"
+                            displayOrder="4"
+                            applicableClassificationMinLacv="3">
+      <securityCategoryTag tagName="FVEY" lacv="1" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="FVEY" isPortionMarking="true" portionAbbreviation="FVEY" />
+          <markingCode codeValue="FVEY" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="USA" lacv="2" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="USA" isPortionMarking="true" portionAbbreviation="USA" />
+          <markingCode codeValue="USA" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="GBR" lacv="3" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="GBR" isPortionMarking="true" portionAbbreviation="GBR" />
+          <markingCode codeValue="GBR" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="CAN" lacv="4" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="CAN" isPortionMarking="true" portionAbbreviation="CAN" />
+          <markingCode codeValue="CAN" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="AUS" lacv="5" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="AUS" isPortionMarking="true" portionAbbreviation="AUS" />
+          <markingCode codeValue="AUS" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="NZL" lacv="6" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="NZL" isPortionMarking="true" portionAbbreviation="NZL" />
+          <markingCode codeValue="NZL" />
+        </markingData>
+      </securityCategoryTag>
+    </securityCategoryTagSet>
+  </securityCategoryTagSets>
+
+  <!-- Government authority field definitions for the classified email compose form -->
+  <extensions>
+    <freeFormField fieldName="authority.showForClassified" fieldValue="true" />
+    <freeFormField fieldName="authority.classifiedBy" fieldValue="Classified by|text|true||CLASSIFIED BY" />
+    <freeFormField fieldName="authority.agency" fieldValue="Agency|text|true||AGENCY" />
+    <freeFormField fieldName="authority.reason" fieldValue="Reason|text|true||REASON" />
+    <freeFormField fieldName="authority.derivedFrom" fieldValue="Derived from|text|true|Multiple Sources|DERIVED FROM" />
+    <freeFormField fieldName="authority.dateOfSource" fieldValue="Date of source|date|true||" />
+    <freeFormField fieldName="authority.declassifyOn" fieldValue="Declassify on|date|false||DECLASSIFY ON" />
+  </extensions>
+</SPIF>

@@ -16,6 +16,31 @@ public sealed class AbacControllerOptions
 
     /// <summary>Rate limiting configuration.</summary>
     public RateLimitingOptions RateLimiting { get; set; } = new();
+
+    /// <summary>First-boot data seeding (default SPIFs etc.).</summary>
+    public SeedOptions Seed { get; set; } = new();
+}
+
+/// <summary>
+/// Controls one-shot seeding that runs during host startup before the API
+/// becomes ready.
+/// </summary>
+public sealed class SeedOptions
+{
+    /// <summary>
+    /// When true (default in dev), the host attempts to import any
+    /// <c>*.spif.xml</c> file under <see cref="SpifSeedDirectory"/> into the
+    /// default tenant on first boot. Idempotent.
+    /// </summary>
+    public bool SeedDefaultSpifs { get; set; }
+
+    /// <summary>
+    /// Directory the seed service scans. Defaults to
+    /// <c>{AppContext.BaseDirectory}/data/seed-spifs</c> which matches the
+    /// path the API project copies the bundled defaults to via the csproj
+    /// Content item.
+    /// </summary>
+    public string? SpifSeedDirectory { get; set; }
 }
 
 /// <summary>

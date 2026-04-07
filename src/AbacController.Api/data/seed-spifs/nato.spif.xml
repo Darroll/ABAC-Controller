@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SPIF xmlns="urn:xmlspif:spif:3.0" version="3">
+  <securityPolicyId oid="2.16.840.1.101.2.1.1.19" />
+  <spifVersionNumber value="1" />
+  <creationDate value="2026-01-01T00:00:00Z" />
+  <originator>North Atlantic Treaty Organization</originator>
+
+  <securityClassifications>
+    <securityClassification name="NATO UNCLASSIFIED" lacv="1" hierarchy="1">
+      <markingData>
+        <markingPhrase phraseText="NATO UNCLASSIFIED" isPortionMarking="true" portionAbbreviation="NU" />
+        <markingCode codeValue="NU" />
+        <foregroundColor value="#000000" />
+        <backgroundColor value="#007A33" />
+      </markingData>
+    </securityClassification>
+
+    <securityClassification name="NATO RESTRICTED" lacv="2" hierarchy="2">
+      <markingData>
+        <markingPhrase phraseText="NATO RESTRICTED" isPortionMarking="true" portionAbbreviation="NR" />
+        <markingCode codeValue="NR" />
+        <foregroundColor value="#000000" />
+        <backgroundColor value="#FF671F" />
+      </markingData>
+    </securityClassification>
+
+    <securityClassification name="NATO CONFIDENTIAL" lacv="3" hierarchy="3">
+      <markingData>
+        <markingPhrase phraseText="NATO CONFIDENTIAL" isPortionMarking="true" portionAbbreviation="NC" />
+        <markingCode codeValue="NC" />
+        <foregroundColor value="#ffffff" />
+        <backgroundColor value="#0033A0" />
+      </markingData>
+    </securityClassification>
+
+    <securityClassification name="NATO SECRET" lacv="4" hierarchy="4">
+      <markingData>
+        <markingPhrase phraseText="NATO SECRET" isPortionMarking="true" portionAbbreviation="NS" />
+        <markingCode codeValue="NS" />
+        <foregroundColor value="#ffffff" />
+        <backgroundColor value="#C8102E" />
+      </markingData>
+    </securityClassification>
+
+    <securityClassification name="COSMIC TOP SECRET" lacv="5" hierarchy="5">
+      <markingData>
+        <markingPhrase phraseText="COSMIC TOP SECRET" isPortionMarking="true" portionAbbreviation="CTS" />
+        <markingCode codeValue="CTS" />
+        <foregroundColor value="#000000" />
+        <backgroundColor value="#F7EA48" />
+      </markingData>
+    </securityClassification>
+  </securityClassifications>
+
+  <!-- Per C-M(2002)49 and STANAG 4774/4778 marking order -->
+  <securityCategoryTagSets>
+    <!-- ATOMAL Markings — restricted nuclear information, gated at NATO CONFIDENTIAL (3) -->
+    <securityCategoryTagSet tagSetName="ATOMAL Markings"
+                            tagSetId="2.16.840.1.101.2.1.1.19.1"
+                            displayName="ATOMAL Markings"
+                            displayOrder="1"
+                            applicableClassificationMinLacv="3">
+      <securityCategoryTag tagName="ATOMAL" lacv="1" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="ATOMAL" isPortionMarking="true" portionAbbreviation="ATOMAL" />
+          <markingCode codeValue="ATOMAL" />
+        </markingData>
+      </securityCategoryTag>
+    </securityCategoryTagSet>
+
+    <!-- BOHEMIA — special intelligence, gated at COSMIC TOP SECRET (5) -->
+    <securityCategoryTagSet tagSetName="BOHEMIA Markings"
+                            tagSetId="2.16.840.1.101.2.1.1.19.5"
+                            displayName="BOHEMIA"
+                            displayOrder="2"
+                            applicableClassificationMinLacv="5">
+      <securityCategoryTag tagName="BOHEMIA" lacv="1" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="BOHEMIA" isPortionMarking="true" portionAbbreviation="BOHEMIA" />
+          <markingCode codeValue="BOHEMIA" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="BALK" lacv="2" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="BALK" isPortionMarking="true" portionAbbreviation="BALK" />
+          <markingCode codeValue="BALK" />
+        </markingData>
+      </securityCategoryTag>
+    </securityCategoryTagSet>
+
+    <!-- Special Categories — gated at NATO CONFIDENTIAL (3) -->
+    <securityCategoryTagSet tagSetName="Special Categories"
+                            tagSetId="2.16.840.1.101.2.1.1.19.2"
+                            displayName="Special Categories"
+                            displayOrder="3"
+                            applicableClassificationMinLacv="3">
+      <securityCategoryTag tagName="CRYPTO" lacv="1" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="CRYPTO" isPortionMarking="true" portionAbbreviation="CRYPTO" />
+          <markingCode codeValue="CRYPTO" />
+        </markingData>
+      </securityCategoryTag>
+    </securityCategoryTagSet>
+
+    <!-- NATO Handling Caveats — NATO-specific caveats only -->
+    <securityCategoryTagSet tagSetName="Handling Caveats"
+                            tagSetId="2.16.840.1.101.2.1.1.19.3"
+                            displayName="Handling Caveats"
+                            displayOrder="4">
+      <securityCategoryTag tagName="PERSONAL FOR" lacv="1" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="PERSONAL FOR" isPortionMarking="true" portionAbbreviation="PF" />
+          <markingCode codeValue="PF" />
+        </markingData>
+      </securityCategoryTag>
+    </securityCategoryTagSet>
+
+    <!-- Releasability -->
+    <securityCategoryTagSet tagSetName="Releasability"
+                            tagSetId="2.16.840.1.101.2.1.1.19.4"
+                            displayName="Releasability"
+                            displayOrder="5">
+      <securityCategoryTag tagName="NATO NATIONS" lacv="1" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="REL TO NATO" isPortionMarking="true" portionAbbreviation="REL NATO" />
+          <markingCode codeValue="REL-NATO" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="PfP NATIONS" lacv="2" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="PfP" isPortionMarking="true" portionAbbreviation="PfP" />
+          <markingCode codeValue="PfP" />
+        </markingData>
+      </securityCategoryTag>
+    </securityCategoryTagSet>
+  </securityCategoryTagSets>
+</SPIF>

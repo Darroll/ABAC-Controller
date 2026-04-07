@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SPIF xmlns="urn:xmlspif:spif:3.0" version="3">
+  <securityPolicyId oid="1.2.36.1.1.0.1" />
+  <spifVersionNumber value="1" />
+  <creationDate value="2026-01-01T00:00:00Z" />
+  <originator>Australian Government — Protective Security Policy Framework</originator>
+
+  <!-- Per PSPF and ISM: 6 classification levels -->
+  <securityClassifications>
+    <securityClassification name="UNOFFICIAL" lacv="1" hierarchy="1">
+      <markingData>
+        <markingPhrase phraseText="UNOFFICIAL" isPortionMarking="true" portionAbbreviation="U" />
+        <markingCode codeValue="U" />
+        <foregroundColor value="#000000" />
+        <backgroundColor value="#9ca3af" />
+      </markingData>
+    </securityClassification>
+
+    <securityClassification name="OFFICIAL" lacv="2" hierarchy="2">
+      <markingData>
+        <markingPhrase phraseText="OFFICIAL" isPortionMarking="true" portionAbbreviation="O" />
+        <markingCode codeValue="O" />
+        <foregroundColor value="#000000" />
+        <backgroundColor value="#6CC24A" />
+      </markingData>
+    </securityClassification>
+
+    <securityClassification name="OFFICIAL:Sensitive" lacv="3" hierarchy="3">
+      <markingData>
+        <markingPhrase phraseText="OFFICIAL:Sensitive" isPortionMarking="true" portionAbbreviation="OS" />
+        <markingCode codeValue="OS" />
+        <foregroundColor value="#000000" />
+        <backgroundColor value="#FFF2CC" />
+      </markingData>
+    </securityClassification>
+
+    <securityClassification name="PROTECTED" lacv="4" hierarchy="4">
+      <markingData>
+        <markingPhrase phraseText="PROTECTED" isPortionMarking="true" portionAbbreviation="P" />
+        <markingCode codeValue="P" />
+        <foregroundColor value="#ffffff" />
+        <backgroundColor value="#4F81BD" />
+      </markingData>
+    </securityClassification>
+
+    <securityClassification name="SECRET" lacv="5" hierarchy="5">
+      <markingData>
+        <markingPhrase phraseText="SECRET" isPortionMarking="true" portionAbbreviation="S" />
+        <markingCode codeValue="S" />
+        <foregroundColor value="#000000" />
+        <backgroundColor value="#E5B8B7" />
+      </markingData>
+    </securityClassification>
+
+    <securityClassification name="TOP SECRET" lacv="6" hierarchy="6">
+      <markingData>
+        <markingPhrase phraseText="TOP SECRET" isPortionMarking="true" portionAbbreviation="TS" />
+        <markingCode codeValue="TS" />
+        <foregroundColor value="#ffffff" />
+        <backgroundColor value="#FF0000" />
+      </markingData>
+    </securityClassification>
+  </securityClassifications>
+
+  <!-- Per PSPF and ISM marking guidance -->
+  <securityCategoryTagSets>
+    <!-- Releasability Caveats — AUSTEO and AGAO apply from OFFICIAL:Sensitive (3) and above -->
+    <securityCategoryTagSet tagSetName="Releasability Caveats"
+                            tagSetId="1.2.36.1.1.0.1.1"
+                            displayName="Releasability Caveats"
+                            displayOrder="1"
+                            applicableClassificationMinLacv="3">
+      <securityCategoryTag tagName="AUSTEO" lacv="1" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="AUSTEO" isPortionMarking="true" portionAbbreviation="AUSTEO" />
+          <markingCode codeValue="AUSTEO" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="AGAO" lacv="2" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="AGAO" isPortionMarking="true" portionAbbreviation="AGAO" />
+          <markingCode codeValue="AGAO" />
+        </markingData>
+      </securityCategoryTag>
+
+      <!-- AUSTEO and AGAO are mutually exclusive per PSPF -->
+      <categoryConstraint constraintType="mutualExclusion"
+                          sourceTagSetId="1.2.36.1.1.0.1.1" sourceTagLacv="1"
+                          targetTagSetId="1.2.36.1.1.0.1.1" targetTagLacv="2"
+                          severity="error">
+        <errorMessage>AUSTEO and AGAO cannot be selected together — AUSTEO restricts to Australian nationals while AGAO restricts to Australian Government employees.</errorMessage>
+      </categoryConstraint>
+    </securityCategoryTagSet>
+
+    <!-- Access Caveats — CABINET gated at PROTECTED (4) -->
+    <securityCategoryTagSet tagSetName="Access Caveats"
+                            tagSetId="1.2.36.1.1.0.1.4"
+                            displayName="Access Caveats"
+                            displayOrder="2"
+                            applicableClassificationMinLacv="4">
+      <securityCategoryTag tagName="CABINET" lacv="1" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="CABINET" isPortionMarking="true" portionAbbreviation="CAB" />
+          <markingCode codeValue="CAB" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="NATIONAL-CABINET" lacv="2" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="NATIONAL-CABINET" isPortionMarking="true" portionAbbreviation="NC" />
+          <markingCode codeValue="NC" />
+        </markingData>
+      </securityCategoryTag>
+    </securityCategoryTagSet>
+
+    <!-- Information Management Markers (IMMs) — gated at OFFICIAL:Sensitive (lacv 3) and above -->
+    <securityCategoryTagSet tagSetName="Information Management Markers"
+                            tagSetId="1.2.36.1.1.0.1.2"
+                            displayName="Information Management Markers"
+                            displayOrder="3"
+                            applicableClassificationMinLacv="3">
+      <securityCategoryTag tagName="Legal-Privilege" lacv="1" tagType="informative">
+        <markingData>
+          <markingPhrase phraseText="Legal Privilege" isPortionMarking="true" portionAbbreviation="LP" />
+          <markingCode codeValue="LP" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="Personal-Privacy" lacv="2" tagType="informative">
+        <markingData>
+          <markingPhrase phraseText="Personal Privacy" isPortionMarking="true" portionAbbreviation="PP" />
+          <markingCode codeValue="PP" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="Legislative-Secrecy" lacv="3" tagType="informative">
+        <markingData>
+          <markingPhrase phraseText="Legislative Secrecy" isPortionMarking="true" portionAbbreviation="LS" />
+          <markingCode codeValue="LS" />
+        </markingData>
+      </securityCategoryTag>
+    </securityCategoryTagSet>
+
+    <!-- Releasability — gated at OFFICIAL:Sensitive (lacv 3) and above -->
+    <securityCategoryTagSet tagSetName="Releasability"
+                            tagSetId="1.2.36.1.1.0.1.3"
+                            displayName="Releasability"
+                            displayOrder="4"
+                            applicableClassificationMinLacv="3">
+      <securityCategoryTag tagName="REL AUS" lacv="1" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="REL AUS" isPortionMarking="true" portionAbbreviation="REL AUS" />
+          <markingCode codeValue="REL-AUS" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="REL FVEY" lacv="2" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="REL FVEY" isPortionMarking="true" portionAbbreviation="REL FVEY" />
+          <markingCode codeValue="REL-FVEY" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="REL NZL" lacv="3" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="REL NZL" isPortionMarking="true" portionAbbreviation="REL NZL" />
+          <markingCode codeValue="REL-NZL" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="REL GBR" lacv="4" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="REL GBR" isPortionMarking="true" portionAbbreviation="REL GBR" />
+          <markingCode codeValue="REL-GBR" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="REL USA" lacv="5" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="REL USA" isPortionMarking="true" portionAbbreviation="REL USA" />
+          <markingCode codeValue="REL-USA" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="REL CAN" lacv="6" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="REL CAN" isPortionMarking="true" portionAbbreviation="REL CAN" />
+          <markingCode codeValue="REL-CAN" />
+        </markingData>
+      </securityCategoryTag>
+
+      <!-- AUSTEO and REL to non-AUS nations are mutually exclusive -->
+      <categoryConstraint constraintType="mutualExclusion"
+                          sourceTagSetId="1.2.36.1.1.0.1.1" sourceTagLacv="1"
+                          targetTagSetId="1.2.36.1.1.0.1.3" targetTagLacv="2"
+                          severity="error">
+        <errorMessage>AUSTEO and REL FVEY cannot be selected together — AUSTEO restricts access to Australian nationals only.</errorMessage>
+      </categoryConstraint>
+    </securityCategoryTagSet>
+  </securityCategoryTagSets>
+</SPIF>

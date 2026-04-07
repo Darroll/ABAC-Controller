@@ -83,6 +83,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IGroupMembershipCache, GroupMembershipCache>();
         services.AddScoped<IGroupMembershipResolver, GroupMembershipResolver>();
         services.AddScoped<IClassificationQueryEngine, ClassificationQueryEngine>();
+        services.AddScoped<SpifSeedService>();
 
         // Webhook publisher + dispatcher
         services.AddScoped<IWebhookSubscriptionRepository, WebhookRepository>();
