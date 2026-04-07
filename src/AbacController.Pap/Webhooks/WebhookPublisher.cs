@@ -32,6 +32,8 @@ public sealed class WebhookDispatcherSignal
 /// </summary>
 public sealed class WebhookPublisher : IWebhookPublisher
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly WebhookDispatcherSignal _signal;
 
@@ -49,6 +51,9 @@ public sealed class WebhookPublisher : IWebhookPublisher
         var matching = await repo.GetMatchingAsync(tenantId, eventType, ct);
         if (matching.Count == 0) return;
 
+        // Web defaults (camelCase) so subscribers — including the Email Classification
+        // AbacWebhookController which deserializes with JsonSerializerDefaults.Web — can
+        // round-trip without case-mismatch surprises.
         var payloadJson = JsonSerializer.Serialize(new WebhookEnvelope
         {
             EventId = Guid.NewGuid(),
@@ -56,7 +61,7 @@ public sealed class WebhookPublisher : IWebhookPublisher
             TenantId = tenantId,
             OccurredAt = DateTimeOffset.UtcNow,
             Payload = payload
-        });
+        }, JsonOptions);
 
         foreach (var subscription in matching)
         {

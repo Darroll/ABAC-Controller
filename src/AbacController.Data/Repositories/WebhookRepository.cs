@@ -21,13 +21,17 @@ public sealed class WebhookRepository : IWebhookSubscriptionRepository
 
     public async Task<List<WebhookSubscription>> ListAsync(string? tenantId, CancellationToken ct = default)
     {
+        // SQLite cannot ORDER BY DateTimeOffset; do it client-side after the
+        // tenant-scoped fetch like AuditRepository does.
         var rows = await _db.WebhookSubscriptions
             .AsNoTracking()
             .Where(e => e.TenantId == tenantId || e.TenantId == null)
-            .OrderBy(e => e.CreatedAt)
             .ToListAsync(ct);
 
-        return rows.Select(Map).ToList();
+        return rows
+            .OrderBy(e => e.CreatedAt)
+            .Select(Map)
+            .ToList();
     }
 
     public async Task<WebhookSubscription?> GetAsync(Guid id, CancellationToken ct = default)
@@ -122,8 +126,28 @@ public sealed class WebhookRepository : IWebhookSubscriptionRepository
     public async Task<List<WebhookEvent>> GetDueAsync(int max, CancellationToken ct = default)
     {
         var now = DateTimeOffset.UtcNow;
+        var pendingStatus = (int)WebhookDeliveryStatus.Pending;
+
+        // SQLite stores DateTimeOffset as TEXT, so server-side ordering and filtering on
+        // DateTimeOffset columns doesn't translate. Materialize the candidate set first
+        // (filtered by Status which DOES translate) and order/filter client-side. The
+        // pending set is bounded by the dispatcher batch size so this stays cheap.
+        if (_db.Database.IsSqlite())
+        {
+            var candidates = await _db.WebhookEvents
+                .Where(e => e.Status == pendingStatus)
+                .ToListAsync(ct);
+
+            return candidates
+                .Where(e => e.NextAttemptAt <= now)
+                .OrderBy(e => e.NextAttemptAt)
+                .Take(max)
+                .Select(MapEvent)
+                .ToList();
+        }
+
         var rows = await _db.WebhookEvents
-            .Where(e => e.Status == (int)WebhookDeliveryStatus.Pending && e.NextAttemptAt <= now)
+            .Where(e => e.Status == pendingStatus && e.NextAttemptAt <= now)
             .OrderBy(e => e.NextAttemptAt)
             .Take(max)
             .ToListAsync(ct);
@@ -146,6 +170,27 @@ public sealed class WebhookRepository : IWebhookSubscriptionRepository
 
     public async Task<List<WebhookEvent>> ListEventsAsync(Guid subscriptionId, DateTimeOffset? since, int max, CancellationToken ct = default)
     {
+        // Filter by SubscriptionId server-side, then apply DateTimeOffset filter and
+        // ordering client-side to sidestep the SQLite translator limitation that the
+        // AuditRepository also has to work around.
+        if (_db.Database.IsSqlite())
+        {
+            var rows = await _db.WebhookEvents
+                .AsNoTracking()
+                .Where(e => e.SubscriptionId == subscriptionId)
+                .ToListAsync(ct);
+
+            IEnumerable<WebhookEventEntity> filtered = rows;
+            if (since.HasValue)
+                filtered = filtered.Where(e => e.CreatedAt >= since.Value);
+
+            return filtered
+                .OrderBy(e => e.CreatedAt)
+                .Take(max)
+                .Select(MapEvent)
+                .ToList();
+        }
+
         var query = _db.WebhookEvents
             .AsNoTracking()
             .Where(e => e.SubscriptionId == subscriptionId);
@@ -153,8 +198,8 @@ public sealed class WebhookRepository : IWebhookSubscriptionRepository
         if (since.HasValue)
             query = query.Where(e => e.CreatedAt >= since.Value);
 
-        var rows = await query.OrderBy(e => e.CreatedAt).Take(max).ToListAsync(ct);
-        return rows.Select(MapEvent).ToList();
+        var ordered = await query.OrderBy(e => e.CreatedAt).Take(max).ToListAsync(ct);
+        return ordered.Select(MapEvent).ToList();
     }
 
     private static WebhookSubscription Map(WebhookSubscriptionEntity e) => new()
