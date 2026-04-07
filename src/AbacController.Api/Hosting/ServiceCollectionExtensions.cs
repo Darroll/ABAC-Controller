@@ -66,6 +66,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<PipHealthMonitor>();
         services.AddSingleton<LabelValidator>();
         services.AddSingleton<IStanag4778MetadataBinder, Stanag4778MetadataBinder>();
+        services.AddSingleton<BindingDataHeaderCodec>();
         services.AddSingleton<AuditWriter>();
         services.AddSingleton<IAuditWriter>(sp => sp.GetRequiredService<AuditWriter>());
         services.AddSingleton<IAuditChannelReader>(sp => sp.GetRequiredService<AuditWriter>());
