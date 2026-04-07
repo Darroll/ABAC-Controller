@@ -386,4 +386,107 @@ public sealed class Stanag4778MetadataBinderTests
             })
         })
     };
+
+    // --- BindDetached tests (Phase 1: null-URI / HTTP body binding) ---
+
+    [Fact]
+    public void BindDetached_Produces_Null_URI_DataReference_With_ContentType()
+    {
+        var (binder, spifIndex, codec) = CreateBinder();
+        var label = MakeLabel();
+        var encoded = codec.Encode(label, spifIndex);
+        Assert.True(encoded.IsSuccess, encoded.Error);
+
+        var xml = binder.BindDetached(encoded.EncodedString!, dataUri: "", contentType: "message/http");
+        var doc = XDocument.Parse(xml);
+
+        var dataRef = doc.Root!
+            .Element(BindingNs + "MetadataBindingContainer")!
+            .Element(BindingNs + "MetadataBinding")!
+            .Element(BindingNs + "DataReference");
+
+        Assert.NotNull(dataRef);
+        Assert.Equal("", dataRef!.Attribute("URI")?.Value);
+        Assert.Equal("message/http", dataRef.Attribute(XmimeNs + "contentType")?.Value);
+    }
+
+    [Fact]
+    public void BindDetached_Produces_No_DataObject_Element()
+    {
+        var (binder, spifIndex, codec) = CreateBinder();
+        var label = MakeLabel();
+        var encoded = codec.Encode(label, spifIndex);
+
+        var xml = binder.BindDetached(encoded.EncodedString!, dataUri: "", contentType: "message/http");
+        var doc = XDocument.Parse(xml);
+
+        Assert.Empty(doc.Root!.Elements(BindingNs + "DataObject"));
+    }
+
+    [Fact]
+    public void BindDetached_Produces_BindingInformation_Root_In_Correct_Namespace()
+    {
+        var (binder, spifIndex, codec) = CreateBinder();
+        var label = MakeLabel();
+        var encoded = codec.Encode(label, spifIndex);
+
+        var xml = binder.BindDetached(encoded.EncodedString!, dataUri: "", contentType: "message/http");
+        var doc = XDocument.Parse(xml);
+
+        Assert.Equal("BindingInformation", doc.Root!.Name.LocalName);
+        Assert.Equal(SpifNamespaces.Stanag4778, doc.Root.Name.NamespaceName);
+    }
+
+    [Fact]
+    public void BindDetached_Metadata_Contains_Label()
+    {
+        var (binder, spifIndex, codec) = CreateBinder();
+        var label = MakeLabel();
+        var encoded = codec.Encode(label, spifIndex);
+
+        var xml = binder.BindDetached(encoded.EncodedString!, dataUri: "", contentType: "message/http");
+        var doc = XDocument.Parse(xml);
+
+        var metadata = doc.Root!
+            .Element(BindingNs + "MetadataBindingContainer")!
+            .Element(BindingNs + "MetadataBinding")!
+            .Element(BindingNs + "Metadata");
+
+        Assert.NotNull(metadata);
+        Assert.Equal("originatorConfidentialityLabel", metadata!.Elements().First().Name.LocalName);
+    }
+
+    [Fact]
+    public void BindDetached_Uses_CallerSupplied_BindingId()
+    {
+        var (binder, spifIndex, codec) = CreateBinder();
+        var label = MakeLabel();
+        var encoded = codec.Encode(label, spifIndex);
+
+        var xml = binder.BindDetached(encoded.EncodedString!, dataUri: "", contentType: "message/http", bindingId: "http-bind-001");
+        var doc = XDocument.Parse(xml);
+
+        var xmlId = doc.Root!
+            .Element(BindingNs + "MetadataBindingContainer")!
+            .Element(BindingNs + "MetadataBinding")!
+            .Attribute(XmlNs + "id")?.Value;
+
+        Assert.Equal("http-bind-001", xmlId);
+    }
+
+    [Fact]
+    public void Unbind_Returns_Empty_Payload_For_Null_URI_DataReference()
+    {
+        var (binder, spifIndex, codec) = CreateBinder();
+        var label = MakeLabel();
+        var encoded = codec.Encode(label, spifIndex);
+
+        var xml = binder.BindDetached(encoded.EncodedString!, dataUri: "", contentType: "message/http");
+        var result = binder.Unbind(xml);
+
+        Assert.Empty(result.Envelope.Payload);
+        Assert.Equal("message/http", result.Envelope.MediaType);
+        Assert.NotNull(result.Label);
+        Assert.Equal("1.2.3.4", result.Label!.PolicyOid);
+    }
 }
