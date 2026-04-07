@@ -24,7 +24,11 @@ public sealed class AbacContainerFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         Directory.CreateDirectory(_dataDirectory);
-        await RunHostCommandAsync("chmod", $"0777 {_dataDirectory}");
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux))
+        {
+            // Required so the container's UID can write to the bind-mounted volume.
+            await RunHostCommandAsync("chmod", $"0777 {_dataDirectory}");
+        }
 
         var repoRoot = FindRepoRoot();
         await RunDockerAsync($"build -t abac-controller:v1.0 {repoRoot}");
@@ -142,7 +146,62 @@ public sealed class AbacContainerFixture : IAsyncLifetime
     }
 
     private static async Task<string> RunDockerAsync(string dockerArgs)
-        => await RunProcessAsync("sg", new[] { "docker", "-c", $"docker {dockerArgs}" }, $"docker {dockerArgs}");
+    {
+        // On Linux the original author runs the test suite under a non-docker user
+        // and elevates with `sg docker -c "docker ..."`. On Windows (and macOS) docker
+        // is invoked directly under the current user. Detect the OS at runtime so the
+        // suite can run on either.
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux))
+        {
+            return await RunProcessAsync("sg", new[] { "docker", "-c", $"docker {dockerArgs}" }, $"docker {dockerArgs}");
+        }
+
+        return await RunProcessAsync("docker", SplitShellArgs(dockerArgs), $"docker {dockerArgs}");
+    }
+
+    /// <summary>
+    /// Internal helper exposed so <see cref="ConfigurableAbacContainer"/> can reuse
+    /// the same shell-style argument splitter.
+    /// </summary>
+    internal static IReadOnlyList<string> SplitShellArgsForTests(string input) => SplitShellArgs(input);
+
+    /// <summary>
+    /// Splits a shell-style argument string on whitespace while honouring single quotes
+    /// (so values like <c>'Data Source=foo'</c> survive intact). Single quotes are
+    /// stripped from the resulting tokens to match shell behaviour. We deliberately
+    /// don't handle double quotes or backslash escapes — the call sites here only use
+    /// single quotes.
+    /// </summary>
+    private static IReadOnlyList<string> SplitShellArgs(string input)
+    {
+        var result = new List<string>();
+        var current = new System.Text.StringBuilder();
+        var inQuotes = false;
+
+        foreach (var c in input)
+        {
+            if (c == '\'')
+            {
+                inQuotes = !inQuotes;
+                continue;
+            }
+
+            if (char.IsWhiteSpace(c) && !inQuotes)
+            {
+                if (current.Length > 0)
+                {
+                    result.Add(current.ToString());
+                    current.Clear();
+                }
+                continue;
+            }
+
+            current.Append(c);
+        }
+
+        if (current.Length > 0) result.Add(current.ToString());
+        return result;
+    }
 
     private static async Task<string> RunHostCommandAsync(string fileName, string arguments)
         => await RunProcessAsync(fileName, arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries), $"{fileName} {arguments}");
