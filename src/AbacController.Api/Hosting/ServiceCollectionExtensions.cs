@@ -59,6 +59,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IMarkingGenerator, MarkingGenerator>();
         services.AddScoped<HttpTenantContext>();
         services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<HttpTenantContext>());
+        services.AddScoped<KeycloakClaimsContext>();
+        services.AddScoped<IKeycloakClaimsContext>(sp => sp.GetRequiredService<KeycloakClaimsContext>());
+        services.AddScoped<IKeycloakGroupClaimsProvider>(sp => sp.GetRequiredService<KeycloakClaimsContext>());
         services.AddSingleton<TenantSpifRegistryStore>();
         services.AddScoped<ISpifRegistry, TenantSpifRegistry>();
         services.AddScoped<IPipSourceCatalog, DatabasePipSourceCatalog>();
@@ -178,6 +181,7 @@ public static class ServiceCollectionExtensions
         app.UseRateLimiter();
         app.UseAuthentication();
         app.UseMiddleware<TenantContextMiddleware>();
+        app.UseMiddleware<Middleware.KeycloakClaimsMiddleware>();
         app.UseAuthorization();
         app.UseAntiforgery();
 
@@ -204,23 +208,47 @@ public static class ServiceCollectionExtensions
     {
         var hasAuthority = !string.IsNullOrWhiteSpace(options.Auth.Authority);
         var hasApiKeys = options.Auth.ApiKeys.Count > 0;
+        var hasKeycloakConfig = options.Auth.Keycloak.IsEnabled;
         var allowDevelopmentAuth = environment.IsDevelopment() && options.Auth.EnableDevelopmentAuth;
 
-        if (!hasAuthority && !hasApiKeys && !allowDevelopmentAuth)
+        if (!hasAuthority && !hasApiKeys && !allowDevelopmentAuth && !hasKeycloakConfig)
         {
             throw new InvalidOperationException(
-                "Authentication is not configured. Set Auth:Authority for JWT bearer, configure Auth:ApiKeys for API key auth, or explicitly enable Auth:EnableDevelopmentAuth in Development only.");
+                "Authentication is not configured. Set Auth:Authority for JWT bearer, Auth:Keycloak:Authority for the Keycloak issuer, configure Auth:ApiKeys for API key auth, or explicitly enable Auth:EnableDevelopmentAuth in Development only.");
         }
 
-        if (hasAuthority)
+        var hasKeycloak = options.Auth.Keycloak.IsEnabled;
+
+        if (hasAuthority || hasKeycloak)
         {
-            var authBuilder = services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-                .AddJwtBearer(jwtOptions =>
+            // Default to whichever issuer is configured first; ASP.NET Core
+            // will fall through to the second scheme automatically when an
+            // [Authorize] policy lists both via AddAuthenticationSchemes.
+            var defaultScheme = hasAuthority
+                ? JwtBearerDefaults.AuthenticationScheme
+                : "Keycloak";
+
+            var authBuilder = services.AddAuthentication(defaultScheme);
+
+            if (hasAuthority)
+            {
+                authBuilder.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, jwtOptions =>
                 {
                     jwtOptions.Authority = options.Auth.Authority;
                     jwtOptions.Audience = options.Auth.Audience;
                     jwtOptions.RequireHttpsMetadata = options.Auth.RequireHttpsMetadata;
                 });
+            }
+
+            if (hasKeycloak)
+            {
+                authBuilder.AddJwtBearer("Keycloak", jwtOptions =>
+                {
+                    jwtOptions.Authority = options.Auth.Keycloak.Authority;
+                    jwtOptions.Audience = options.Auth.Keycloak.Audience;
+                    jwtOptions.RequireHttpsMetadata = options.Auth.Keycloak.RequireHttpsMetadata;
+                });
+            }
 
             if (hasApiKeys)
             {
@@ -332,6 +360,18 @@ public static class ServiceCollectionExtensions
 
     private static void AddScopePolicy(AuthorizationOptions options, string policyName, string scope)
     {
-        options.AddPolicy(policyName, policy => policy.RequireScope(scope));
+        options.AddPolicy(policyName, policy =>
+        {
+            // Accept whichever schemes are registered. Schemes that aren't
+            // configured (e.g. Keycloak when Auth:Keycloak.Authority is empty)
+            // are silently skipped at evaluation time, so listing them all
+            // here is safe.
+            policy.AddAuthenticationSchemes(
+                JwtBearerDefaults.AuthenticationScheme,
+                "Keycloak",
+                ApiKeyAuthenticationDefaults.SchemeName,
+                DevelopmentAuthenticationDefaults.SchemeName);
+            policy.RequireScope(scope);
+        });
     }
 }

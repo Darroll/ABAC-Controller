@@ -25,6 +25,8 @@ public sealed class ClassificationQueryEngine : IClassificationQueryEngine
     private readonly IAuditWriter _auditWriter;
     private readonly ITenantContext _tenantContext;
     private readonly IEntitlementResolver? _entitlementResolver;
+    private readonly IGroupMembershipResolver? _groupMembershipResolver;
+    private readonly IKeycloakGroupClaimsProvider? _keycloakGroupClaims;
 
     public ClassificationQueryEngine(
         ISpifRegistry spifRegistry,
@@ -33,7 +35,9 @@ public sealed class ClassificationQueryEngine : IClassificationQueryEngine
         IApplicationRepository appRepository,
         IAuditWriter auditWriter,
         ITenantContext tenantContext,
-        IEntitlementResolver? entitlementResolver = null)
+        IEntitlementResolver? entitlementResolver = null,
+        IGroupMembershipResolver? groupMembershipResolver = null,
+        IKeycloakGroupClaimsProvider? keycloakGroupClaims = null)
     {
         _spifRegistry = spifRegistry;
         _acdf = acdf;
@@ -42,6 +46,8 @@ public sealed class ClassificationQueryEngine : IClassificationQueryEngine
         _auditWriter = auditWriter;
         _tenantContext = tenantContext;
         _entitlementResolver = entitlementResolver;
+        _groupMembershipResolver = groupMembershipResolver;
+        _keycloakGroupClaims = keycloakGroupClaims;
     }
 
     public async Task<AllowedClassificationsResult> EvaluateAsync(
@@ -108,11 +114,34 @@ public sealed class ClassificationQueryEngine : IClassificationQueryEngine
                     "ClassificationAssignmentQuery.EnforceEntitlements is true but no IEntitlementResolver was configured.");
             }
 
+            // Group resolution preference order:
+            // 1. If the caller pushed groups in subject.Properties["groups"]
+            //    they win (back-compat for tests and existing callers).
+            // 2. Otherwise, if an IGroupMembershipResolver is registered AND
+            //    we can pull Keycloak group claims for the current request,
+            //    resolve the effective ABAC group ids automatically.
+            var callerSuppliedGroups = ExtractGroups(query.Subject);
+            IReadOnlyList<string> effectiveGroupIds = callerSuppliedGroups;
+
+            if (callerSuppliedGroups.Count == 0
+                && _groupMembershipResolver is not null
+                && _tenantContext.TenantId is not null)
+            {
+                var keycloakGroups = _keycloakGroupClaims?.KeycloakGroupIds
+                                     ?? Array.Empty<string>();
+                var resolved = await _groupMembershipResolver.ResolveAsync(
+                    _tenantContext.TenantId,
+                    query.Subject.Id,
+                    keycloakGroups,
+                    ct);
+                effectiveGroupIds = resolved.Select(g => g.ToString()).ToList();
+            }
+
             var subject = new EntitlementSubject
             {
                 SubjectId = query.Subject.Id,
                 TenantId = _tenantContext.TenantId,
-                GroupIds = ExtractGroups(query.Subject)
+                GroupIds = effectiveGroupIds
             };
             entitlements = await _entitlementResolver.ResolveAsync(subject, ct);
         }

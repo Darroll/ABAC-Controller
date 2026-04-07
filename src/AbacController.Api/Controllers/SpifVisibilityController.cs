@@ -1,3 +1,4 @@
+using AbacController.Api.Auth;
 using AbacController.Core.Domain.Entitlements;
 using AbacController.Core.Interfaces;
 using AbacController.Data;
@@ -33,27 +34,27 @@ namespace AbacController.Api.Controllers;
 [Authorize(Policy = "ClassificationQuery")]
 public sealed class SpifVisibilityController : ControllerBase
 {
-    private const string GroupsClaim = "groups";
-    private const string MemberOfClaim = "memberOf";
-
     private readonly IGroupMembershipResolver _groupResolver;
     private readonly IEntitlementResolver _entitlementResolver;
     private readonly IApplicationRepository _applicationRepository;
     private readonly AbacDbContext _db;
     private readonly ITenantContext _tenantContext;
+    private readonly IKeycloakGroupClaimsProvider _keycloakClaims;
 
     public SpifVisibilityController(
         IGroupMembershipResolver groupResolver,
         IEntitlementResolver entitlementResolver,
         IApplicationRepository applicationRepository,
         AbacDbContext db,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IKeycloakGroupClaimsProvider keycloakClaims)
     {
         _groupResolver = groupResolver;
         _entitlementResolver = entitlementResolver;
         _applicationRepository = applicationRepository;
         _db = db;
         _tenantContext = tenantContext;
+        _keycloakClaims = keycloakClaims;
     }
 
     /// <summary>List the SPIFs the current subject can see.</summary>
@@ -66,7 +67,7 @@ public sealed class SpifVisibilityController : ControllerBase
                         ?? User.FindFirst("client_id")?.Value
                         ?? "anonymous";
 
-        var keycloakGroups = ExtractKeycloakGroupClaims(User);
+        var keycloakGroups = _keycloakClaims.KeycloakGroupIds;
         var abacGroupIds = await _groupResolver.ResolveAsync(tenantId, subjectId, keycloakGroups, ct);
 
         var entitlements = await _entitlementResolver.ResolveAsync(new EntitlementSubject
@@ -130,24 +131,6 @@ public sealed class SpifVisibilityController : ControllerBase
             DefaultPolicyOid = defaultPolicyOid,
             Spifs = responseSpifs
         });
-    }
-
-    /// <summary>
-    /// Reads the Keycloak group claims out of the principal. Looks at both
-    /// <c>groups</c> (Keycloak default) and <c>memberOf</c> (LDAP-style)
-    /// to be friendly to mixed environments.
-    /// </summary>
-    private static IReadOnlyCollection<string> ExtractKeycloakGroupClaims(System.Security.Claims.ClaimsPrincipal principal)
-    {
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var claim in principal.FindAll(GroupsClaim).Concat(principal.FindAll(MemberOfClaim)))
-        {
-            if (!string.IsNullOrWhiteSpace(claim.Value))
-            {
-                seen.Add(claim.Value);
-            }
-        }
-        return seen;
     }
 
     /// <summary>Response shape for <c>GET /pdp/api/spifs/visible</c>.</summary>

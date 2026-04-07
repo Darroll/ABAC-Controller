@@ -35,6 +35,7 @@ public sealed class SpifVisibilityControllerTests : IDisposable
     private readonly GroupMembershipResolver _groupResolver;
     private readonly GroupMembershipCache _cache = new(TimeSpan.FromMinutes(5));
     private readonly StubAppRepo _appRepo = new();
+    private readonly StubKeycloakClaims _keycloakClaims = new();
     private readonly SpifVisibilityController _controller;
 
     public SpifVisibilityControllerTests()
@@ -58,7 +59,8 @@ public sealed class SpifVisibilityControllerTests : IDisposable
             _entitlementResolver,
             _appRepo,
             _db,
-            new StubTenantContext(Tenant));
+            new StubTenantContext(Tenant),
+            _keycloakClaims);
     }
 
     public void Dispose()
@@ -87,6 +89,10 @@ public sealed class SpifVisibilityControllerTests : IDisposable
         {
             HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) }
         };
+
+        // Mirror the production middleware: when the principal is set, the
+        // Keycloak claims provider is populated with the same group claims.
+        _keycloakClaims.SetGroups(keycloakGroups);
     }
 
     private async Task<SpifVisibilityController.VisibleSpifsResponse> Visible(string? appId = null)
@@ -335,6 +341,12 @@ public sealed class SpifVisibilityControllerTests : IDisposable
     private sealed class StubTenantContext(string? tenantId) : ITenantContext
     {
         public string? TenantId { get; } = tenantId;
+    }
+
+    private sealed class StubKeycloakClaims : IKeycloakGroupClaimsProvider
+    {
+        public IReadOnlyCollection<string> KeycloakGroupIds { get; private set; } = Array.Empty<string>();
+        public void SetGroups(IReadOnlyCollection<string> groups) => KeycloakGroupIds = groups ?? Array.Empty<string>();
     }
 
     private sealed class StubAppRepo : IApplicationRepository

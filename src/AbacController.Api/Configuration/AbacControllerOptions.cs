@@ -77,6 +77,36 @@ public sealed class AuthOptions
 
     /// <summary>Configured API keys for machine-to-machine authentication.</summary>
     public List<ApiKeyConfig> ApiKeys { get; set; } = [];
+
+    /// <summary>
+    /// Optional secondary JWT issuer for Keycloak. When <see cref="KeycloakAuthOptions.Authority"/>
+    /// is set the host registers an additional <c>"Keycloak"</c> bearer scheme alongside
+    /// the primary issuer; authorization policies accept either scheme.
+    /// </summary>
+    public KeycloakAuthOptions Keycloak { get; set; } = new();
+}
+
+/// <summary>
+/// Configuration for the Keycloak JWT bearer scheme. Disabled by default —
+/// when <see cref="Authority"/> is empty no second scheme is registered and
+/// the host behaves exactly as before.
+/// </summary>
+public sealed class KeycloakAuthOptions
+{
+    /// <summary>OIDC issuer URL, e.g. <c>http://keycloak:8080/realms/abac-dev</c>.</summary>
+    public string Authority { get; set; } = "";
+
+    /// <summary>Expected <c>aud</c> claim value (typically the Keycloak client id).</summary>
+    public string Audience { get; set; } = "abac-controller-api";
+
+    /// <summary>
+    /// Whether to require HTTPS for OIDC metadata discovery. Defaults to false
+    /// for the dev compose stack; production deployments should set this to true.
+    /// </summary>
+    public bool RequireHttpsMetadata { get; set; }
+
+    /// <summary>True when the Keycloak scheme should be activated.</summary>
+    public bool IsEnabled => !string.IsNullOrWhiteSpace(Authority);
 }
 
 /// <summary>
