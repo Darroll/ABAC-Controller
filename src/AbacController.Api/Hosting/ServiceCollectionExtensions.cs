@@ -165,7 +165,7 @@ public static class ServiceCollectionExtensions
         services.AddAuthorizationCore();
         services.AddSingleton<IAuthorizationHandler, ScopeAuthorizationHandler>();
         ConfigureAuthentication(services, environment, options);
-        ConfigureAuthorization(services);
+        ConfigureAuthorization(services, environment, options);
         ConfigureRateLimiting(services, options);
 
         return services;
@@ -279,30 +279,51 @@ public static class ServiceCollectionExtensions
         }
     }
 
-    private static void ConfigureAuthorization(IServiceCollection services)
+    private static void ConfigureAuthorization(
+        IServiceCollection services,
+        IWebHostEnvironment environment,
+        AbacControllerOptions options)
     {
-        services.AddAuthorization(options =>
+        // Compute the actual list of authentication scheme names that will be
+        // registered, mirroring the logic in ConfigureAuthentication. We
+        // attach exactly these schemes to every authorization policy so that
+        // a request authenticated by ANY of them satisfies the policy, and so
+        // we never list a scheme that doesn't exist (which would cause a 500
+        // at evaluation time with "No authentication handler is registered").
+        var schemes = new List<string>();
+        if (!string.IsNullOrWhiteSpace(options.Auth.Authority))
+            schemes.Add(JwtBearerDefaults.AuthenticationScheme);
+        if (options.Auth.Keycloak.IsEnabled)
+            schemes.Add("Keycloak");
+        if (options.Auth.ApiKeys.Count > 0)
+            schemes.Add(ApiKeyAuthenticationDefaults.SchemeName);
+        if (environment.IsDevelopment() && options.Auth.EnableDevelopmentAuth)
+            schemes.Add(DevelopmentAuthenticationDefaults.SchemeName);
+
+        var schemesArray = schemes.ToArray();
+
+        services.AddAuthorization(authOptions =>
         {
-            AddScopePolicy(options, "Evaluate", Scopes.Evaluate);
-            AddScopePolicy(options, "EvaluateExplain", Scopes.EvaluateExplain);
-            AddScopePolicy(options, "PolicyRead", Scopes.PolicyRead);
-            AddScopePolicy(options, "PolicyWrite", Scopes.PolicyWrite);
-            AddScopePolicy(options, "PolicyAdmin", Scopes.PolicyAdmin);
-            AddScopePolicy(options, "PipRead", Scopes.PipRead);
-            AddScopePolicy(options, "PipAdmin", Scopes.PipAdmin);
-            AddScopePolicy(options, "PepRead", Scopes.PepRead);
-            AddScopePolicy(options, "PepAdmin", Scopes.PepAdmin);
-            AddScopePolicy(options, "PepLabel", Scopes.PepLabel);
-            AddScopePolicy(options, "AuditRead", Scopes.AuditRead);
-            AddScopePolicy(options, "SysRead", Scopes.SysRead);
-            AddScopePolicy(options, "SysAdmin", Scopes.SysAdmin);
-            AddScopePolicy(options, "ClassificationQuery", Scopes.ClassificationQuery);
-            AddScopePolicy(options, "ApplicationAdmin", Scopes.ApplicationAdmin);
-            AddScopePolicy(options, "EntitlementAdmin", Scopes.EntitlementAdmin);
-            AddScopePolicy(options, "RecipientCheck", Scopes.RecipientCheck);
-            AddScopePolicy(options, "WebhookAdmin", Scopes.WebhookAdmin);
-            AddScopePolicy(options, "AuditMirrorWrite", Scopes.AuditMirrorWrite);
-            AddScopePolicy(options, "GroupAdmin", Scopes.GroupAdmin);
+            AddScopePolicy(authOptions, "Evaluate", Scopes.Evaluate, schemesArray);
+            AddScopePolicy(authOptions, "EvaluateExplain", Scopes.EvaluateExplain, schemesArray);
+            AddScopePolicy(authOptions, "PolicyRead", Scopes.PolicyRead, schemesArray);
+            AddScopePolicy(authOptions, "PolicyWrite", Scopes.PolicyWrite, schemesArray);
+            AddScopePolicy(authOptions, "PolicyAdmin", Scopes.PolicyAdmin, schemesArray);
+            AddScopePolicy(authOptions, "PipRead", Scopes.PipRead, schemesArray);
+            AddScopePolicy(authOptions, "PipAdmin", Scopes.PipAdmin, schemesArray);
+            AddScopePolicy(authOptions, "PepRead", Scopes.PepRead, schemesArray);
+            AddScopePolicy(authOptions, "PepAdmin", Scopes.PepAdmin, schemesArray);
+            AddScopePolicy(authOptions, "PepLabel", Scopes.PepLabel, schemesArray);
+            AddScopePolicy(authOptions, "AuditRead", Scopes.AuditRead, schemesArray);
+            AddScopePolicy(authOptions, "SysRead", Scopes.SysRead, schemesArray);
+            AddScopePolicy(authOptions, "SysAdmin", Scopes.SysAdmin, schemesArray);
+            AddScopePolicy(authOptions, "ClassificationQuery", Scopes.ClassificationQuery, schemesArray);
+            AddScopePolicy(authOptions, "ApplicationAdmin", Scopes.ApplicationAdmin, schemesArray);
+            AddScopePolicy(authOptions, "EntitlementAdmin", Scopes.EntitlementAdmin, schemesArray);
+            AddScopePolicy(authOptions, "RecipientCheck", Scopes.RecipientCheck, schemesArray);
+            AddScopePolicy(authOptions, "WebhookAdmin", Scopes.WebhookAdmin, schemesArray);
+            AddScopePolicy(authOptions, "AuditMirrorWrite", Scopes.AuditMirrorWrite, schemesArray);
+            AddScopePolicy(authOptions, "GroupAdmin", Scopes.GroupAdmin, schemesArray);
         });
     }
 
@@ -358,19 +379,18 @@ public static class ServiceCollectionExtensions
         });
     }
 
-    private static void AddScopePolicy(AuthorizationOptions options, string policyName, string scope)
+    private static void AddScopePolicy(AuthorizationOptions options, string policyName, string scope, string[] schemes)
     {
         options.AddPolicy(policyName, policy =>
         {
-            // Accept whichever schemes are registered. Schemes that aren't
-            // configured (e.g. Keycloak when Auth:Keycloak.Authority is empty)
-            // are silently skipped at evaluation time, so listing them all
-            // here is safe.
-            policy.AddAuthenticationSchemes(
-                JwtBearerDefaults.AuthenticationScheme,
-                "Keycloak",
-                ApiKeyAuthenticationDefaults.SchemeName,
-                DevelopmentAuthenticationDefaults.SchemeName);
+            // Only attach schemes that ConfigureAuthentication actually
+            // registered. Listing a scheme that doesn't exist would cause
+            // AuthorizationMiddleware to throw "No authentication handler is
+            // registered for the scheme '<name>'" at request time.
+            if (schemes.Length > 0)
+            {
+                policy.AddAuthenticationSchemes(schemes);
+            }
             policy.RequireScope(scope);
         });
     }

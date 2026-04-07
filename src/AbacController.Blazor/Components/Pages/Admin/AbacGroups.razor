@@ -1,0 +1,330 @@
+@*
+    Component: AbacGroups
+    Purpose: Manage first-class ABAC groups and their direct/Keycloak-inherited
+             memberships. Operators use this page to bind users to ABAC groups
+             that downstream entitlement assignments target.
+    Route: /groups
+    Dependencies: HttpClient (calls /pap/api/groups/{tenantId} via the Blazor
+                  ApiAuthenticationForwardingHandler).
+*@
+@page "/groups"
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<h2>ABAC Groups</h2>
+<p class="text-muted" style="margin-top:-0.5rem; margin-bottom:1.5rem; font-size:0.95rem;">
+    First-class ABAC groups with direct user members and inherited Keycloak
+    group references. Resolved on every classification query.
+</p>
+
+<div class="row g-2 mb-3">
+    <div class="col-md-4">
+        <label class="form-label small">Tenant Id</label>
+        <input class="form-control form-control-sm" @bind="_tenantId" @bind:event="oninput" placeholder="abac-dev" />
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-sm btn-primary w-100" @onclick="LoadGroups">Reload</button>
+    </div>
+</div>
+
+@if (_errorMessage is not null)
+{
+    <div class="alert alert-danger py-2">@_errorMessage</div>
+}
+
+<div class="card mb-3">
+    <div class="card-header">
+        <strong>Create group</strong>
+    </div>
+    <div class="card-body">
+        <div class="row g-2">
+            <div class="col-md-4">
+                <label class="form-label small">Name <span class="text-danger">*</span></label>
+                <input class="form-control form-control-sm" @bind="_createForm.Name" placeholder="nato-readers" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small">Description</label>
+                <input class="form-control form-control-sm" @bind="_createForm.Description" placeholder="Operators with read access to NATO SPIFs" />
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-success btn-sm w-100"
+                        disabled="@(string.IsNullOrWhiteSpace(_tenantId) || string.IsNullOrWhiteSpace(_createForm.Name))"
+                        @onclick="CreateGroup">Create</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <strong>Groups</strong>
+        <span class="text-muted ms-2">@(_groups?.Count ?? 0) groups</span>
+    </div>
+    <div class="card-body p-0">
+        @if (_groups is null)
+        {
+            <div class="p-3 text-muted">No data loaded.</div>
+        }
+        else if (_groups.Count == 0)
+        {
+            <div class="p-3 text-muted">No groups for this tenant.</div>
+        }
+        else
+        {
+            <table class="table table-sm table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Id</th>
+                        <th>Description</th>
+                        <th style="width: 220px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var g in _groups)
+                {
+                    <tr>
+                        <td><strong>@g.Name</strong></td>
+                        <td><code>@g.Id.ToString("N").Substring(0, 8)</code></td>
+                        <td><small>@(g.Description ?? "—")</small></td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => OpenMembers(g)">Members</button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteGroup(g.Id)">Delete</button>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@if (_activeGroup is not null)
+{
+    <div class="card mt-3">
+        <div class="card-header d-flex justify-content-between">
+            <strong>Members of @_activeGroup.Name</strong>
+            <button class="btn btn-sm btn-link py-0" @onclick="() => { _activeGroup = null; _members = null; }">Close</button>
+        </div>
+        <div class="card-body">
+            <div class="row g-2 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label small">Add direct user (id)</label>
+                    <input class="form-control form-control-sm" @bind="_addUserId" placeholder="alice" />
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button class="btn btn-success btn-sm w-100" disabled="@string.IsNullOrWhiteSpace(_addUserId)" @onclick="AddDirectUser">Add user</button>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">Add inherited Keycloak group</label>
+                    <input class="form-control form-control-sm" @bind="_addKeycloakGroup" placeholder="kc-nato" />
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button class="btn btn-success btn-sm w-100" disabled="@string.IsNullOrWhiteSpace(_addKeycloakGroup)" @onclick="AddKeycloakGroup">Inherit</button>
+                </div>
+            </div>
+
+            @if (_members is null)
+            {
+                <div class="text-muted">Loading…</div>
+            }
+            else if (_members.Count == 0)
+            {
+                <div class="text-muted">No members.</div>
+            }
+            else
+            {
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Kind</th>
+                            <th>Member Id</th>
+                            <th style="width: 100px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var m in _members)
+                    {
+                        <tr>
+                            <td>@(m.Kind == 0 ? "User" : "Keycloak group")</td>
+                            <td><code>@m.MemberId</code></td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveMember(m)">Remove</button>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private string _tenantId = "abac-dev";
+    private string? _errorMessage;
+    private List<GroupRow>? _groups;
+    private GroupRow? _activeGroup;
+    private List<MembershipRow>? _members;
+    private CreateForm _createForm = new();
+    private string _addUserId = "";
+    private string _addKeycloakGroup = "";
+
+    private async Task LoadGroups()
+    {
+        _errorMessage = null;
+        if (string.IsNullOrWhiteSpace(_tenantId))
+        {
+            _groups = [];
+            return;
+        }
+        try
+        {
+            _groups = await Http.GetFromJsonAsync<List<GroupRow>>(
+                $"pap/api/groups/{Uri.EscapeDataString(_tenantId)}") ?? [];
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Load failed: {ex.Message}";
+            _groups = [];
+        }
+    }
+
+    private async Task CreateGroup()
+    {
+        _errorMessage = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                $"pap/api/groups/{Uri.EscapeDataString(_tenantId)}",
+                new { name = _createForm.Name, description = _createForm.Description });
+            response.EnsureSuccessStatusCode();
+            _createForm = new();
+            await LoadGroups();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Create failed: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteGroup(Guid id)
+    {
+        _errorMessage = null;
+        try
+        {
+            var response = await Http.DeleteAsync(
+                $"pap/api/groups/{Uri.EscapeDataString(_tenantId)}/{id}");
+            response.EnsureSuccessStatusCode();
+            if (_activeGroup?.Id == id) { _activeGroup = null; _members = null; }
+            await LoadGroups();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Delete failed: {ex.Message}";
+        }
+    }
+
+    private async Task OpenMembers(GroupRow group)
+    {
+        _activeGroup = group;
+        await LoadMembers();
+    }
+
+    private async Task LoadMembers()
+    {
+        _errorMessage = null;
+        if (_activeGroup is null) { _members = null; return; }
+        try
+        {
+            _members = await Http.GetFromJsonAsync<List<MembershipRow>>(
+                $"pap/api/groups/{Uri.EscapeDataString(_tenantId)}/{_activeGroup.Id}/members") ?? [];
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Members load failed: {ex.Message}";
+            _members = [];
+        }
+    }
+
+    private async Task AddDirectUser()
+    {
+        if (_activeGroup is null) return;
+        _errorMessage = null;
+        try
+        {
+            var response = await Http.PostAsync(
+                $"pap/api/groups/{Uri.EscapeDataString(_tenantId)}/{_activeGroup.Id}/members/users/{Uri.EscapeDataString(_addUserId)}",
+                content: null);
+            response.EnsureSuccessStatusCode();
+            _addUserId = "";
+            await LoadMembers();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Add user failed: {ex.Message}";
+        }
+    }
+
+    private async Task AddKeycloakGroup()
+    {
+        if (_activeGroup is null) return;
+        _errorMessage = null;
+        try
+        {
+            var response = await Http.PostAsync(
+                $"pap/api/groups/{Uri.EscapeDataString(_tenantId)}/{_activeGroup.Id}/members/keycloak-groups/{Uri.EscapeDataString(_addKeycloakGroup)}",
+                content: null);
+            response.EnsureSuccessStatusCode();
+            _addKeycloakGroup = "";
+            await LoadMembers();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Add Keycloak group failed: {ex.Message}";
+        }
+    }
+
+    private async Task RemoveMember(MembershipRow row)
+    {
+        if (_activeGroup is null) return;
+        _errorMessage = null;
+        try
+        {
+            var path = row.Kind == 0
+                ? $"pap/api/groups/{Uri.EscapeDataString(_tenantId)}/{_activeGroup.Id}/members/users/{Uri.EscapeDataString(row.MemberId)}"
+                : $"pap/api/groups/{Uri.EscapeDataString(_tenantId)}/{_activeGroup.Id}/members/keycloak-groups/{Uri.EscapeDataString(row.MemberId)}";
+            var response = await Http.DeleteAsync(path);
+            response.EnsureSuccessStatusCode();
+            await LoadMembers();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Remove failed: {ex.Message}";
+        }
+    }
+
+    public sealed class GroupRow
+    {
+        public Guid Id { get; set; }
+        public string? TenantId { get; set; }
+        public string Name { get; set; } = "";
+        public string? Description { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+    }
+
+    public sealed class MembershipRow
+    {
+        public Guid AbacGroupId { get; set; }
+        public int Kind { get; set; } // 0 = User, 1 = KeycloakGroup
+        public string MemberId { get; set; } = "";
+        public string? TenantId { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+    }
+
+    private sealed class CreateForm
+    {
+        public string Name { get; set; } = "";
+        public string? Description { get; set; }
+    }
+}
