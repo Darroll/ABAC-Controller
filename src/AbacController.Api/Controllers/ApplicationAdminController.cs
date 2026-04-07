@@ -1,6 +1,7 @@
 using System.Text.Json;
 using AbacController.Core.Domain.Audit;
 using AbacController.Core.Domain.Classifications;
+using AbacController.Core.Domain.Webhooks;
 using AbacController.Core.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,15 +19,18 @@ public sealed class ApplicationAdminController : ControllerBase
     private readonly IApplicationRepository _repository;
     private readonly IAuditWriter _auditWriter;
     private readonly ITenantContext _tenantContext;
+    private readonly IWebhookPublisher _webhookPublisher;
 
     public ApplicationAdminController(
         IApplicationRepository repository,
         IAuditWriter auditWriter,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IWebhookPublisher webhookPublisher)
     {
         _repository = repository;
         _auditWriter = auditWriter;
         _tenantContext = tenantContext;
+        _webhookPublisher = webhookPublisher;
     }
 
     private string GetActorIdentity()
@@ -88,6 +92,11 @@ public sealed class ApplicationAdminController : ControllerBase
 
         var result = await _repository.UpsertAsync(registration, ct);
         AuditChange("upsert_application", id, new { request.Name, request.DefaultPolicyOid });
+        await _webhookPublisher.PublishAsync(
+            WebhookEventTypes.ApplicationUpdated,
+            new { applicationId = id, request.Name, request.DefaultPolicyOid, isActive = result.IsActive },
+            _tenantContext.TenantId,
+            ct);
         return Ok(result);
     }
 
@@ -101,6 +110,11 @@ public sealed class ApplicationAdminController : ControllerBase
             return NotFound(new { error = $"Application '{id}' not found." });
 
         AuditChange("delete_application", id);
+        await _webhookPublisher.PublishAsync(
+            WebhookEventTypes.ApplicationUpdated,
+            new { applicationId = id, deleted = true },
+            _tenantContext.TenantId,
+            ct);
         return NoContent();
     }
 

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using AbacController.Core.Domain.Audit;
 using AbacController.Core.Domain.Entitlements;
+using AbacController.Core.Domain.Webhooks;
 using AbacController.Core.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,12 +20,24 @@ public sealed class EntitlementAdminController : ControllerBase
 {
     private readonly IEntitlementRepository _repository;
     private readonly IAuditWriter _auditWriter;
+    private readonly IWebhookPublisher _webhookPublisher;
 
-    public EntitlementAdminController(IEntitlementRepository repository, IAuditWriter auditWriter)
+    public EntitlementAdminController(
+        IEntitlementRepository repository,
+        IAuditWriter auditWriter,
+        IWebhookPublisher webhookPublisher)
     {
         _repository = repository;
         _auditWriter = auditWriter;
+        _webhookPublisher = webhookPublisher;
     }
+
+    private Task PublishAssignmentChangeAsync(string tenantId, string action, object detail, CancellationToken ct)
+        => _webhookPublisher.PublishAsync(
+            WebhookEventTypes.AssignmentChanged,
+            new { tenantId, action, detail },
+            tenantId,
+            ct);
 
     // ── Baseline ────────────────────────────────────────────────────────────
 
@@ -54,6 +67,8 @@ public sealed class EntitlementAdminController : ControllerBase
 
         var result = await _repository.AddBaselineAsync(grant, ct);
         AuditChange("add_baseline_entitlement", tenantId, new { request.PolicyOid, request.ClassificationLacv });
+        await PublishAssignmentChangeAsync(tenantId, "add_baseline",
+            new { request.PolicyOid, request.ClassificationLacv }, ct);
         return Ok(result);
     }
 
@@ -72,6 +87,8 @@ public sealed class EntitlementAdminController : ControllerBase
         if (!removed) return NotFound(new { error = "Baseline entitlement not found." });
 
         AuditChange("remove_baseline_entitlement", tenantId, new { policyOid, classificationLacv });
+        await PublishAssignmentChangeAsync(tenantId, "remove_baseline",
+            new { policyOid, classificationLacv }, ct);
         return NoContent();
     }
 
@@ -105,6 +122,8 @@ public sealed class EntitlementAdminController : ControllerBase
 
         var result = await _repository.AddGroupEntitlementAsync(grant, ct);
         AuditChange("add_group_entitlement", tenantId, new { groupId, request.PolicyOid, request.ClassificationLacv });
+        await PublishAssignmentChangeAsync(tenantId, "add_group",
+            new { groupId, request.PolicyOid, request.ClassificationLacv }, ct);
         return Ok(result);
     }
 
@@ -124,6 +143,8 @@ public sealed class EntitlementAdminController : ControllerBase
         if (!removed) return NotFound(new { error = "Group entitlement not found." });
 
         AuditChange("remove_group_entitlement", tenantId, new { groupId, policyOid, classificationLacv });
+        await PublishAssignmentChangeAsync(tenantId, "remove_group",
+            new { groupId, policyOid, classificationLacv }, ct);
         return NoContent();
     }
 
@@ -160,6 +181,8 @@ public sealed class EntitlementAdminController : ControllerBase
 
         var result = await _repository.AddUserGrantAsync(grant, ct);
         AuditChange("add_user_grant", tenantId, new { userId, request.PolicyOid, request.ClassificationLacv });
+        await PublishAssignmentChangeAsync(tenantId, "add_user_grant",
+            new { userId, request.PolicyOid, request.ClassificationLacv }, ct);
         return Ok(result);
     }
 
@@ -186,6 +209,8 @@ public sealed class EntitlementAdminController : ControllerBase
 
         var result = await _repository.AddUserDenyAsync(deny, ct);
         AuditChange("add_user_deny", tenantId, new { userId, request.PolicyOid, request.ClassificationLacv, request.Reason });
+        await PublishAssignmentChangeAsync(tenantId, "add_user_deny",
+            new { userId, request.PolicyOid, request.ClassificationLacv, request.Reason }, ct);
         return Ok(result);
     }
 
@@ -205,6 +230,8 @@ public sealed class EntitlementAdminController : ControllerBase
         if (!removed) return NotFound(new { error = "User override not found." });
 
         AuditChange("remove_user_override", tenantId, new { userId, policyOid, classificationLacv });
+        await PublishAssignmentChangeAsync(tenantId, "remove_user_override",
+            new { userId, policyOid, classificationLacv }, ct);
         return NoContent();
     }
 

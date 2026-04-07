@@ -10,6 +10,7 @@ using AbacController.Core.Interfaces;
 using AbacController.Data;
 using AbacController.Data.Repositories;
 using AbacController.Pap;
+using AbacController.Pap.Webhooks;
 using AbacController.Pdp;
 using AbacController.Pep;
 using AbacController.Pep.Codecs;
@@ -79,6 +80,16 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEntitlementRepository, EntitlementRepository>();
         services.AddScoped<IEntitlementResolver, EntitlementResolver>();
         services.AddScoped<IClassificationQueryEngine, ClassificationQueryEngine>();
+
+        // Webhook publisher + dispatcher
+        services.AddScoped<IWebhookSubscriptionRepository, WebhookRepository>();
+        services.AddSingleton<WebhookDispatcherSignal>();
+        services.AddSingleton<IWebhookPublisher, WebhookPublisher>();
+        services.AddHostedService<WebhookDispatcherHostedService>();
+        services.AddHttpClient("AbacWebhookDispatcher", client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
 
         // Async evaluation support
         services.AddSingleton<AsyncEvaluationQueue>();

@@ -47,6 +47,12 @@ public class AbacDbContext : DbContext
     /// <summary>Per-user entitlement overrides (grants and denies).</summary>
     public DbSet<UserEntitlementOverrideEntity> UserEntitlementOverrides => Set<UserEntitlementOverrideEntity>();
 
+    /// <summary>Registered webhook subscriptions.</summary>
+    public DbSet<WebhookSubscriptionEntity> WebhookSubscriptions => Set<WebhookSubscriptionEntity>();
+
+    /// <summary>Queued webhook deliveries (outbox pattern).</summary>
+    public DbSet<WebhookEventEntity> WebhookEvents => Set<WebhookEventEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AbacDbContext).Assembly);
