@@ -38,6 +38,15 @@ public class AbacDbContext : DbContext
     /// <summary>Registered application classification scopes.</summary>
     public DbSet<ApplicationRegistrationEntity> ApplicationRegistrations => Set<ApplicationRegistrationEntity>();
 
+    /// <summary>Tenant baseline entitlements.</summary>
+    public DbSet<TenantBaselineEntitlementEntity> TenantBaselineEntitlements => Set<TenantBaselineEntitlementEntity>();
+
+    /// <summary>Directory-group entitlements.</summary>
+    public DbSet<GroupEntitlementEntity> GroupEntitlements => Set<GroupEntitlementEntity>();
+
+    /// <summary>Per-user entitlement overrides (grants and denies).</summary>
+    public DbSet<UserEntitlementOverrideEntity> UserEntitlementOverrides => Set<UserEntitlementOverrideEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AbacDbContext).Assembly);
