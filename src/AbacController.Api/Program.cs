@@ -4,6 +4,7 @@ using AbacController.Api.Hosting;
 using AbacController.Api.Observability;
 using AbacController.Api.Runtime;
 using AbacController.Blazor.Components;
+using AbacController.Core.Domain.Classifications;
 using AbacController.Core.Interfaces;
 using AbacController.Data;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
@@ -93,8 +94,42 @@ static async Task InitializeAsync(WebApplication app)
     await db.Database.EnsureCreatedAsync();
     db.InitializeSqlite();
 
+    await BootstrapEmailClassificationAsync(scope, app);
+
     var runtimeState = scope.ServiceProvider.GetRequiredService<AppRuntimeState>();
     runtimeState.MarkStartupCompleted();
+}
+
+static async Task BootstrapEmailClassificationAsync(IServiceScope scope, WebApplication app)
+{
+    var bootstrap = app.Configuration
+        .GetSection("EmailClassificationBootstrap")
+        .Get<EmailClassificationBootstrapOptions>();
+
+    if (bootstrap is null || !bootstrap.Enabled) return;
+
+    var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("EmailClassificationBootstrap");
+    var repository = scope.ServiceProvider.GetRequiredService<IApplicationRepository>();
+
+    var existing = await repository.GetByIdAsync(bootstrap.ApplicationId);
+    var registration = new ApplicationRegistration
+    {
+        Id = bootstrap.ApplicationId,
+        Name = bootstrap.ApplicationName,
+        Description = bootstrap.ApplicationDescription,
+        DefaultPolicyOid = string.IsNullOrWhiteSpace(bootstrap.DefaultPolicyOid) ? null : bootstrap.DefaultPolicyOid,
+        AllowedClassificationLacvs = bootstrap.AllowedClassificationLacvs,
+        MaxClassificationHierarchy = bootstrap.MaxClassificationHierarchy,
+        AllowedTagSetOids = bootstrap.AllowedTagSetOids,
+        IsActive = true
+    };
+
+    await repository.UpsertAsync(registration);
+    logger.LogInformation(
+        "EmailClassificationBootstrap: {Action} application '{Id}' (defaultPolicyOid={Oid})",
+        existing is null ? "seeded" : "updated",
+        bootstrap.ApplicationId,
+        bootstrap.DefaultPolicyOid ?? "(none)");
 }
 
 static void RegisterLabelCodecs(WebApplication app)
