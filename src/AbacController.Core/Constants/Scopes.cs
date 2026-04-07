@@ -43,4 +43,10 @@ public static class Scopes
 
     /// <summary>Scope for system administration operations.</summary>
     public const string SysAdmin = "abac:sys:admin";
+
+    /// <summary>Scope for querying allowed classifications.</summary>
+    public const string ClassificationQuery = "abac:classification:query";
+
+    /// <summary>Scope for administering application registrations.</summary>
+    public const string ApplicationAdmin = "abac:application:admin";
 }

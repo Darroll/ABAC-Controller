@@ -36,6 +36,11 @@ public sealed class AuthZenDiscoveryTests
         Assert.Equal("/pdp/api/evaluate/async", root.GetProperty("evaluation_async_endpoint").GetString());
         Assert.Equal("1.0", root.GetProperty("api_version").GetString());
 
+        // Classification assignment endpoints
+        Assert.Equal("/pdp/api/classifications/allowed", root.GetProperty("classification_allowed_endpoint").GetString());
+        Assert.Equal("/pdp/api/classifications/allowed/batch", root.GetProperty("classification_allowed_batch_endpoint").GetString());
+        Assert.Equal("/pap/api/applications", root.GetProperty("applications_endpoint").GetString());
+
         // Authentication methods should include bearer
         var authMethods = root.GetProperty("authentication_methods");
         Assert.True(authMethods.GetArrayLength() > 0);

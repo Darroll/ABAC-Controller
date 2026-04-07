@@ -148,3 +148,22 @@ public class ConfigurationEntryEntityConfiguration : IEntityTypeConfiguration<Co
         builder.Property(e => e.Key).HasMaxLength(256);
     }
 }
+
+/// <summary>
+/// Configures EF Core persistence for application registration entities.
+/// </summary>
+public class ApplicationRegistrationEntityConfiguration : IEntityTypeConfiguration<ApplicationRegistrationEntity>
+{
+    /// <summary>
+    /// Configures the <see cref="ApplicationRegistrationEntity"/> table, keys, and column constraints.
+    /// </summary>
+    public void Configure(EntityTypeBuilder<ApplicationRegistrationEntity> builder)
+    {
+        builder.ToTable("ApplicationRegistrations");
+        builder.HasKey(e => e.Id);
+        builder.Property(e => e.Id).HasMaxLength(128);
+        builder.Property(e => e.Name).HasMaxLength(256).IsRequired();
+        builder.Property(e => e.DefaultPolicyOid).HasMaxLength(256);
+        builder.HasIndex(e => e.TenantId);
+    }
+}

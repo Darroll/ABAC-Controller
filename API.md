@@ -113,6 +113,18 @@ Underlying scopes are ABAC-specific values such as `abac:evaluate` and `abac:pol
 - `POST /pip/api/cache/invalidate/{subjectId}`
 - `POST /pip/api/cache/invalidate-all`
 
+### Classification query endpoints
+
+- `POST /pdp/api/classifications/allowed` — allowed classifications for a subject/app/context
+- `POST /pdp/api/classifications/allowed/batch` — batch query (max 50)
+
+### Application management endpoints
+
+- `GET /pap/api/applications` — list registered applications
+- `GET /pap/api/applications/{id}` — get application by ID
+- `PUT /pap/api/applications/{id}` — create or update application
+- `DELETE /pap/api/applications/{id}` — delete application
+
 ### PEP metadata endpoints
 
 - `POST /pep/api/metadata/bind`

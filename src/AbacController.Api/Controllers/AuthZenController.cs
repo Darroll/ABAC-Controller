@@ -284,6 +284,9 @@ public class AuthZenController : ControllerBase
             subjects_endpoint = "/access/v1/subjects",
             resources_endpoint = "/access/v1/resources",
             actions_endpoint = "/access/v1/actions",
+            classification_allowed_endpoint = "/pdp/api/classifications/allowed",
+            classification_allowed_batch_endpoint = "/pdp/api/classifications/allowed/batch",
+            applications_endpoint = "/pap/api/applications",
             authentication_methods = new[] { "bearer" },
             api_version = "1.0"
         });

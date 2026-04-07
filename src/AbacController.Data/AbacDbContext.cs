@@ -35,6 +35,9 @@ public class AbacDbContext : DbContext
     /// <summary>Configuration entries.</summary>
     public DbSet<ConfigurationEntryEntity> Configuration => Set<ConfigurationEntryEntity>();
 
+    /// <summary>Registered application classification scopes.</summary>
+    public DbSet<ApplicationRegistrationEntity> ApplicationRegistrations => Set<ApplicationRegistrationEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AbacDbContext).Assembly);

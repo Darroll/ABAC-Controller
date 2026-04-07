@@ -75,6 +75,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPdpEngine, PdpEngine>();
         services.AddScoped<IPolicyRepository, PolicyRepository>();
         services.AddScoped<IAuditReader, AuditRepository>();
+        services.AddScoped<IApplicationRepository, ApplicationRepository>();
+        services.AddScoped<IClassificationQueryEngine, ClassificationQueryEngine>();
 
         // Async evaluation support
         services.AddSingleton<AsyncEvaluationQueue>();
@@ -249,6 +251,8 @@ public static class ServiceCollectionExtensions
             AddScopePolicy(options, "AuditRead", Scopes.AuditRead);
             AddScopePolicy(options, "SysRead", Scopes.SysRead);
             AddScopePolicy(options, "SysAdmin", Scopes.SysAdmin);
+            AddScopePolicy(options, "ClassificationQuery", Scopes.ClassificationQuery);
+            AddScopePolicy(options, "ApplicationAdmin", Scopes.ApplicationAdmin);
         });
     }
 
