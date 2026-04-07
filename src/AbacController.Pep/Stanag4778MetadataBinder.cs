@@ -113,6 +113,7 @@ public sealed class Stanag4778MetadataBinder : IStanag4778MetadataBinder
         {
             new XAttribute("URI", dataUri)
         };
+        // Whitespace-only contentType is treated as absent (same as null).
         if (!string.IsNullOrWhiteSpace(contentType))
         {
             dataRefAttributes.Add(new XAttribute(XmimeNs + "contentType", contentType));

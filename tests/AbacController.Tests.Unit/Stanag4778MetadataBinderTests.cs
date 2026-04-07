@@ -326,7 +326,7 @@ public sealed class Stanag4778MetadataBinderTests
     {
         var (binder, _, _) = CreateBinder();
 
-        // External DataReference URI is not supported in Phase 0
+        // External DataReference URIs are not supported (requires Phase 2 XMLDSIG Manifest)
         var badXml = """
             <mb:BindingInformation xmlns:mb="urn:nato:stanag:4778:bindinginformation:1:0">
               <mb:MetadataBindingContainer>
