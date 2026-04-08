@@ -18,6 +18,13 @@ public sealed class ConfigurableAbacContainer : IAsyncDisposable
     public string GrpcUrl { get; private set; } = string.Empty;
     public HttpClient HttpClient { get; private set; } = null!;
 
+    /// <summary>
+    /// Host-side path of the directory bind-mounted into the container at
+    /// <c>/data</c>. Tests can drop fixture files here before calling
+    /// <see cref="StartAsync"/> to make them visible to the container.
+    /// </summary>
+    public string DataDirectory => _dataDirectory;
+
     public ConfigurableAbacContainer(Dictionary<string, string>? environment = null)
     {
         _environment = environment ?? new Dictionary<string, string>(StringComparer.Ordinal);

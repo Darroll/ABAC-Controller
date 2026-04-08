@@ -11,6 +11,12 @@ public static class SpifNamespaces
     /// <summary>Common typo found in some SPIFs (xmslpif instead of xmlspif).</summary>
     public const string SpifTypo = "http://www.xmslpif.org/spif";
 
+    /// <summary>
+    /// URN-form xmlspif namespace emitted by the Blazor SpifEditor and used by the
+    /// 7 bundled seed SPIFs that originated in the Email Classification project.
+    /// </summary>
+    public const string SpifUrnV3 = "urn:xmlspif:spif:3.0";
+
     /// <summary>XML Schema Instance namespace.</summary>
     public const string Xsi = "http://www.w3.org/2001/XMLSchema-instance";
 

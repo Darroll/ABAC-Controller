@@ -121,7 +121,9 @@ public sealed class SpifParser : ISpifParser
     }
 
     private static string NormalizeNamespaceTypos(string xmlContent)
-        => xmlContent.Replace(SpifNamespaces.SpifTypo, SpifNamespaces.Spif, StringComparison.Ordinal);
+        => xmlContent
+            .Replace(SpifNamespaces.SpifTypo, SpifNamespaces.Spif, StringComparison.Ordinal)
+            .Replace(SpifNamespaces.SpifUrnV3, SpifNamespaces.Spif, StringComparison.Ordinal);
 
     private SpifParseResult ParseDocument(XDocument document)
     {
@@ -224,7 +226,9 @@ public sealed class SpifParser : ISpifParser
 
         var namespaceName = root.Name.NamespaceName;
         if (!string.IsNullOrEmpty(namespaceName) &&
-            !string.Equals(namespaceName, SpifNamespaces.Spif, StringComparison.Ordinal))
+            !string.Equals(namespaceName, SpifNamespaces.Spif, StringComparison.Ordinal) &&
+            !string.Equals(namespaceName, SpifNamespaces.SpifTypo, StringComparison.Ordinal) &&
+            !string.Equals(namespaceName, SpifNamespaces.SpifUrnV3, StringComparison.Ordinal))
         {
             errors.Add(new SpifParseError(
                 $"Unsupported SPIF namespace '{namespaceName}'",
