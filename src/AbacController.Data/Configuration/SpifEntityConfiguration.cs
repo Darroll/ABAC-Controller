@@ -16,7 +16,18 @@ public class SpifEntityConfiguration : IEntityTypeConfiguration<SpifEntity>
     {
         builder.ToTable("Spifs");
         builder.HasKey(e => e.Id);
-        builder.HasIndex(e => e.PolicyOid).IsUnique();
+
+        // Multi-tenancy: a (TenantId, PolicyOid) pair is globally unique but
+        // the same PolicyOid MAY be registered independently in different
+        // tenants. Previously this was a single-column unique index on
+        // PolicyOid which broke any multi-tenant scenario where two tenants
+        // wanted to import the same SPIF (including every integration test
+        // that imports TestSpifSamples.BasicPolicy).
+        builder.HasIndex(e => new { e.TenantId, e.PolicyOid }).IsUnique();
+
+        // Secondary lookup for tenant-scoped listing hot paths.
+        builder.HasIndex(e => e.TenantId);
+
         builder.Property(e => e.Name).HasMaxLength(256).IsRequired();
         builder.Property(e => e.PolicyOid).HasMaxLength(256).IsRequired();
         builder.Property(e => e.SchemaVersion).HasMaxLength(10).IsRequired();
