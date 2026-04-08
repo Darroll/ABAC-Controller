@@ -91,11 +91,22 @@ public sealed class BundledSpifImporter
             return BundledSpifImportResult.Empty(sourceDirectory);
         }
 
-        var existingOids = await _dbContext.Spifs
+        // Live-only existing set drives the skip-existing behaviour; a
+        // soft-deleted row should NOT cause us to skip a re-import.
+        var liveOids = await _dbContext.Spifs
             .Where(s => s.TenantId == tenantId)
             .Select(s => s.PolicyOid)
             .ToListAsync(ct);
-        var existing = new HashSet<string>(existingOids, StringComparer.Ordinal);
+        var live = new HashSet<string>(liveOids, StringComparer.Ordinal);
+
+        // All-rows lookup (including soft-deleted) so we can revive an
+        // existing row instead of inserting a duplicate.
+        var allRows = await _dbContext.Spifs
+            .IgnoreQueryFilters()
+            .Where(s => s.TenantId == tenantId)
+            .ToListAsync(ct);
+        var byOid = allRows.ToDictionary(
+            r => r.PolicyOid, r => r, StringComparer.Ordinal);
 
         var imported = new List<BundledSpifRecord>();
         var skipped = new List<BundledSpifRecord>();
@@ -128,7 +139,7 @@ public sealed class BundledSpifImporter
                 continue;
             }
 
-            if (skipExisting && existing.Contains(parsed.Spif.PolicyId.Oid))
+            if (skipExisting && live.Contains(parsed.Spif.PolicyId.Oid))
             {
                 _logger.LogInformation(
                     "Skipping already-imported SPIF '{Oid}' in tenant '{Tenant}'.",
@@ -141,25 +152,36 @@ public sealed class BundledSpifImporter
             var spifIndex = new SpifIndex(parsed.Spif);
             _spifRegistry.Register(spifIndex);
 
-            var entity = new SpifEntity
+            // Revive an existing (possibly soft-deleted) row if we have one;
+            // otherwise insert a fresh entity. Revival keeps the audit
+            // history aligned with a single DB row per (tenant, OID).
+            var existingRow = byOid.GetValueOrDefault(spifIndex.PolicyOid);
+            var entity = existingRow ?? new SpifEntity
             {
                 Id = Guid.NewGuid(),
                 PolicyOid = spifIndex.PolicyOid,
-                Name = spifIndex.PolicyName,
-                SchemaVersion = parsed.Spif.SchemaVersion ?? "unknown",
-                RawXml = xml,
-                IsActive = true,
-                ImportedAt = DateTimeOffset.UtcNow,
-                ImportedBy = ImportedByTag,
                 TenantId = tenantId,
-                ClassificationCount = parsed.Spif.Classifications.Count,
-                CategoryCount = parsed.Spif.CategoryTagSets.Sum(ts => ts.Tags.Sum(t => t.Categories.Count)),
-                Hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(xml))),
             };
 
-            _dbContext.Spifs.Add(entity);
+            entity.Name = spifIndex.PolicyName;
+            entity.SchemaVersion = parsed.Spif.SchemaVersion ?? "unknown";
+            entity.RawXml = xml;
+            entity.IsActive = true;
+            entity.ImportedAt = DateTimeOffset.UtcNow;
+            entity.ImportedBy = ImportedByTag;
+            entity.ClassificationCount = parsed.Spif.Classifications.Count;
+            entity.CategoryCount = parsed.Spif.CategoryTagSets.Sum(ts => ts.Tags.Sum(t => t.Categories.Count));
+            entity.Hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(xml)));
+            entity.IsDeleted = false;
+            entity.DeletedAt = null;
+
+            if (existingRow is null)
+            {
+                _dbContext.Spifs.Add(entity);
+                byOid[entity.PolicyOid] = entity;
+            }
             imported.Add(new BundledSpifRecord(fileName, entity.PolicyOid, entity.Name));
-            existing.Add(entity.PolicyOid);
+            live.Add(entity.PolicyOid);
 
             _auditWriter.Write(new AuditEvent
             {

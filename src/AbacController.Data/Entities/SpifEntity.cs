@@ -49,6 +49,18 @@ public class SpifEntity
 
     /// <summary>Tenant identifier for multi-tenant isolation. Null = default/system tenant.</summary>
     public string? TenantId { get; set; }
+
+    /// <summary>
+    /// Soft-delete marker. Rows with <c>IsDeleted=true</c> are invisible to
+    /// standard queries via the global EF query filter but remain in the
+    /// table for audit continuity. Re-importing a previously soft-deleted
+    /// policy OID must bypass the query filter (see <c>PapAdminController</c>
+    /// and <c>BundledSpifImporter</c>).
+    /// </summary>
+    public bool IsDeleted { get; set; }
+
+    /// <summary>Timestamp of the soft-delete, or null for live rows.</summary>
+    public DateTimeOffset? DeletedAt { get; set; }
 }
 
 /// <summary>

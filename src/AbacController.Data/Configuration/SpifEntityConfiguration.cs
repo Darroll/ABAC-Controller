@@ -17,13 +17,18 @@ public class SpifEntityConfiguration : IEntityTypeConfiguration<SpifEntity>
         builder.ToTable("Spifs");
         builder.HasKey(e => e.Id);
 
+        // Soft-delete: every query sees only live rows by default. Writers
+        // that need to re-import a previously deleted OID must use
+        // `IgnoreQueryFilters()`.
+        builder.HasQueryFilter(e => !e.IsDeleted);
+
         // Multi-tenancy: a (TenantId, PolicyOid) pair is globally unique but
         // the same PolicyOid MAY be registered independently in different
-        // tenants. Previously this was a single-column unique index on
-        // PolicyOid which broke any multi-tenant scenario where two tenants
-        // wanted to import the same SPIF (including every integration test
-        // that imports TestSpifSamples.BasicPolicy).
-        builder.HasIndex(e => new { e.TenantId, e.PolicyOid }).IsUnique();
+        // tenants. The uniqueness is FILTERED to live rows only so a
+        // soft-deleted row does not block a fresh re-import of the same OID.
+        builder.HasIndex(e => new { e.TenantId, e.PolicyOid })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = 0");
 
         // Secondary lookup for tenant-scoped listing hot paths.
         builder.HasIndex(e => e.TenantId);

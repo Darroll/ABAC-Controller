@@ -65,16 +65,66 @@ public class AbacDbContext : DbContext
     }
 
     /// <summary>
-    /// Initialize SQLite-specific PRAGMAs for performance.
+    /// Initialize SQLite-specific PRAGMAs for performance and run any
+    /// additive schema upgrades that existing dev databases may need
+    /// (this project uses <c>EnsureCreatedAsync</c> rather than EF
+    /// migrations, so schema changes land here).
     /// </summary>
     public void InitializeSqlite()
     {
-        if (Database.IsSqlite())
+        if (!Database.IsSqlite())
         {
-            Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL;");
-            Database.ExecuteSqlRaw("PRAGMA synchronous=NORMAL;");
-            Database.ExecuteSqlRaw("PRAGMA mmap_size=268435456;");
-            Database.ExecuteSqlRaw("PRAGMA foreign_keys=ON;");
+            return;
         }
+
+        Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL;");
+        Database.ExecuteSqlRaw("PRAGMA synchronous=NORMAL;");
+        Database.ExecuteSqlRaw("PRAGMA mmap_size=268435456;");
+        Database.ExecuteSqlRaw("PRAGMA foreign_keys=ON;");
+
+        UpgradeSpifSoftDeleteIfNeeded();
+    }
+
+    /// <summary>
+    /// Idempotently adds the <c>IsDeleted</c> / <c>DeletedAt</c> columns to
+    /// the Spifs table on existing dev databases that were created before
+    /// the soft-delete feature shipped. New databases created via
+    /// <c>EnsureCreatedAsync</c> already have these columns via
+    /// <c>SpifEntityConfiguration</c>, in which case this method is a no-op.
+    /// Also rebuilds the unique index as filtered-on-live-rows so a
+    /// soft-deleted OID does not block a re-import.
+    /// </summary>
+    private void UpgradeSpifSoftDeleteIfNeeded()
+    {
+        // Check whether the Spifs table exists at all; if not, EnsureCreated
+        // will build the correct schema and there is nothing to patch.
+        var tableExists = Database.SqlQueryRaw<int>(
+            "SELECT COUNT(*) AS Value FROM sqlite_master WHERE type='table' AND name='Spifs'")
+            .AsEnumerable()
+            .FirstOrDefault();
+        if (tableExists == 0)
+        {
+            return;
+        }
+
+        var columnExists = Database.SqlQueryRaw<int>(
+            "SELECT COUNT(*) AS Value FROM pragma_table_info('Spifs') WHERE name='IsDeleted'")
+            .AsEnumerable()
+            .FirstOrDefault();
+        if (columnExists == 0)
+        {
+            Database.ExecuteSqlRaw(
+                "ALTER TABLE \"Spifs\" ADD COLUMN \"IsDeleted\" INTEGER NOT NULL DEFAULT 0;");
+            Database.ExecuteSqlRaw(
+                "ALTER TABLE \"Spifs\" ADD COLUMN \"DeletedAt\" TEXT NULL;");
+        }
+
+        // Drop the old unconditional unique index (if present) and recreate
+        // it as a filtered index so soft-deleted rows don't block re-imports.
+        Database.ExecuteSqlRaw(
+            "DROP INDEX IF EXISTS \"IX_Spifs_TenantId_PolicyOid\";");
+        Database.ExecuteSqlRaw(
+            "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_Spifs_TenantId_PolicyOid\" " +
+            "ON \"Spifs\" (\"TenantId\", \"PolicyOid\") WHERE \"IsDeleted\" = 0;");
     }
 }
