@@ -31,8 +31,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Default SPIF policies seeded into the in-process registry on first
-         boot when Seed:SeedDefaultSpifs is true. See SpifSeedService. -->
+    <!-- Default SPIF policies bundled with the container image and
+         imported on demand via POST /pap/api/spifs/bundled/import.
+         See BundledSpifImporter / BundledSpifImportController. -->
     <Content Include="data\seed-spifs\*.spif.xml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

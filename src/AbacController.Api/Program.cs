@@ -95,41 +95,12 @@ static async Task InitializeAsync(WebApplication app)
     db.InitializeSqlite();
 
     await BootstrapEmailClassificationAsync(scope, app);
-    await SeedDefaultSpifsAsync(scope, app);
+
+    // Bundled SPIF import is now an explicit operator action driven via
+    // POST /pap/api/spifs/bundled/import — no automatic first-boot seed.
 
     var runtimeState = scope.ServiceProvider.GetRequiredService<AppRuntimeState>();
     runtimeState.MarkStartupCompleted();
-}
-
-static async Task SeedDefaultSpifsAsync(IServiceScope scope, WebApplication app)
-{
-    var seedOptions = app.Configuration.GetSection("Seed").Get<AbacController.Api.Configuration.SeedOptions>()
-                      ?? new AbacController.Api.Configuration.SeedOptions();
-    if (!seedOptions.SeedDefaultSpifs)
-    {
-        return;
-    }
-
-    var seedDirectory = string.IsNullOrWhiteSpace(seedOptions.SpifSeedDirectory)
-        ? Path.Combine(AppContext.BaseDirectory, "data", "seed-spifs")
-        : seedOptions.SpifSeedDirectory;
-
-    var seeder = scope.ServiceProvider.GetRequiredService<AbacController.Api.Hosting.SpifSeedService>();
-    var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("SpifSeed");
-    try
-    {
-        var seeded = await seeder.SeedDefaultsAsync(seedDirectory);
-        if (seeded > 0)
-        {
-            logger.LogInformation("Seeded {Count} default SPIFs from '{Directory}'", seeded, seedDirectory);
-        }
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "SPIF seed pass failed for '{Directory}'", seedDirectory);
-        // Don't crash startup — operators can re-run seeding by clearing
-        // the Spifs table and restarting the host.
-    }
 }
 
 static async Task BootstrapEmailClassificationAsync(IServiceScope scope, WebApplication app)

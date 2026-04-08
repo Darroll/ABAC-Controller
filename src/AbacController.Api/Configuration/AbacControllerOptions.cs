@@ -17,28 +17,30 @@ public sealed class AbacControllerOptions
     /// <summary>Rate limiting configuration.</summary>
     public RateLimitingOptions RateLimiting { get; set; } = new();
 
-    /// <summary>First-boot data seeding (default SPIFs etc.).</summary>
+    /// <summary>Default location of the bundled SPIF import directory.</summary>
     public SeedOptions Seed { get; set; } = new();
 }
 
 /// <summary>
-/// Controls one-shot seeding that runs during host startup before the API
-/// becomes ready.
+/// Configures the bundled SPIF import directory used by
+/// <c>POST /pap/api/spifs/bundled/import</c>. Startup no longer auto-seeds;
+/// operators drive imports explicitly via the admin endpoint.
 /// </summary>
 public sealed class SeedOptions
 {
     /// <summary>
-    /// When true (default in dev), the host attempts to import any
-    /// <c>*.spif.xml</c> file under <see cref="SpifSeedDirectory"/> into the
-    /// default tenant on first boot. Idempotent.
+    /// Retained for backward compatibility with existing configuration
+    /// files, but no longer drives automatic behaviour. The bundled
+    /// SPIF import is always an explicit admin-API action now.
     /// </summary>
     public bool SeedDefaultSpifs { get; set; }
 
     /// <summary>
-    /// Directory the seed service scans. Defaults to
-    /// <c>{AppContext.BaseDirectory}/data/seed-spifs</c> which matches the
-    /// path the API project copies the bundled defaults to via the csproj
-    /// Content item.
+    /// Directory the bundled importer scans. Defaults to
+    /// <c>{AppContext.BaseDirectory}/data/seed-spifs</c> which matches
+    /// the path the API project copies the bundled defaults to via the
+    /// csproj Content item (and thus <c>/app/data/seed-spifs</c> in the
+    /// shipped container image).
     /// </summary>
     public string? SpifSeedDirectory { get; set; }
 }

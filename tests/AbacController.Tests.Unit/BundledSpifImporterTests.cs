@@ -11,22 +11,25 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace AbacController.Tests.Unit;
 
 /// <summary>
-/// Tests for <see cref="SpifSeedService"/>: missing directory short-circuits,
-/// already-seeded tenant short-circuits, on-disk XML files are imported into
-/// the registry + DB, and webhook + audit events fire after a successful seed.
+/// Unit tests for <see cref="BundledSpifImporter"/>: missing/empty source
+/// directories short-circuit, valid files land under the caller-supplied
+/// tenant with audit + webhook side-effects, already-imported policies
+/// are skipped when <c>skipExisting=true</c>, and malformed files are
+/// reported in the failed collection without blocking the rest of the
+/// batch.
 /// </summary>
-public sealed class SpifSeedServiceTests : IDisposable
+public sealed class BundledSpifImporterTests : IDisposable
 {
     private readonly string _tempDir;
     private readonly AbacDbContext _db;
     private readonly InMemorySpifRegistry _registry = new();
     private readonly StubAuditWriter _audit = new();
     private readonly StubPublisher _publisher = new();
-    private readonly SpifSeedService _service;
+    private readonly BundledSpifImporter _service;
 
-    public SpifSeedServiceTests()
+    public BundledSpifImporterTests()
     {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"abac-seed-test-{Guid.NewGuid():N}");
+        _tempDir = Path.Combine(Path.GetTempPath(), $"abac-bundled-import-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
 
         var options = new DbContextOptionsBuilder<AbacDbContext>()
@@ -36,13 +39,13 @@ public sealed class SpifSeedServiceTests : IDisposable
         _db.Database.OpenConnection();
         _db.Database.EnsureCreated();
 
-        _service = new SpifSeedService(
+        _service = new BundledSpifImporter(
             new SpifParser(),
             _registry,
             _db,
             _audit,
             _publisher,
-            NullLogger<SpifSeedService>.Instance);
+            NullLogger<BundledSpifImporter>.Instance);
     }
 
     public void Dispose()
@@ -56,74 +59,91 @@ public sealed class SpifSeedServiceTests : IDisposable
         File.WriteAllText(Path.Combine(_tempDir, fileName), xml);
 
     [Fact]
-    public async Task Returns_Zero_WhenDirectoryMissing()
+    public async Task ImportFromDirectoryAsync_MissingDirectory_ReturnsEmpty()
     {
-        var seeded = await _service.SeedDefaultsAsync(Path.Combine(_tempDir, "missing"));
-        Assert.Equal(0, seeded);
+        var missing = Path.Combine(_tempDir, "missing");
+        var result = await _service.ImportFromDirectoryAsync("default", missing);
+
+        Assert.Empty(result.Imported);
+        Assert.Empty(result.Skipped);
+        Assert.Empty(result.Failed);
+        Assert.False(result.HasChanges);
         Assert.Empty(await _db.Spifs.ToListAsync());
     }
 
     [Fact]
-    public async Task Returns_Zero_WhenDirectoryEmpty()
+    public async Task ImportFromDirectoryAsync_EmptyDirectory_ReturnsEmpty()
     {
-        var seeded = await _service.SeedDefaultsAsync(_tempDir);
-        Assert.Equal(0, seeded);
+        var result = await _service.ImportFromDirectoryAsync("default", _tempDir);
+
+        Assert.Empty(result.Imported);
+        Assert.False(result.HasChanges);
     }
 
     [Fact]
-    public async Task Returns_Zero_WhenDefaultTenantAlreadyHasSpifs()
-    {
-        _db.Spifs.Add(new SpifEntity
-        {
-            Id = Guid.NewGuid(),
-            PolicyOid = "1.2.3.4",
-            Name = "Existing",
-            SchemaVersion = "3.0",
-            Hash = "abc",
-            TenantId = SpifSeedService.DefaultTenant,
-            RawXml = "<spif/>"
-        });
-        await _db.SaveChangesAsync();
-
-        WriteSpif("a.spif.xml", TestSpifSamples.BasicPolicy);
-
-        var seeded = await _service.SeedDefaultsAsync(_tempDir);
-
-        Assert.Equal(0, seeded);
-        Assert.Single(await _db.Spifs.ToListAsync());
-    }
-
-    [Fact]
-    public async Task Seeds_ValidSpifFile_PersistsAuditsAndPublishes()
+    public async Task ImportFromDirectoryAsync_ValidFile_PersistsWithTenantAndSideEffects()
     {
         WriteSpif("basic.spif.xml", TestSpifSamples.BasicPolicy);
 
-        var seeded = await _service.SeedDefaultsAsync(_tempDir);
+        var result = await _service.ImportFromDirectoryAsync("tenant-bundled", _tempDir);
 
-        Assert.Equal(1, seeded);
+        Assert.Single(result.Imported);
+        Assert.Equal("tenant-bundled", result.TenantId);
+        Assert.True(result.HasChanges);
+
         var rows = await _db.Spifs.ToListAsync();
         Assert.Single(rows);
-        Assert.Equal(SpifSeedService.DefaultTenant, rows[0].TenantId);
-        Assert.True(rows[0].IsActive);
-        Assert.Equal("system-seed", rows[0].ImportedBy);
+        Assert.Equal("tenant-bundled", rows[0].TenantId);
+        Assert.Equal(BundledSpifImporter.ImportedByTag, rows[0].ImportedBy);
         Assert.NotEmpty(rows[0].Hash);
 
-        Assert.Single(_audit.Events, e => e.ActionName == "seed_spif");
+        Assert.Single(_audit.Events, e => e.ActionName == "bundled_import_spif");
         Assert.Single(_publisher.Events, e => e.EventType == WebhookEventTypes.SpifImported);
         Assert.True(_registry.Registered);
     }
 
     [Fact]
-    public async Task SkipsInvalidFile_ButContinuesWithRest()
+    public async Task ImportFromDirectoryAsync_AlreadyExisting_IsSkipped()
+    {
+        // Preload the destination tenant with the same policy OID.
+        _db.Spifs.Add(new SpifEntity
+        {
+            Id = Guid.NewGuid(),
+            PolicyOid = "1.2.3.4",
+            Name = "PreExisting",
+            SchemaVersion = "3.0",
+            Hash = "hash",
+            TenantId = "default",
+            RawXml = "<spif/>",
+        });
+        await _db.SaveChangesAsync();
+
+        WriteSpif("basic.spif.xml", TestSpifSamples.BasicPolicy);
+
+        var result = await _service.ImportFromDirectoryAsync("default", _tempDir);
+
+        Assert.Empty(result.Imported);
+        Assert.Single(result.Skipped);
+        Assert.Empty(result.Failed);
+        Assert.Equal("1.2.3.4", result.Skipped[0].PolicyOid);
+
+        // Row count unchanged.
+        Assert.Single(await _db.Spifs.ToListAsync());
+    }
+
+    [Fact]
+    public async Task ImportFromDirectoryAsync_MalformedFile_ReportedAsFailed_OthersContinue()
     {
         WriteSpif("broken.spif.xml", "<not-a-spif/>");
         WriteSpif("valid.spif.xml", TestSpifSamples.BasicPolicy);
 
-        var seeded = await _service.SeedDefaultsAsync(_tempDir);
+        var result = await _service.ImportFromDirectoryAsync("default", _tempDir);
 
-        Assert.Equal(1, seeded);
-        var rows = await _db.Spifs.ToListAsync();
-        Assert.Single(rows);
+        Assert.Single(result.Imported);
+        Assert.Single(result.Failed);
+        Assert.Equal("broken.spif.xml", result.Failed[0].File);
+
+        Assert.Single(await _db.Spifs.ToListAsync());
     }
 
     // ── Stubs ──
