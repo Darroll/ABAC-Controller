@@ -18,7 +18,65 @@
     <a href="/spif/create" class="btn btn-success">
         <span class="oi oi-plus"></span> Create New SPIF
     </a>
+    <button class="btn btn-outline-success" @onclick="ImportBundledDefaults" disabled="@_bundledImporting">
+        <span class="oi oi-data-transfer-download"></span>
+        @(_bundledImporting ? "Importing bundled defaults..." : "Import Bundled Defaults")
+    </button>
 </div>
+
+@if (_bundledResult is not null)
+{
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <strong>Bundled import result</strong>
+            <button type="button" class="btn-close btn-sm" aria-label="Close" @onclick="() => _bundledResult = null"></button>
+        </div>
+        <div class="card-body">
+            <div class="mb-2">
+                <span class="badge bg-success me-1">Imported: @_bundledResult.Imported.Count</span>
+                <span class="badge bg-secondary me-1">Skipped: @_bundledResult.Skipped.Count</span>
+                <span class="badge bg-danger me-1">Failed: @_bundledResult.Failed.Count</span>
+                <small class="text-muted ms-2">Source: <code>@_bundledResult.SourceDirectory</code></small>
+            </div>
+            @if (_bundledResult.Imported.Count > 0)
+            {
+                <details open>
+                    <summary><strong>Imported</strong></summary>
+                    <ul class="mb-0">
+                    @foreach (var row in _bundledResult.Imported)
+                    {
+                        <li><code>@row.File</code> → @row.Name (<code>@row.PolicyOid</code>)</li>
+                    }
+                    </ul>
+                </details>
+            }
+            @if (_bundledResult.Skipped.Count > 0)
+            {
+                <details>
+                    <summary><strong>Skipped (already imported)</strong></summary>
+                    <ul class="mb-0">
+                    @foreach (var row in _bundledResult.Skipped)
+                    {
+                        <li><code>@row.File</code> → <code>@row.PolicyOid</code></li>
+                    }
+                    </ul>
+                </details>
+            }
+            @if (_bundledResult.Failed.Count > 0)
+            {
+                <details open>
+                    <summary class="text-danger"><strong>Failed</strong></summary>
+                    <ul class="mb-0">
+                    @foreach (var row in _bundledResult.Failed)
+                    {
+                        <li><code>@row.File</code> — @row.Reason</li>
+                    }
+                    </ul>
+                </details>
+            }
+        </div>
+    </div>
+}
 
 @if (_showUpload)
 {
@@ -239,7 +297,64 @@ else
         }
     }
 
+    private bool _bundledImporting;
+    private BundledImportResult? _bundledResult;
+
+    private async Task ImportBundledDefaults()
+    {
+        _bundledImporting = true;
+        _bundledResult = null;
+        _pageError = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                "pap/api/spifs/bundled/import", new { skipExisting = true });
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                _pageError = $"Bundled import failed: {body}";
+                return;
+            }
+
+            _bundledResult = await response.Content.ReadFromJsonAsync<BundledImportResult>();
+            await LoadSpifs();
+        }
+        catch (Exception ex)
+        {
+            _pageError = $"Bundled import failed: {ex.Message}";
+        }
+        finally
+        {
+            _bundledImporting = false;
+        }
+    }
+
     private sealed record SpifRow(
         Guid Id, string PolicyOid, string Name, string SchemaVersion,
         bool IsActive, DateTimeOffset ImportedAt, int ClassificationCount, int CategoryCount);
+
+    /// <summary>Wire shape returned by <c>POST /pap/api/spifs/bundled/import</c>.</summary>
+    public sealed class BundledImportResult
+    {
+        public string TenantId { get; set; } = "";
+        public string SourceDirectory { get; set; } = "";
+        public List<BundledRecord> Imported { get; set; } = new();
+        public List<BundledRecord> Skipped { get; set; } = new();
+        public List<BundledFailure> Failed { get; set; } = new();
+    }
+
+    /// <summary>One imported or skipped SPIF row in the bundled-import report.</summary>
+    public sealed class BundledRecord
+    {
+        public string File { get; set; } = "";
+        public string PolicyOid { get; set; } = "";
+        public string Name { get; set; } = "";
+    }
+
+    /// <summary>One failed SPIF row in the bundled-import report.</summary>
+    public sealed class BundledFailure
+    {
+        public string File { get; set; } = "";
+        public string Reason { get; set; } = "";
+    }
 }
