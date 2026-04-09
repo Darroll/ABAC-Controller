@@ -159,27 +159,26 @@ public static class ServiceCollectionExtensions
         services.AddRazorComponents().AddInteractiveServerComponents();
 
         // The embedded Blazor admin pages call relative URIs like
-        // "pap/api/spifs". Razor pages don't get an HttpClient with a
-        // BaseAddress unless we register one explicitly. The Blazor admin
-        // is hosted in the same process as the API on Kestrel's HTTP
-        // listener (port 8080 inside the container), so we point its
-        // HttpClient at the in-process loopback. This is independent of
-        // any host-side port mapping (e.g. 18080 → 8080 in compose).
+        // "pap/api/spifs". Razor pages don't get a configured HttpClient
+        // without an explicit registration. Three requirements:
         //
-        // Every PAP/PDP endpoint in this controller is tenant-scoped via
-        // X-Tenant-Id. The Blazor admin is single-tenant in V1, so we
-        // pin the header to "default" by default. Pages that need to
-        // operate on a different tenant can either pass an explicit
-        // header on each request or build a custom HttpClient.
-        services.AddScoped<HttpClient>(_ =>
-        {
-            var http = new HttpClient
+        //   1. BaseAddress must be the in-process Kestrel listener so the
+        //      client is independent of any host-side port mapping.
+        //   2. Authorization must forward the bearer / API key from the
+        //      caller's request so the PAP call runs with the admin's
+        //      scopes, not as an anonymous loopback.
+        //   3. X-Tenant-Id must come from the current request, not a
+        //      hard-coded literal — otherwise admins viewing tenant B
+        //      through the shell get data from tenant A.
+        services.AddHttpContextAccessor();
+        services.AddTransient<BlazorAdminAuthForwardingHandler>();
+        services.AddHttpClient("BlazorAdmin", client =>
             {
-                BaseAddress = new Uri("http://localhost:8080/"),
-            };
-            http.DefaultRequestHeaders.Add("X-Tenant-Id", "default");
-            return http;
-        });
+                client.BaseAddress = new Uri("http://localhost:8080/");
+            })
+            .AddHttpMessageHandler<BlazorAdminAuthForwardingHandler>();
+        services.AddScoped(sp =>
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient("BlazorAdmin"));
 
         services.AddHealthChecks()
             .AddCheck<StartupHealthCheck>("startup", tags: ["startup"])

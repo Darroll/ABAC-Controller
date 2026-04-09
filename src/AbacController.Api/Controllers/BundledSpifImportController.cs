@@ -81,9 +81,39 @@ public sealed class BundledSpifImportController : ControllerBase
                 ? _tenantContext.TenantId!
                 : BundledSpifImporter.DefaultTenant);
 
-        var sourceDirectory = !string.IsNullOrWhiteSpace(request?.SourceDirectory)
-            ? request!.SourceDirectory!
-            : ResolveSourceDirectory();
+        string sourceDirectory;
+        if (!string.IsNullOrWhiteSpace(request?.SourceDirectory))
+        {
+            // Override supplied. Canonicalise the path and require it to sit
+            // underneath the configured bundled-seed root so an authenticated
+            // PolicyAdmin cannot point the importer at /etc, C:\Windows, or
+            // a traversal string like ../../../.
+            var defaultRoot = Path.GetFullPath(ResolveSourceDirectory());
+            string candidate;
+            try
+            {
+                candidate = Path.GetFullPath(request!.SourceDirectory!);
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                return BadRequest(new { error = $"sourceDirectory is not a valid path: {ex.Message}" });
+            }
+
+            var rootWithSeparator = defaultRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            if (!candidate.Equals(defaultRoot, StringComparison.OrdinalIgnoreCase) &&
+                !candidate.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(new
+                {
+                    error = "sourceDirectory must be the configured bundled-seed directory or a subdirectory of it.",
+                });
+            }
+            sourceDirectory = candidate;
+        }
+        else
+        {
+            sourceDirectory = ResolveSourceDirectory();
+        }
 
         var skipExisting = request?.SkipExisting ?? true;
 

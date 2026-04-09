@@ -62,10 +62,28 @@ public sealed class SpifVisibilityController : ControllerBase
     [HttpGet("visible/{applicationId}")]
     public async Task<ActionResult<VisibleSpifsResponse>> Visible(string? applicationId, CancellationToken ct)
     {
-        var tenantId = _tenantContext.TenantId ?? "default";
-        var subjectId = User.FindFirst("sub")?.Value
-                        ?? User.FindFirst("client_id")?.Value
-                        ?? "anonymous";
+        // Reject missing subject / tenant explicitly instead of silently
+        // falling back to "anonymous" / "default". Two different API-key
+        // callers with no sub claim would otherwise share a cached
+        // visibility set, and a caller with no tenant header would probe
+        // the default tenant's SPIFs.
+        var subjectId = User.FindFirst("sub")?.Value ?? User.FindFirst("client_id")?.Value;
+        if (string.IsNullOrWhiteSpace(subjectId))
+        {
+            return Unauthorized(new
+            {
+                error = "Subject id (sub or client_id claim) is required to resolve visibility.",
+            });
+        }
+
+        var tenantId = _tenantContext.TenantId;
+        if (string.IsNullOrWhiteSpace(tenantId))
+        {
+            return BadRequest(new
+            {
+                error = "Tenant id is required. Supply X-Tenant-Id or a tenant claim in the token.",
+            });
+        }
 
         var keycloakGroups = _keycloakClaims.KeycloakGroupIds;
         var abacGroupIds = await _groupResolver.ResolveAsync(tenantId, subjectId, keycloakGroups, ct);

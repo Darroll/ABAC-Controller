@@ -111,6 +111,7 @@ public sealed class BundledSpifImporter
         var imported = new List<BundledSpifRecord>();
         var skipped = new List<BundledSpifRecord>();
         var failed = new List<BundledSpifFailure>();
+        var pendingRegistrations = new List<SpifIndex>();
 
         foreach (var file in files.OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
         {
@@ -149,8 +150,13 @@ public sealed class BundledSpifImporter
                 continue;
             }
 
+            // Defer SpifRegistry.Register until AFTER SaveChangesAsync
+            // commits — otherwise a mid-loop EF failure (unique-index race,
+            // SQLite I/O error, etc.) leaves the PDP's in-memory registry
+            // populated with entries that never landed in the DB, making
+            // the reported imported[] list untruthful and the PDP's view
+            // diverge from the persisted policy store.
             var spifIndex = new SpifIndex(parsed.Spif);
-            _spifRegistry.Register(spifIndex);
 
             // Revive an existing (possibly soft-deleted) row if we have one;
             // otherwise insert a fresh entity. Revival keeps the audit
@@ -181,6 +187,7 @@ public sealed class BundledSpifImporter
                 byOid[entity.PolicyOid] = entity;
             }
             imported.Add(new BundledSpifRecord(fileName, entity.PolicyOid, entity.Name));
+            pendingRegistrations.Add(spifIndex);
             live.Add(entity.PolicyOid);
 
             _auditWriter.Write(new AuditEvent
@@ -198,6 +205,15 @@ public sealed class BundledSpifImporter
         if (imported.Count > 0)
         {
             await _dbContext.SaveChangesAsync(ct);
+
+            // Commit succeeded — now populate the PDP's in-memory registry.
+            // If the commit had failed above, we would have propagated the
+            // exception without touching the registry, keeping it in sync
+            // with what the database actually persisted.
+            foreach (var index in pendingRegistrations)
+            {
+                _spifRegistry.Register(index);
+            }
 
             foreach (var row in imported)
             {
