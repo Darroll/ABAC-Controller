@@ -121,7 +121,17 @@ public sealed class SpifParser : ISpifParser
     }
 
     private static string NormalizeNamespaceTypos(string xmlContent)
-        => xmlContent.Replace(SpifNamespaces.SpifTypo, SpifNamespaces.Spif, StringComparison.Ordinal);
+    {
+        // First, rewrite SPIFs that use the legacy urn:xmlspif:spif:3.0
+        // dialect (the 7 bundled sample policies + Blazor SpifEditor output)
+        // into the strict xmlspif.org shape so downstream parsing and XSD
+        // validation see a single canonical form.
+        var dialectNormalized = LegacySpifDialectNormalizer.Normalize(xmlContent);
+
+        // Then fix the common "xmslpif" namespace typo (e.g. copy/paste error).
+        return dialectNormalized
+            .Replace(SpifNamespaces.SpifTypo, SpifNamespaces.Spif, StringComparison.Ordinal);
+    }
 
     private SpifParseResult ParseDocument(XDocument document)
     {
@@ -224,7 +234,9 @@ public sealed class SpifParser : ISpifParser
 
         var namespaceName = root.Name.NamespaceName;
         if (!string.IsNullOrEmpty(namespaceName) &&
-            !string.Equals(namespaceName, SpifNamespaces.Spif, StringComparison.Ordinal))
+            !string.Equals(namespaceName, SpifNamespaces.Spif, StringComparison.Ordinal) &&
+            !string.Equals(namespaceName, SpifNamespaces.SpifTypo, StringComparison.Ordinal) &&
+            !string.Equals(namespaceName, SpifNamespaces.SpifUrnV3, StringComparison.Ordinal))
         {
             errors.Add(new SpifParseError(
                 $"Unsupported SPIF namespace '{namespaceName}'",

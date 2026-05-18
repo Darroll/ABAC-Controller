@@ -1,0 +1,681 @@
+@*
+    Component: Entitlements
+    Purpose: Admin UI for the hybrid assignment model. Three tabs:
+             - Default SPIFs: tenant baseline entitlements (everyone gets these).
+             - Groups: per-ABAC-group SPIF assignments.
+             - Users: per-user grants and denies.
+    Route: /entitlements
+    Dependencies: HttpClient, /pap/api/entitlements/*, /pap/api/groups/*.
+*@
+@page "/entitlements"
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<h2>Entitlements</h2>
+<p class="text-muted" style="margin-top:-0.5rem; margin-bottom:1.5rem; font-size:0.95rem;">
+    Hybrid assignment model. Defaults apply to everyone in the tenant; group
+    assignments flow through ABAC group membership; user overrides take
+    precedence with denies winning over grants.
+</p>
+
+<div class="row g-2 mb-3">
+    <div class="col-md-4">
+        <label class="form-label small">Tenant Id</label>
+        <input class="form-control form-control-sm"
+               @bind="_tenantId"
+               @bind:event="oninput"
+               placeholder="default" />
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-sm btn-primary w-100" @onclick="ReloadActiveTab">Reload</button>
+    </div>
+</div>
+
+@if (_errorMessage is not null)
+{
+    <div class="alert alert-danger py-2">@_errorMessage</div>
+}
+
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <button type="button"
+                class="nav-link @(_activeTab == Tab.Defaults ? "active" : "")"
+                @onclick="() => SwitchTab(Tab.Defaults)">
+            Default SPIFs
+        </button>
+    </li>
+    <li class="nav-item">
+        <button type="button"
+                class="nav-link @(_activeTab == Tab.Groups ? "active" : "")"
+                @onclick="() => SwitchTab(Tab.Groups)">
+            Groups
+        </button>
+    </li>
+    <li class="nav-item">
+        <button type="button"
+                class="nav-link @(_activeTab == Tab.Users ? "active" : "")"
+                @onclick="() => SwitchTab(Tab.Users)">
+            Users
+        </button>
+    </li>
+</ul>
+
+@if (_activeTab == Tab.Defaults)
+{
+    <div class="card mb-3">
+        <div class="card-header">
+            <strong>Add default SPIF</strong>
+        </div>
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <label class="form-label small">Policy OID <span class="text-danger">*</span></label>
+                    <input class="form-control form-control-sm" @bind="_baselineForm.PolicyOid" placeholder="2.16.840.1.101.2.1.1.19" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">Classification LACV (optional)</label>
+                    <input class="form-control form-control-sm" type="number" @bind="_baselineForm.ClassificationLacv" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">Tag set OID (optional)</label>
+                    <input class="form-control form-control-sm" @bind="_baselineForm.TagSetOid" />
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button class="btn btn-success btn-sm w-100"
+                            disabled="@(string.IsNullOrWhiteSpace(_tenantId) || string.IsNullOrWhiteSpace(_baselineForm.PolicyOid))"
+                            @onclick="AddBaseline">Add</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <strong>Current defaults</strong>
+            <span class="text-muted ms-2">@(_baselineRows?.Count ?? 0) entries</span>
+        </div>
+        <div class="card-body p-0">
+            @if (_baselineRows is null)
+            {
+                <div class="p-3 text-muted">No data loaded.</div>
+            }
+            else if (_baselineRows.Count == 0)
+            {
+                <div class="p-3 text-muted">No default SPIFs for this tenant.</div>
+            }
+            else
+            {
+                <table class="table table-sm table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Policy OID</th>
+                            <th>Classification LACV</th>
+                            <th>Tag set OID</th>
+                            <th style="width: 100px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in _baselineRows)
+                    {
+                        <tr>
+                            <td><code>@row.PolicyOid</code></td>
+                            <td>@(row.ClassificationLacv?.ToString() ?? "—")</td>
+                            <td>@(row.TagSetOid ?? "—")</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-danger"
+                                        @onclick="() => RemoveBaseline(row)">Remove</button>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+}
+else if (_activeTab == Tab.Groups)
+{
+    <div class="row g-2 mb-3">
+        <div class="col-md-6">
+            <label class="form-label small">ABAC group</label>
+            <select class="form-select form-select-sm"
+                    @bind="_selectedGroupId"
+                    @bind:after="OnGroupSelectedAsync">
+                <option value="">— pick a group —</option>
+                @if (_groups is not null)
+                {
+                    @foreach (var g in _groups)
+                    {
+                        <option value="@g.Id">@g.Name</option>
+                    }
+                }
+            </select>
+        </div>
+    </div>
+
+    @if (_selectedGroupId is not null && _selectedGroupId != Guid.Empty)
+    {
+        <div class="card mb-3">
+            <div class="card-header"><strong>Assign SPIF to group</strong></div>
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label class="form-label small">Policy OID <span class="text-danger">*</span></label>
+                        <input class="form-control form-control-sm" @bind="_groupForm.PolicyOid" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small">Classification LACV (optional)</label>
+                        <input class="form-control form-control-sm" type="number" @bind="_groupForm.ClassificationLacv" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small">Tag set OID (optional)</label>
+                        <input class="form-control form-control-sm" @bind="_groupForm.TagSetOid" />
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button class="btn btn-success btn-sm w-100"
+                                disabled="@string.IsNullOrWhiteSpace(_groupForm.PolicyOid)"
+                                @onclick="AddGroupEntitlement">Add</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <strong>Entitlements assigned to this group</strong>
+                <span class="text-muted ms-2">@(_groupRows?.Count ?? 0) entries</span>
+            </div>
+            <div class="card-body p-0">
+                @if (_groupRows is null || _groupRows.Count == 0)
+                {
+                    <div class="p-3 text-muted">None.</div>
+                }
+                else
+                {
+                    <table class="table table-sm table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Policy OID</th>
+                                <th>Classification LACV</th>
+                                <th>Tag set OID</th>
+                                <th style="width: 100px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in _groupRows)
+                        {
+                            <tr>
+                                <td><code>@row.PolicyOid</code></td>
+                                <td>@(row.ClassificationLacv?.ToString() ?? "—")</td>
+                                <td>@(row.TagSetOid ?? "—")</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            @onclick="() => RemoveGroupEntitlement(row)">Remove</button>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+    }
+}
+else if (_activeTab == Tab.Users)
+{
+    <div class="row g-2 mb-3">
+        <div class="col-md-6">
+            <label class="form-label small">User id (Keycloak sub / local user id)</label>
+            <input class="form-control form-control-sm"
+                   @bind="_userId"
+                   @bind:event="oninput"
+                   placeholder="alice@abac-dev.local" />
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+            <button class="btn btn-sm btn-primary w-100"
+                    disabled="@string.IsNullOrWhiteSpace(_userId)"
+                    @onclick="LoadUser">Load</button>
+        </div>
+    </div>
+
+    @if (_userOverrides is not null)
+    {
+        <div class="card mb-3">
+            <div class="card-header"><strong>Add user grant</strong></div>
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label class="form-label small">Policy OID <span class="text-danger">*</span></label>
+                        <input class="form-control form-control-sm" @bind="_userGrantForm.PolicyOid" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small">Classification LACV</label>
+                        <input class="form-control form-control-sm" type="number" @bind="_userGrantForm.ClassificationLacv" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small">Tag set OID</label>
+                        <input class="form-control form-control-sm" @bind="_userGrantForm.TagSetOid" />
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button class="btn btn-success btn-sm w-100"
+                                disabled="@string.IsNullOrWhiteSpace(_userGrantForm.PolicyOid)"
+                                @onclick="AddUserGrant">Grant</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header"><strong>Add user deny</strong></div>
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-md-3">
+                        <label class="form-label small">Policy OID <span class="text-danger">*</span></label>
+                        <input class="form-control form-control-sm" @bind="_userDenyForm.PolicyOid" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">Class. LACV</label>
+                        <input class="form-control form-control-sm" type="number" @bind="_userDenyForm.ClassificationLacv" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small">Tag set OID</label>
+                        <input class="form-control form-control-sm" @bind="_userDenyForm.TagSetOid" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">Reason</label>
+                        <input class="form-control form-control-sm" @bind="_userDenyForm.Reason" />
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button class="btn btn-danger btn-sm w-100"
+                                disabled="@string.IsNullOrWhiteSpace(_userDenyForm.PolicyOid)"
+                                @onclick="AddUserDeny">Deny</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <strong>Grants</strong>
+                <span class="text-muted ms-2">@_userOverrides.Grants.Count entries</span>
+            </div>
+            <div class="card-body p-0">
+                @if (_userOverrides.Grants.Count == 0)
+                {
+                    <div class="p-3 text-muted">No grants.</div>
+                }
+                else
+                {
+                    <table class="table table-sm table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Policy OID</th>
+                                <th>Classification LACV</th>
+                                <th>Tag set OID</th>
+                                <th style="width: 100px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in _userOverrides.Grants)
+                        {
+                            <tr>
+                                <td><code>@row.PolicyOid</code></td>
+                                <td>@(row.ClassificationLacv?.ToString() ?? "—")</td>
+                                <td>@(row.TagSetOid ?? "—")</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            @onclick="() => RemoveUserOverride(row.PolicyOid, row.ClassificationLacv)">Remove</button>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <strong>Denies</strong>
+                <span class="text-muted ms-2">@_userOverrides.Denies.Count entries</span>
+            </div>
+            <div class="card-body p-0">
+                @if (_userOverrides.Denies.Count == 0)
+                {
+                    <div class="p-3 text-muted">No denies.</div>
+                }
+                else
+                {
+                    <table class="table table-sm table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Policy OID</th>
+                                <th>Classification LACV</th>
+                                <th>Tag set OID</th>
+                                <th>Reason</th>
+                                <th style="width: 100px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in _userOverrides.Denies)
+                        {
+                            <tr>
+                                <td><code>@row.PolicyOid</code></td>
+                                <td>@(row.ClassificationLacv?.ToString() ?? "—")</td>
+                                <td>@(row.TagSetOid ?? "—")</td>
+                                <td>@(row.Reason ?? "—")</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            @onclick="() => RemoveUserOverride(row.PolicyOid, row.ClassificationLacv)">Remove</button>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private enum Tab { Defaults, Groups, Users }
+    private Tab _activeTab = Tab.Defaults;
+
+    private string _tenantId = "default";
+    private string? _errorMessage;
+
+    // Defaults tab
+    private List<EntitlementRow>? _baselineRows;
+    private EntitlementForm _baselineForm = new();
+
+    // Groups tab
+    private List<GroupRow>? _groups;
+    private Guid? _selectedGroupId;
+    private List<EntitlementRow>? _groupRows;
+    private EntitlementForm _groupForm = new();
+
+    // Users tab
+    private string _userId = "";
+    private UserOverridesResponse? _userOverrides;
+    private EntitlementForm _userGrantForm = new();
+    private DenyForm _userDenyForm = new();
+
+    protected override Task OnInitializedAsync() => LoadBaseline();
+
+    private async Task SwitchTab(Tab tab)
+    {
+        _activeTab = tab;
+        _errorMessage = null;
+        await ReloadActiveTab();
+    }
+
+    private Task ReloadActiveTab() => _activeTab switch
+    {
+        Tab.Defaults => LoadBaseline(),
+        Tab.Groups => LoadGroups(),
+        Tab.Users => string.IsNullOrWhiteSpace(_userId) ? Task.CompletedTask : LoadUser(),
+        _ => Task.CompletedTask,
+    };
+
+    // ── Defaults (baseline) ────────────────────────────────────────────────
+
+    private async Task LoadBaseline()
+    {
+        _errorMessage = null;
+        if (string.IsNullOrWhiteSpace(_tenantId)) { _baselineRows = []; return; }
+        try
+        {
+            _baselineRows = await Http.GetFromJsonAsync<List<EntitlementRow>>(
+                $"pap/api/entitlements/{Uri.EscapeDataString(_tenantId)}/baseline") ?? [];
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Load failed: {ex.Message}";
+            _baselineRows = [];
+        }
+    }
+
+    private async Task AddBaseline()
+    {
+        _errorMessage = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                $"pap/api/entitlements/{Uri.EscapeDataString(_tenantId)}/baseline",
+                new { policyOid = _baselineForm.PolicyOid, classificationLacv = _baselineForm.ClassificationLacv, tagSetOid = _baselineForm.TagSetOid });
+            response.EnsureSuccessStatusCode();
+            _baselineForm = new();
+            await LoadBaseline();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Add failed: {ex.Message}";
+        }
+    }
+
+    private async Task RemoveBaseline(EntitlementRow row)
+    {
+        _errorMessage = null;
+        try
+        {
+            var query = $"?policyOid={Uri.EscapeDataString(row.PolicyOid)}";
+            if (row.ClassificationLacv.HasValue)
+                query += $"&classificationLacv={row.ClassificationLacv.Value}";
+
+            var response = await Http.DeleteAsync(
+                $"pap/api/entitlements/{Uri.EscapeDataString(_tenantId)}/baseline{query}");
+            response.EnsureSuccessStatusCode();
+            await LoadBaseline();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Remove failed: {ex.Message}";
+        }
+    }
+
+    // ── Groups ─────────────────────────────────────────────────────────────
+
+    private async Task LoadGroups()
+    {
+        _errorMessage = null;
+        if (string.IsNullOrWhiteSpace(_tenantId)) { _groups = []; return; }
+        try
+        {
+            _groups = await Http.GetFromJsonAsync<List<GroupRow>>(
+                $"pap/api/groups/{Uri.EscapeDataString(_tenantId)}") ?? [];
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Load groups failed: {ex.Message}";
+            _groups = [];
+        }
+    }
+
+    private async Task OnGroupSelectedAsync()
+    {
+        if (_selectedGroupId is null || _selectedGroupId == Guid.Empty)
+        {
+            _groupRows = null;
+            return;
+        }
+        await LoadGroupEntitlements();
+    }
+
+    private async Task LoadGroupEntitlements()
+    {
+        _errorMessage = null;
+        try
+        {
+            _groupRows = await Http.GetFromJsonAsync<List<EntitlementRow>>(
+                $"pap/api/entitlements/{Uri.EscapeDataString(_tenantId)}/groups/{Uri.EscapeDataString(_selectedGroupId!.Value.ToString())}") ?? [];
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Load group entitlements failed: {ex.Message}";
+            _groupRows = [];
+        }
+    }
+
+    private async Task AddGroupEntitlement()
+    {
+        _errorMessage = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                $"pap/api/entitlements/{Uri.EscapeDataString(_tenantId)}/groups/{Uri.EscapeDataString(_selectedGroupId!.Value.ToString())}",
+                new { policyOid = _groupForm.PolicyOid, classificationLacv = _groupForm.ClassificationLacv, tagSetOid = _groupForm.TagSetOid });
+            response.EnsureSuccessStatusCode();
+            _groupForm = new();
+            await LoadGroupEntitlements();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Add failed: {ex.Message}";
+        }
+    }
+
+    private async Task RemoveGroupEntitlement(EntitlementRow row)
+    {
+        _errorMessage = null;
+        try
+        {
+            var query = $"?policyOid={Uri.EscapeDataString(row.PolicyOid)}";
+            if (row.ClassificationLacv.HasValue)
+                query += $"&classificationLacv={row.ClassificationLacv.Value}";
+
+            var response = await Http.DeleteAsync(
+                $"pap/api/entitlements/{Uri.EscapeDataString(_tenantId)}/groups/{Uri.EscapeDataString(_selectedGroupId!.Value.ToString())}{query}");
+            response.EnsureSuccessStatusCode();
+            await LoadGroupEntitlements();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Remove failed: {ex.Message}";
+        }
+    }
+
+    // ── Users ──────────────────────────────────────────────────────────────
+
+    private async Task LoadUser()
+    {
+        _errorMessage = null;
+        if (string.IsNullOrWhiteSpace(_userId)) { _userOverrides = null; return; }
+        try
+        {
+            _userOverrides = await Http.GetFromJsonAsync<UserOverridesResponse>(
+                $"pap/api/entitlements/{Uri.EscapeDataString(_tenantId)}/users/{Uri.EscapeDataString(_userId)}");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Load user failed: {ex.Message}";
+            _userOverrides = new UserOverridesResponse();
+        }
+    }
+
+    private async Task AddUserGrant()
+    {
+        _errorMessage = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                $"pap/api/entitlements/{Uri.EscapeDataString(_tenantId)}/users/{Uri.EscapeDataString(_userId)}/grants",
+                new { policyOid = _userGrantForm.PolicyOid, classificationLacv = _userGrantForm.ClassificationLacv, tagSetOid = _userGrantForm.TagSetOid });
+            response.EnsureSuccessStatusCode();
+            _userGrantForm = new();
+            await LoadUser();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Grant failed: {ex.Message}";
+        }
+    }
+
+    private async Task AddUserDeny()
+    {
+        _errorMessage = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                $"pap/api/entitlements/{Uri.EscapeDataString(_tenantId)}/users/{Uri.EscapeDataString(_userId)}/denies",
+                new { policyOid = _userDenyForm.PolicyOid, classificationLacv = _userDenyForm.ClassificationLacv, tagSetOid = _userDenyForm.TagSetOid, reason = _userDenyForm.Reason });
+            response.EnsureSuccessStatusCode();
+            _userDenyForm = new();
+            await LoadUser();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Deny failed: {ex.Message}";
+        }
+    }
+
+    private async Task RemoveUserOverride(string policyOid, int? classificationLacv)
+    {
+        _errorMessage = null;
+        try
+        {
+            var query = $"?policyOid={Uri.EscapeDataString(policyOid)}";
+            if (classificationLacv.HasValue)
+                query += $"&classificationLacv={classificationLacv.Value}";
+
+            var response = await Http.DeleteAsync(
+                $"pap/api/entitlements/{Uri.EscapeDataString(_tenantId)}/users/{Uri.EscapeDataString(_userId)}{query}");
+            response.EnsureSuccessStatusCode();
+            await LoadUser();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Remove failed: {ex.Message}";
+        }
+    }
+
+    // ── DTOs ───────────────────────────────────────────────────────────────
+
+    /// <summary>One entitlement row (used in all three tabs).</summary>
+    public sealed class EntitlementRow
+    {
+        public string PolicyOid { get; set; } = "";
+        public int? ClassificationLacv { get; set; }
+        public string? TagSetOid { get; set; }
+    }
+
+    /// <summary>Form state for the baseline / group / grant add dialogs.</summary>
+    private sealed class EntitlementForm
+    {
+        public string PolicyOid { get; set; } = "";
+        public int? ClassificationLacv { get; set; }
+        public string? TagSetOid { get; set; }
+    }
+
+    /// <summary>Deny form state (denies carry an optional reason).</summary>
+    private sealed class DenyForm
+    {
+        public string PolicyOid { get; set; } = "";
+        public int? ClassificationLacv { get; set; }
+        public string? TagSetOid { get; set; }
+        public string? Reason { get; set; }
+    }
+
+    /// <summary>Group picker row (subset of the AbacGroup domain shape).</summary>
+    public sealed class GroupRow
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = "";
+    }
+
+    /// <summary>Wire shape matching <c>UserOverridesResponse</c> on the server.</summary>
+    public sealed class UserOverridesResponse
+    {
+        public List<EntitlementRow> Grants { get; set; } = new();
+        public List<DenyRow> Denies { get; set; } = new();
+    }
+
+    /// <summary>Deny row for the Users tab (grants use <see cref="EntitlementRow"/>).</summary>
+    public sealed class DenyRow
+    {
+        public string PolicyOid { get; set; } = "";
+        public int? ClassificationLacv { get; set; }
+        public string? TagSetOid { get; set; }
+        public string? Reason { get; set; }
+    }
+}

@@ -18,6 +18,13 @@ public sealed class ConfigurableAbacContainer : IAsyncDisposable
     public string GrpcUrl { get; private set; } = string.Empty;
     public HttpClient HttpClient { get; private set; } = null!;
 
+    /// <summary>
+    /// Host-side path of the directory bind-mounted into the container at
+    /// <c>/data</c>. Tests can drop fixture files here before calling
+    /// <see cref="StartAsync"/> to make them visible to the container.
+    /// </summary>
+    public string DataDirectory => _dataDirectory;
+
     public ConfigurableAbacContainer(Dictionary<string, string>? environment = null)
     {
         _environment = environment ?? new Dictionary<string, string>(StringComparer.Ordinal);
@@ -26,7 +33,10 @@ public sealed class ConfigurableAbacContainer : IAsyncDisposable
     public async Task StartAsync()
     {
         Directory.CreateDirectory(_dataDirectory);
-        await RunHostCommandAsync("chmod", $"0777 {_dataDirectory}");
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux))
+        {
+            await RunHostCommandAsync("chmod", $"0777 {_dataDirectory}");
+        }
 
         var repoRoot = FindRepoRoot();
         await RunDockerAsync($"build -t abac-controller:v1.0 {repoRoot}");
@@ -144,7 +154,16 @@ public sealed class ConfigurableAbacContainer : IAsyncDisposable
     }
 
     private static async Task<string> RunDockerAsync(string dockerArgs)
-        => await RunProcessAsync("sg", ["docker", "-c", $"docker {dockerArgs}"], $"docker {dockerArgs}");
+    {
+        // Linux: elevate via `sg docker -c "docker ..."` for non-docker user setups.
+        // Windows / macOS: invoke docker directly. (See AbacContainerFixture.cs.)
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux))
+        {
+            return await RunProcessAsync("sg", ["docker", "-c", $"docker {dockerArgs}"], $"docker {dockerArgs}");
+        }
+
+        return await RunProcessAsync("docker", AbacContainerFixture.SplitShellArgsForTests(dockerArgs), $"docker {dockerArgs}");
+    }
 
     private static async Task<string> RunHostCommandAsync(string fileName, string arguments)
         => await RunProcessAsync(fileName, arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries), $"{fileName} {arguments}");

@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using AbacController.Core.Domain.Audit;
 using AbacController.Core.Domain.Policy;
+using AbacController.Core.Domain.Webhooks;
 using AbacController.Core.Interfaces;
 using AbacController.Data;
 using AbacController.Data.Entities;
@@ -27,6 +28,7 @@ public sealed class PapAdminController : ControllerBase
     private readonly AbacDbContext _dbContext;
     private readonly IAuditWriter _auditWriter;
     private readonly ITenantContext _tenantContext;
+    private readonly IWebhookPublisher _webhookPublisher;
 
     /// <summary>Initializes a new instance of the <see cref="PapAdminController"/> class.</summary>
     public PapAdminController(
@@ -35,7 +37,8 @@ public sealed class PapAdminController : ControllerBase
         ISpifRegistry spifRegistry,
         AbacDbContext dbContext,
         IAuditWriter auditWriter,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IWebhookPublisher webhookPublisher)
     {
         _policyRepository = policyRepository;
         _spifParser = spifParser;
@@ -43,6 +46,7 @@ public sealed class PapAdminController : ControllerBase
         _dbContext = dbContext;
         _auditWriter = auditWriter;
         _tenantContext = tenantContext;
+        _webhookPublisher = webhookPublisher;
     }
 
     /// <summary>Extracts the actor identity from the current JWT claims.</summary>
@@ -219,6 +223,11 @@ public sealed class PapAdminController : ControllerBase
         await _policyRepository.ActivateVersionAsync(id, versionId, ct);
         AuditPolicyChange("activate_policy_version", "policy_version", id,
             new { versionId, versionNumber = version.VersionNumber });
+        await _webhookPublisher.PublishAsync(
+            WebhookEventTypes.PolicyActivated,
+            new { policyId = id, versionId, versionNumber = version.VersionNumber },
+            _tenantContext.TenantId,
+            ct);
         return NoContent();
     }
 
@@ -321,8 +330,13 @@ public sealed class PapAdminController : ControllerBase
             _spifRegistry.SetDefault(spifIndex.PolicyOid);
 
         var tenantId = _tenantContext.TenantId;
-        var exists = await _dbContext.Spifs.FirstOrDefaultAsync(
-            x => x.PolicyOid == spifIndex.PolicyOid && x.TenantId == tenantId, ct);
+
+        // IgnoreQueryFilters so a previously soft-deleted row can be revived
+        // by a fresh import of the same policy OID.
+        var exists = await _dbContext.Spifs
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(
+                x => x.PolicyOid == spifIndex.PolicyOid && x.TenantId == tenantId, ct);
         var entity = exists ?? new SpifEntity { Id = Guid.NewGuid(), PolicyOid = spifIndex.PolicyOid };
         entity.Name = spifIndex.PolicyName;
         entity.SchemaVersion = parsed.Spif.SchemaVersion ?? "unknown";
@@ -334,6 +348,9 @@ public sealed class PapAdminController : ControllerBase
         entity.ClassificationCount = parsed.Spif.Classifications.Count;
         entity.CategoryCount = parsed.Spif.CategoryTagSets.Sum(ts => ts.Tags.Sum(t => t.Categories.Count));
         entity.Hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(request.Xml)));
+        // Re-import clears any previous soft-delete marker.
+        entity.IsDeleted = false;
+        entity.DeletedAt = null;
 
         if (exists is null)
             _dbContext.Spifs.Add(entity);
@@ -342,6 +359,18 @@ public sealed class PapAdminController : ControllerBase
 
         AuditPolicyChange("import_spif", "spif", spifIndex.PolicyOid,
             new { name = spifIndex.PolicyName, schemaVersion = entity.SchemaVersion, setAsDefault = request.SetAsDefault, importedBy = request.ImportedBy });
+
+        await _webhookPublisher.PublishAsync(
+            WebhookEventTypes.SpifImported,
+            new
+            {
+                policyOid = spifIndex.PolicyOid,
+                name = spifIndex.PolicyName,
+                schemaVersion = entity.SchemaVersion,
+                setAsDefault = request.SetAsDefault
+            },
+            tenantId,
+            ct);
 
         return Ok(new
         {
@@ -363,14 +392,23 @@ public sealed class PapAdminController : ControllerBase
         if (entity is null)
             return NotFound();
 
-        // Remove from in-memory registry
+        // Remove from in-memory registry so evaluator ignores it immediately.
         _spifRegistry.Remove(entity.PolicyOid);
 
-        _dbContext.Spifs.Remove(entity);
+        // Soft-delete: keep the row for audit continuity, hide it from
+        // standard queries via the global query filter on SpifEntity.
+        entity.IsDeleted = true;
+        entity.DeletedAt = DateTimeOffset.UtcNow;
         await _dbContext.SaveChangesAsync(ct);
 
         AuditPolicyChange("delete_spif", "spif", entity.PolicyOid,
             new { name = entity.Name, deletedById = id });
+
+        await _webhookPublisher.PublishAsync(
+            WebhookEventTypes.SpifDeleted,
+            new { policyOid = entity.PolicyOid, name = entity.Name },
+            tenantId,
+            ct);
 
         return NoContent();
     }

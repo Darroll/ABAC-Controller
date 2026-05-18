@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Test Corp Organization — archTIS-inspired corporate classification policy.
+  Models a commercial organization with business-oriented classification levels,
+  project categories, dissemination controls, and handling caveats.
+
+  OID: 1.3.6.1.4.1.99999.1  (private enterprise arc, test-only)
+-->
+<SPIF xmlns="urn:xmlspif:spif:3.0" version="3">
+  <securityPolicyId oid="1.3.6.1.4.1.99999.1" />
+  <spifVersionNumber value="1" />
+  <creationDate value="2026-01-15T00:00:00Z" />
+  <originator>Test Corp Organization</originator>
+
+  <!--
+    Corporate classification levels modeled on archTIS NC Protect / Kojensi patterns.
+    Five levels from PUBLIC through HIGHLY RESTRICTED.
+  -->
+  <securityClassifications>
+    <securityClassification name="PUBLIC" lacv="1" hierarchy="1">
+      <markingData>
+        <markingPhrase phraseText="PUBLIC" isPortionMarking="true" portionAbbreviation="PUB" />
+        <markingCode codeValue="PUBLIC" />
+        <foregroundColor value="#000000" />
+        <backgroundColor value="#E8F5E9" />
+      </markingData>
+    </securityClassification>
+
+    <securityClassification name="INTERNAL" lacv="2" hierarchy="2">
+      <markingData>
+        <markingPhrase phraseText="INTERNAL" isPortionMarking="true" portionAbbreviation="INT" />
+        <markingCode codeValue="INTERNAL" />
+        <foregroundColor value="#ffffff" />
+        <backgroundColor value="#1565C0" />
+      </markingData>
+    </securityClassification>
+
+    <securityClassification name="CONFIDENTIAL" lacv="3" hierarchy="3">
+      <markingData>
+        <markingPhrase phraseText="CONFIDENTIAL" isPortionMarking="true" portionAbbreviation="CONF" />
+        <markingCode codeValue="CONFIDENTIAL" />
+        <foregroundColor value="#ffffff" />
+        <backgroundColor value="#F57F17" />
+      </markingData>
+    </securityClassification>
+
+    <securityClassification name="RESTRICTED" lacv="4" hierarchy="4">
+      <markingData>
+        <markingPhrase phraseText="RESTRICTED" isPortionMarking="true" portionAbbreviation="REST" />
+        <markingCode codeValue="RESTRICTED" />
+        <foregroundColor value="#ffffff" />
+        <backgroundColor value="#D32F2F" />
+      </markingData>
+    </securityClassification>
+
+    <securityClassification name="HIGHLY RESTRICTED" lacv="5" hierarchy="5">
+      <markingData>
+        <markingPhrase phraseText="HIGHLY RESTRICTED" isPortionMarking="true" portionAbbreviation="H-REST" />
+        <markingCode codeValue="HIGHLY RESTRICTED" />
+        <foregroundColor value="#ffffff" />
+        <backgroundColor value="#4A148C" />
+      </markingData>
+      <!-- At HIGHLY RESTRICTED, BOARD ONLY handling caveat is required -->
+      <requiredCategory tagSetRef="1.3.6.1.4.1.99999.1.3" tagRef="3" />
+    </securityClassification>
+  </securityClassifications>
+
+  <securityCategoryTagSets>
+    <!--
+      Business Categories — project/department tags for information segregation.
+      Gated at CONFIDENTIAL (lacv 3) and above.
+      Inspired by archTIS NC Protect attribute-based access control categories.
+    -->
+    <securityCategoryTagSet tagSetName="Business Categories"
+                            tagSetId="1.3.6.1.4.1.99999.1.1"
+                            displayName="Business Category"
+                            displayOrder="1"
+                            applicableClassificationMinLacv="3">
+      <securityCategoryTag tagName="R&amp;D" lacv="1" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="R&amp;D" isPortionMarking="true" portionAbbreviation="RD" />
+          <markingCode codeValue="R&amp;D" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="LEGAL" lacv="2" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="LEGAL" isPortionMarking="true" portionAbbreviation="LGL" />
+          <markingCode codeValue="LEGAL" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="FINANCE" lacv="3" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="FINANCE" isPortionMarking="true" portionAbbreviation="FIN" />
+          <markingCode codeValue="FINANCE" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="HR" lacv="4" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="HR" isPortionMarking="true" portionAbbreviation="HR" />
+          <markingCode codeValue="HR" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="M&amp;A" lacv="5" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="M&amp;A" isPortionMarking="true" portionAbbreviation="MA" />
+          <markingCode codeValue="M&amp;A" />
+        </markingData>
+      </securityCategoryTag>
+
+      <categoryGroup groupName="Operational" groupType="optional"
+                     minSelections="0" maxSelections="3"
+                     displayHint="checkboxList">
+        <description>Select the business area(s) this content relates to.</description>
+        <tagRef lacv="1" />
+        <tagRef lacv="2" />
+        <tagRef lacv="3" />
+        <tagRef lacv="4" />
+      </categoryGroup>
+
+      <categoryGroup groupName="Strategic" groupType="optional"
+                     minSelections="0" maxSelections="1"
+                     displayHint="radioGroup">
+        <description>Strategic category — at most one allowed per message.</description>
+        <tagRef lacv="5" />
+      </categoryGroup>
+    </securityCategoryTagSet>
+
+    <!--
+      Dissemination Controls — audience-sharing controls.
+      Available from INTERNAL (lacv 2) and above.
+      INTERNAL ONLY and PARTNER OK are mutually exclusive.
+    -->
+    <securityCategoryTagSet tagSetName="Dissemination Controls"
+                            tagSetId="1.3.6.1.4.1.99999.1.2"
+                            displayName="Dissemination"
+                            displayOrder="2"
+                            applicableClassificationMinLacv="2">
+      <securityCategoryTag tagName="INTERNAL ONLY" lacv="1" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="INTERNAL ONLY" isPortionMarking="true" portionAbbreviation="INT-ONLY" />
+          <markingCode codeValue="INTERNAL ONLY" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="PARTNER OK" lacv="2" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="PARTNER OK" isPortionMarking="true" portionAbbreviation="PTR-OK" />
+          <markingCode codeValue="PARTNER OK" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="CUSTOMER SHAREABLE" lacv="3" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="CUSTOMER SHAREABLE" isPortionMarking="true" portionAbbreviation="CUST" />
+          <markingCode codeValue="CUSTOMER SHAREABLE" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="NDA REQUIRED" lacv="4" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="NDA REQUIRED" isPortionMarking="true" portionAbbreviation="NDA" />
+          <markingCode codeValue="NDA REQUIRED" />
+        </markingData>
+      </securityCategoryTag>
+
+      <!-- INTERNAL ONLY and PARTNER OK are mutually exclusive -->
+      <categoryConstraint constraintType="mutualExclusion"
+                          sourceTagSetId="1.3.6.1.4.1.99999.1.2" sourceTagLacv="1"
+                          targetTagSetId="1.3.6.1.4.1.99999.1.2" targetTagLacv="2"
+                          severity="error">
+        <errorMessage>INTERNAL ONLY and PARTNER OK cannot be selected together — INTERNAL ONLY prohibits external sharing.</errorMessage>
+      </categoryConstraint>
+
+      <!-- INTERNAL ONLY and CUSTOMER SHAREABLE are mutually exclusive -->
+      <categoryConstraint constraintType="mutualExclusion"
+                          sourceTagSetId="1.3.6.1.4.1.99999.1.2" sourceTagLacv="1"
+                          targetTagSetId="1.3.6.1.4.1.99999.1.2" targetTagLacv="3"
+                          severity="error">
+        <errorMessage>INTERNAL ONLY and CUSTOMER SHAREABLE cannot be selected together — INTERNAL ONLY prohibits external sharing.</errorMessage>
+      </categoryConstraint>
+
+      <!-- NDA REQUIRED implies PARTNER OK or CUSTOMER SHAREABLE should be present -->
+      <categoryConstraint constraintType="implication"
+                          sourceTagSetId="1.3.6.1.4.1.99999.1.2" sourceTagLacv="4"
+                          targetTagSetId="1.3.6.1.4.1.99999.1.2" targetTagLacv="2"
+                          severity="warning">
+        <errorMessage>NDA REQUIRED is typically used with PARTNER OK or CUSTOMER SHAREABLE.</errorMessage>
+      </categoryConstraint>
+    </securityCategoryTagSet>
+
+    <!--
+      Handling Caveats — operational handling restrictions.
+      Gated at RESTRICTED (lacv 4) and above.
+      Inspired by archTIS handling instruction controls.
+    -->
+    <securityCategoryTagSet tagSetName="Handling Caveats"
+                            tagSetId="1.3.6.1.4.1.99999.1.3"
+                            displayName="Handling Instructions"
+                            displayOrder="3"
+                            applicableClassificationMinLacv="4">
+      <securityCategoryTag tagName="DO NOT FORWARD" lacv="1" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="DO NOT FORWARD" isPortionMarking="true" portionAbbreviation="DNF" />
+          <markingCode codeValue="DO NOT FORWARD" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="ENCRYPT REQUIRED" lacv="2" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="ENCRYPT REQUIRED" isPortionMarking="true" portionAbbreviation="ENC" />
+          <markingCode codeValue="ENCRYPT REQUIRED" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="BOARD ONLY" lacv="3" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="BOARD ONLY" isPortionMarking="true" portionAbbreviation="BRD" />
+          <markingCode codeValue="BOARD ONLY" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="LEGAL HOLD" lacv="4" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="LEGAL HOLD" isPortionMarking="true" portionAbbreviation="LH" />
+          <markingCode codeValue="LEGAL HOLD" />
+        </markingData>
+      </securityCategoryTag>
+
+      <categoryGroup groupName="Board Oversight" groupType="optional"
+                     minSelections="0" maxSelections="1"
+                     displayHint="radioGroup">
+        <description>Board-level access restriction.</description>
+        <tagRef lacv="3" />
+      </categoryGroup>
+
+      <!-- BOARD ONLY prohibits PARTNER OK (cross-tag-set: caveats → dissemination) -->
+      <categoryConstraint constraintType="prohibition"
+                          sourceTagSetId="1.3.6.1.4.1.99999.1.3" sourceTagLacv="3"
+                          targetTagSetId="1.3.6.1.4.1.99999.1.2" targetTagLacv="2"
+                          severity="error">
+        <errorMessage>BOARD ONLY prohibits PARTNER OK — board-restricted content cannot be shared with partners.</errorMessage>
+      </categoryConstraint>
+
+      <!-- BOARD ONLY prohibits CUSTOMER SHAREABLE (cross-tag-set: caveats → dissemination) -->
+      <categoryConstraint constraintType="prohibition"
+                          sourceTagSetId="1.3.6.1.4.1.99999.1.3" sourceTagLacv="3"
+                          targetTagSetId="1.3.6.1.4.1.99999.1.2" targetTagLacv="3"
+                          severity="error">
+        <errorMessage>BOARD ONLY prohibits CUSTOMER SHAREABLE — board-restricted content cannot be shared externally.</errorMessage>
+      </categoryConstraint>
+    </securityCategoryTagSet>
+
+    <!--
+      Regulatory Compliance markers — informational tags for compliance tracking.
+      Available from INTERNAL (lacv 2) and above.
+    -->
+    <securityCategoryTagSet tagSetName="Compliance Markers"
+                            tagSetId="1.3.6.1.4.1.99999.1.4"
+                            displayName="Compliance"
+                            displayOrder="4"
+                            applicableClassificationMinLacv="2">
+      <securityCategoryTag tagName="GDPR" lacv="1" tagType="informative">
+        <markingData>
+          <markingPhrase phraseText="GDPR" isPortionMarking="true" portionAbbreviation="GDPR" />
+          <markingCode codeValue="GDPR" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="HIPAA" lacv="2" tagType="informative">
+        <markingData>
+          <markingPhrase phraseText="HIPAA" isPortionMarking="true" portionAbbreviation="HIPAA" />
+          <markingCode codeValue="HIPAA" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="SOX" lacv="3" tagType="informative">
+        <markingData>
+          <markingPhrase phraseText="SOX" isPortionMarking="true" portionAbbreviation="SOX" />
+          <markingCode codeValue="SOX" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="ITAR" lacv="4" tagType="informative">
+        <markingData>
+          <markingPhrase phraseText="ITAR" isPortionMarking="true" portionAbbreviation="ITAR" />
+          <markingCode codeValue="ITAR" />
+        </markingData>
+      </securityCategoryTag>
+    </securityCategoryTagSet>
+
+    <!--
+      Projects — internal and external partnership project tags.
+      Gated at CONFIDENTIAL (lacv 3) and above.
+      External partnerships enforce dissemination control co-requirements.
+    -->
+    <securityCategoryTagSet tagSetName="Projects"
+                            tagSetId="1.3.6.1.4.1.99999.1.5"
+                            displayName="Projects"
+                            displayOrder="5"
+                            applicableClassificationMinLacv="3">
+      <!-- Internal projects -->
+      <securityCategoryTag tagName="AURORA" lacv="1" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="AURORA" isPortionMarking="true" portionAbbreviation="AUR" />
+          <markingCode codeValue="AURORA" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="SENTINEL" lacv="2" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="SENTINEL" isPortionMarking="true" portionAbbreviation="SNTL" />
+          <markingCode codeValue="SENTINEL" />
+        </markingData>
+      </securityCategoryTag>
+
+      <!-- External partnership projects -->
+      <securityCategoryTag tagName="NEXUS" lacv="3" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="NEXUS" isPortionMarking="true" portionAbbreviation="NXS" />
+          <markingCode codeValue="NEXUS" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="HORIZON" lacv="4" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="HORIZON" isPortionMarking="true" portionAbbreviation="HZN" />
+          <markingCode codeValue="HORIZON" />
+        </markingData>
+      </securityCategoryTag>
+
+      <categoryGroup groupName="Internal Projects" groupType="optional"
+                     minSelections="0" maxSelections="2"
+                     displayHint="checkboxList">
+        <description>Internal R&amp;D and platform projects.</description>
+        <tagRef lacv="1" />
+        <tagRef lacv="2" />
+      </categoryGroup>
+
+      <categoryGroup groupName="External Partnerships" groupType="optional"
+                     minSelections="0" maxSelections="1"
+                     displayHint="radioGroup">
+        <description>External partnership or contract projects — at most one per message.</description>
+        <tagRef lacv="3" />
+        <tagRef lacv="4" />
+      </categoryGroup>
+
+      <!-- NEXUS (external) co-requires PARTNER OK dissemination -->
+      <categoryConstraint constraintType="coRequirement"
+                          sourceTagSetId="1.3.6.1.4.1.99999.1.5" sourceTagLacv="3"
+                          targetTagSetId="1.3.6.1.4.1.99999.1.2" targetTagLacv="2"
+                          severity="warning">
+        <errorMessage>NEXUS is an external partnership — consider adding PARTNER OK dissemination control.</errorMessage>
+      </categoryConstraint>
+
+      <!-- HORIZON (gov contract) co-requires NDA REQUIRED dissemination -->
+      <categoryConstraint constraintType="coRequirement"
+                          sourceTagSetId="1.3.6.1.4.1.99999.1.5" sourceTagLacv="4"
+                          targetTagSetId="1.3.6.1.4.1.99999.1.2" targetTagLacv="4"
+                          severity="warning">
+        <errorMessage>HORIZON is a government contract — consider adding NDA REQUIRED dissemination control.</errorMessage>
+      </categoryConstraint>
+
+      <!-- NEXUS prohibits INTERNAL ONLY (external project cannot be internal-only) -->
+      <categoryConstraint constraintType="prohibition"
+                          sourceTagSetId="1.3.6.1.4.1.99999.1.5" sourceTagLacv="3"
+                          targetTagSetId="1.3.6.1.4.1.99999.1.2" targetTagLacv="1"
+                          severity="error">
+        <errorMessage>NEXUS is an external partnership — cannot be marked INTERNAL ONLY.</errorMessage>
+      </categoryConstraint>
+
+      <!-- HORIZON prohibits INTERNAL ONLY (gov contract cannot be internal-only) -->
+      <categoryConstraint constraintType="prohibition"
+                          sourceTagSetId="1.3.6.1.4.1.99999.1.5" sourceTagLacv="4"
+                          targetTagSetId="1.3.6.1.4.1.99999.1.2" targetTagLacv="1"
+                          severity="error">
+        <errorMessage>HORIZON is a government contract — cannot be marked INTERNAL ONLY.</errorMessage>
+      </categoryConstraint>
+    </securityCategoryTagSet>
+  </securityCategoryTagSets>
+
+  <!-- Corporate authority field definitions — no classified/derived government fields -->
+  <extensions>
+    <freeFormField fieldName="authority.showForClassified" fieldValue="true" />
+    <freeFormField fieldName="authority.classifiedBy" fieldValue="Labelled by|text|true||LABELLED BY" />
+    <freeFormField fieldName="authority.department" fieldValue="Department|text|false||DEPARTMENT" />
+  </extensions>
+</SPIF>

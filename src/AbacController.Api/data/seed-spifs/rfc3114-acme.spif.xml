@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  RFC 3114 Example — Acme Widgets Corporation classification policy.
+  Based on the corporate classification policy described in RFC 3114
+  "Implementing Company Classification Policy with the S/MIME Security Label".
+
+  OID: 1.2.3.6.7.1  (test arc for RFC 3114 example)
+-->
+<SPIF xmlns="urn:xmlspif:spif:3.0" version="3">
+  <securityPolicyId oid="1.2.3.6.7.1" />
+  <spifVersionNumber value="1" />
+  <creationDate value="2026-01-01T00:00:00Z" />
+  <originator>Acme Widgets Corporation</originator>
+
+  <!--
+    Three classification levels per RFC 3114 Section 3:
+    UNMARKED — no restrictions
+    PROPRIETARY — company-internal information
+    CONFIDENTIAL — restricted access, need-to-know
+  -->
+  <securityClassifications>
+    <securityClassification name="UNMARKED" lacv="1" hierarchy="1">
+      <markingData>
+        <markingPhrase phraseText="UNMARKED" isPortionMarking="true" portionAbbreviation="U" />
+        <markingCode codeValue="U" />
+        <foregroundColor value="#000000" />
+        <backgroundColor value="#E8E8E8" />
+      </markingData>
+    </securityClassification>
+
+    <securityClassification name="PROPRIETARY" lacv="2" hierarchy="2">
+      <markingData>
+        <markingPhrase phraseText="PROPRIETARY" isPortionMarking="true" portionAbbreviation="PROP" />
+        <markingCode codeValue="PROP" />
+        <foregroundColor value="#ffffff" />
+        <backgroundColor value="#1565C0" />
+      </markingData>
+    </securityClassification>
+
+    <securityClassification name="CONFIDENTIAL" lacv="3" hierarchy="3">
+      <markingData>
+        <markingPhrase phraseText="CONFIDENTIAL" isPortionMarking="true" portionAbbreviation="CONF" />
+        <markingCode codeValue="CONF" />
+        <foregroundColor value="#ffffff" />
+        <backgroundColor value="#C62828" />
+      </markingData>
+    </securityClassification>
+  </securityClassifications>
+
+  <securityCategoryTagSets>
+    <!--
+      Access Controls per RFC 3114 Section 3.2:
+      EXECUTIVE USE — board and senior management only
+      INTERNAL USE — all employees
+      EXTERNAL USE — may be shared with external parties
+    -->
+    <securityCategoryTagSet tagSetName="Access Controls"
+                            tagSetId="1.2.3.6.7.1.1"
+                            displayName="Access Control"
+                            displayOrder="1"
+                            applicableClassificationMinLacv="2">
+      <securityCategoryTag tagName="EXECUTIVE USE" lacv="1" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="EXECUTIVE USE" isPortionMarking="true" portionAbbreviation="EXEC" />
+          <markingCode codeValue="EXEC" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="INTERNAL USE" lacv="2" tagType="restrictive">
+        <markingData>
+          <markingPhrase phraseText="INTERNAL USE" isPortionMarking="true" portionAbbreviation="INT" />
+          <markingCode codeValue="INT" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="EXTERNAL USE" lacv="3" tagType="permissive">
+        <markingData>
+          <markingPhrase phraseText="EXTERNAL USE" isPortionMarking="true" portionAbbreviation="EXT" />
+          <markingCode codeValue="EXT" />
+        </markingData>
+      </securityCategoryTag>
+
+      <!-- EXECUTIVE USE and EXTERNAL USE are mutually exclusive -->
+      <categoryConstraint constraintType="mutualExclusion"
+                          sourceTagSetId="1.2.3.6.7.1.1" sourceTagLacv="1"
+                          targetTagSetId="1.2.3.6.7.1.1" targetTagLacv="3"
+                          severity="error">
+        <errorMessage>EXECUTIVE USE and EXTERNAL USE cannot be selected together — executive content cannot be shared externally.</errorMessage>
+      </categoryConstraint>
+    </securityCategoryTagSet>
+
+    <!--
+      Project Categories per RFC 3114 Section 3.3:
+      Informational tags for project-level tracking.
+    -->
+    <securityCategoryTagSet tagSetName="Project Categories"
+                            tagSetId="1.2.3.6.7.1.2"
+                            displayName="Project"
+                            displayOrder="2"
+                            applicableClassificationMinLacv="2">
+      <securityCategoryTag tagName="WIDGE-BUDGET" lacv="1" tagType="informative">
+        <markingData>
+          <markingPhrase phraseText="WIDGE-BUDGET" isPortionMarking="true" portionAbbreviation="WB" />
+          <markingCode codeValue="WB" />
+        </markingData>
+      </securityCategoryTag>
+
+      <securityCategoryTag tagName="WIDGE-DESIGN" lacv="2" tagType="informative">
+        <markingData>
+          <markingPhrase phraseText="WIDGE-DESIGN" isPortionMarking="true" portionAbbreviation="WD" />
+          <markingCode codeValue="WD" />
+        </markingData>
+      </securityCategoryTag>
+    </securityCategoryTagSet>
+  </securityCategoryTagSets>
+</SPIF>

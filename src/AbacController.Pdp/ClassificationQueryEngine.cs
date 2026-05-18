@@ -4,6 +4,7 @@ using AbacController.Core.Constants;
 using AbacController.Core.Domain.Audit;
 using AbacController.Core.Domain.Classifications;
 using AbacController.Core.Domain.Decisions;
+using AbacController.Core.Domain.Entitlements;
 using AbacController.Core.Domain.Labels;
 using AbacController.Core.Domain.Spif;
 using AbacController.Core.Interfaces;
@@ -12,7 +13,8 @@ namespace AbacController.Pdp;
 
 /// <summary>
 /// Evaluates which classifications a subject is permitted to assign.
-/// Applies three-layer filtering: ACDF clearance, native policy rules, application scope.
+/// Applies up to four filter layers in order: ACDF clearance, entitlements (opt-in),
+/// native policy rules, application scope.
 /// </summary>
 public sealed class ClassificationQueryEngine : IClassificationQueryEngine
 {
@@ -22,6 +24,9 @@ public sealed class ClassificationQueryEngine : IClassificationQueryEngine
     private readonly IApplicationRepository _appRepository;
     private readonly IAuditWriter _auditWriter;
     private readonly ITenantContext _tenantContext;
+    private readonly IEntitlementResolver? _entitlementResolver;
+    private readonly IGroupMembershipResolver? _groupMembershipResolver;
+    private readonly IKeycloakGroupClaimsProvider? _keycloakGroupClaims;
 
     public ClassificationQueryEngine(
         ISpifRegistry spifRegistry,
@@ -29,7 +34,10 @@ public sealed class ClassificationQueryEngine : IClassificationQueryEngine
         IPolicyRepository policyRepository,
         IApplicationRepository appRepository,
         IAuditWriter auditWriter,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IEntitlementResolver? entitlementResolver = null,
+        IGroupMembershipResolver? groupMembershipResolver = null,
+        IKeycloakGroupClaimsProvider? keycloakGroupClaims = null)
     {
         _spifRegistry = spifRegistry;
         _acdf = acdf;
@@ -37,6 +45,9 @@ public sealed class ClassificationQueryEngine : IClassificationQueryEngine
         _appRepository = appRepository;
         _auditWriter = auditWriter;
         _tenantContext = tenantContext;
+        _entitlementResolver = entitlementResolver;
+        _groupMembershipResolver = groupMembershipResolver;
+        _keycloakGroupClaims = keycloakGroupClaims;
     }
 
     public async Task<AllowedClassificationsResult> EvaluateAsync(
@@ -83,14 +94,56 @@ public sealed class ClassificationQueryEngine : IClassificationQueryEngine
 
         var totalCount = allClassifications.Count;
 
-        // Step 5: Three-layer filtering
+        // Step 5: Four-layer filtering (entitlements are opt-in)
         var allowed = new List<AllowedClassification>();
 
-        // Load policy sets for Layer 2
+        // Load policy sets for Layer 3
         var policySets = await _policyRepository.GetPolicySetsAsync(ct);
         if (!string.IsNullOrWhiteSpace(query.PolicySetId))
         {
             policySets = policySets.Where(ps => ps.Id == query.PolicySetId).ToList();
+        }
+
+        // Resolve entitlements for Layer 2 (skipped when caller has not opted in)
+        ResolvedEntitlements? entitlements = null;
+        if (query.EnforceEntitlements)
+        {
+            if (_entitlementResolver is null)
+            {
+                throw new InvalidOperationException(
+                    "ClassificationAssignmentQuery.EnforceEntitlements is true but no IEntitlementResolver was configured.");
+            }
+
+            // Group resolution preference order:
+            // 1. If the caller pushed groups in subject.Properties["groups"]
+            //    they win (back-compat for tests and existing callers).
+            // 2. Otherwise, if an IGroupMembershipResolver is registered AND
+            //    we can pull Keycloak group claims for the current request,
+            //    resolve the effective ABAC group ids automatically.
+            var callerSuppliedGroups = ExtractGroups(query.Subject);
+            IReadOnlyList<string> effectiveGroupIds = callerSuppliedGroups;
+
+            if (callerSuppliedGroups.Count == 0
+                && _groupMembershipResolver is not null
+                && _tenantContext.TenantId is not null)
+            {
+                var keycloakGroups = _keycloakGroupClaims?.KeycloakGroupIds
+                                     ?? Array.Empty<string>();
+                var resolved = await _groupMembershipResolver.ResolveAsync(
+                    _tenantContext.TenantId,
+                    query.Subject.Id,
+                    keycloakGroups,
+                    ct);
+                effectiveGroupIds = resolved.Select(g => g.ToString()).ToList();
+            }
+
+            var subject = new EntitlementSubject
+            {
+                SubjectId = query.Subject.Id,
+                TenantId = _tenantContext.TenantId,
+                GroupIds = effectiveGroupIds
+            };
+            entitlements = await _entitlementResolver.ResolveAsync(subject, ct);
         }
 
         foreach (var classification in allClassifications)
@@ -127,7 +180,26 @@ public sealed class ClassificationQueryEngine : IClassificationQueryEngine
                 continue;
             }
 
-            // Layer 2: Native Policy Filter
+            // Layer 2: Entitlement Filter (opt-in via query.EnforceEntitlements)
+            if (entitlements is not null)
+            {
+                var permits = entitlements.Permits(spifIndex.PolicyOid, classification.Lacv.Value);
+                traceSteps?.Add(new ClassificationFilterStep
+                {
+                    ClassificationName = classification.Name,
+                    Lacv = classification.Lacv.Value,
+                    FilterLayer = "entitlement_filter",
+                    Passed = permits,
+                    Reason = permits
+                        ? "Subject has a baseline, group, or user grant for this classification"
+                        : "No entitlement grant covers this classification (or a deny applies)"
+                });
+
+                if (!permits)
+                    continue;
+            }
+
+            // Layer 3: Native Policy Filter
             var policyResult = EvaluatePolicyFilter(query, classification, policySets);
             traceSteps?.Add(new ClassificationFilterStep
             {
@@ -234,6 +306,38 @@ public sealed class ClassificationQueryEngine : IClassificationQueryEngine
 
         // Try to parse from JSON element (matches AuthZenController pattern)
         return null;
+    }
+
+    /// <summary>
+    /// Extracts directory group identifiers from subject properties. Callers may pass
+    /// them as a <c>IEnumerable&lt;string&gt;</c> under the "groups" or "memberOf" key.
+    /// Returns an empty list when no groups are present.
+    /// </summary>
+    private static IReadOnlyList<string> ExtractGroups(SubjectInfo subject)
+    {
+        foreach (var key in new[] { "groups", "memberOf" })
+        {
+            if (!subject.Properties.TryGetValue(key, out var raw) || raw is null)
+                continue;
+
+            switch (raw)
+            {
+                case IEnumerable<string> strings:
+                    return strings.ToList();
+                case string single when !string.IsNullOrWhiteSpace(single):
+                    return [single];
+                case System.Collections.IEnumerable enumerable:
+                    var list = new List<string>();
+                    foreach (var item in enumerable)
+                    {
+                        if (item is string s && !string.IsNullOrWhiteSpace(s))
+                            list.Add(s);
+                    }
+                    if (list.Count > 0) return list;
+                    break;
+            }
+        }
+        return [];
     }
 
     private static bool EvaluateClearanceFilter(

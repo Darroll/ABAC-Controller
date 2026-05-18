@@ -8,7 +8,19 @@
     <HeadOutlet />
 </head>
 <body>
-    <Routes />
+    @* InteractiveServer at the root makes every admin page interactive
+       (their @onclick handlers fire on a real Blazor circuit). Without
+       this attribute, admin pages render SSR-only and tab clicks /
+       form submits never reach the @code block. *@
+    <Routes @rendermode="@InteractiveServer" />
     <script src="_framework/blazor.web.js"></script>
 </body>
 </html>
+
+@code {
+    /// <summary>
+    /// Default render mode applied at the route boundary so every admin
+    /// page gets a real Blazor interactive circuit.
+    /// </summary>
+    private static readonly InteractiveServerRenderMode InteractiveServer = new(prerender: true);
+}

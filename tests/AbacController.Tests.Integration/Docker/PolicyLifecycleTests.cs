@@ -293,26 +293,29 @@ public sealed class PolicyLifecycleTests
 
     private async Task<int> WaitForAuditDecisionAsync(string subjectId, string resourceId, string decision)
     {
-        var timeoutAt = DateTimeOffset.UtcNow.AddSeconds(20);
+        // Query the running container's HTTP audit endpoint instead of opening the
+        // bind-mounted SQLite file directly. The bind-mount approach was unreliable on
+        // Docker Desktop / WSL2 because the host doesn't see WAL-mode writes until
+        // the container checkpoints. Going through the API uses the same EF context
+        // the writer used so reads are immediately consistent.
+        var timeoutAt = DateTimeOffset.UtcNow.AddSeconds(30);
         Exception? lastError = null;
 
         while (DateTimeOffset.UtcNow < timeoutAt)
         {
             try
             {
-                await using var connection = new SqliteConnection($"Data Source={_fixture.DatabaseFilePath}");
-                await connection.OpenAsync();
-
-                await using var command = connection.CreateCommand();
-                command.CommandText = "SELECT COUNT(*) FROM AuditEvents WHERE SubjectId = $subjectId AND ResourceId = $resourceId AND Decision = $decision";
-                command.Parameters.AddWithValue("$subjectId", subjectId);
-                command.Parameters.AddWithValue("$resourceId", resourceId);
-                command.Parameters.AddWithValue("$decision", decision);
-
-                var count = Convert.ToInt32(await command.ExecuteScalarAsync());
-                if (count > 0)
+                var url = $"/system/api/audit?subjectId={Uri.EscapeDataString(subjectId)}" +
+                          $"&resourceId={Uri.EscapeDataString(resourceId)}" +
+                          $"&decision={Uri.EscapeDataString(decision)}&pageSize=200";
+                var response = await _fixture.HttpClient.GetAsync(url);
+                if (response.IsSuccessStatusCode)
                 {
-                    return count;
+                    using var doc = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                    if (doc.RootElement.TryGetProperty("totalCount", out var total) && total.GetInt32() > 0)
+                    {
+                        return total.GetInt32();
+                    }
                 }
             }
             catch (Exception ex)
@@ -320,7 +323,7 @@ public sealed class PolicyLifecycleTests
                 lastError = ex;
             }
 
-            await Task.Delay(1000);
+            await Task.Delay(500);
         }
 
         var logs = await _fixture.GetLogsAsync();
