@@ -32,3 +32,9 @@ packages/
 appsettings.*.local.json
 .env
 .github/workflows/
+
+## Test output
+**/TestResults/
+
+## Plugin / skill artifacts (not source)
+docs/superpowers/
