@@ -9,9 +9,11 @@ services:
     image: 192.168.2.3:5000/abac-controller:${ABAC_IMAGE_TAG:-latest}
     container_name: abac-controller
     restart: unless-stopped
+    # Host ports 8080/8081 are already taken on Voltron by binhex-sabnzbd and
+    # open-webui, so publish on 8090/8091 instead. Container ports are unchanged.
     ports:
-      - "8080:8080"   # HTTP / REST
-      - "8081:8081"   # gRPC
+      - "8090:8080"   # HTTP / REST
+      - "8091:8081"   # gRPC
     volumes:
       - /mnt/user/appdata/abac-controller/data:/data
     environment:

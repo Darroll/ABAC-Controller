@@ -217,7 +217,7 @@ jobs:
         run: |
           for i in $(seq 1 30); do
             code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
-              http://192.168.2.3:8080/health/ready || true)
+              http://192.168.2.3:8090/health/ready || true)
             echo "attempt $i -> $code"
             if [ "$code" = "200" ]; then
               echo "ABAC Controller is live on Voltron at tag ${{ needs.publish.outputs.tag }}"
