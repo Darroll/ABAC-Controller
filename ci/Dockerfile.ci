@@ -1,0 +1,28 @@
+# CI build image: .NET SDK + docker CLI, published to the private registry.
+#
+# The integration suite shells out via `sg docker -c "docker ..."`, so the
+# container needs the docker CLI, an sg binary, and a real "docker" group
+# whose GID matches the host so the mounted socket is writable.
+
+FROM docker:28-cli AS dockercli
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0
+
+# Host docker group id. Override at build time if the runner host differs.
+ARG DOCKER_GID=984
+
+COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
+
+# `sg` ships in passwd; install it explicitly so the image does not depend on
+# the base image continuing to include it.
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends passwd; \
+    rm -rf /var/lib/apt/lists/*; \
+    groupadd -g "${DOCKER_GID}" docker || groupmod -g "${DOCKER_GID}" docker; \
+    usermod -aG docker root; \
+    docker --version; \
+    command -v sg
+
+ENV DOTNET_NOLOGO=true \
+    DOTNET_CLI_TELEMETRY_OPTOUT=true

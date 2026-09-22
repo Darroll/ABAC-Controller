@@ -17,6 +17,9 @@ env:
   SDK_IMAGE: mcr.microsoft.com/dotnet/sdk:10.0
   REGISTRY: 192.168.2.3:5000
   IMAGE_NAME: abac-controller
+  # SDK plus docker CLI and a matching docker group, needed because the
+  # integration fixtures shell out via `sg docker -c "docker ..."`.
+  CI_SDK_IMAGE: 192.168.2.3:5000/ci/dotnet-sdk-docker:10.0
 
 jobs:
   build-and-test:
@@ -70,7 +73,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -e ABAC_DOCKER_IMAGE="${IMAGE_NAME}:test" \
             -e DOTNET_NOLOGO -e DOTNET_CLI_TELEMETRY_OPTOUT \
-            "$SDK_IMAGE" sh -euxc '
+            "$CI_SDK_IMAGE" sh -euxc '
               dotnet restore AbacController.slnx
               dotnet build AbacController.slnx --no-restore -c Release
               dotnet test tests/AbacController.Tests.Integration/AbacController.Tests.Integration.csproj \
