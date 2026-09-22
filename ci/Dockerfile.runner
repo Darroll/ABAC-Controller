@@ -1,0 +1,43 @@
+# Self-hosted GitHub Actions runner with the .NET SDK baked in.
+#
+# Jobs run dotnet directly on the runner instead of shelling into a nested
+# SDK container. That matters for the integration suite, which does:
+#
+#   docker run -d -P -v <Path.GetTempPath()>/abac-it-<guid>:/data ...
+#
+# The host daemon resolves that bind mount against the *host* filesystem. When
+# the tests ran nested, the temp dir only existed inside the inner container,
+# so the app container came up with an empty /data and EF Core failed to open
+# the SQLite database. Running on the runner with /tmp bind-mounted 1:1 makes
+# the path identical in both namespaces.
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS sdk
+
+FROM myoung34/github-runner:latest
+
+# Must match the docker group id on the runner host so the mounted socket is
+# writable, and so the fixtures' `sg docker -c "docker ..."` resolves.
+ARG DOCKER_GID=984
+
+COPY --from=sdk /usr/share/dotnet /usr/share/dotnet
+
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends libicu-dev openssh-client passwd; \
+    rm -rf /var/lib/apt/lists/*; \
+    ln -sf /usr/share/dotnet/dotnet /usr/local/bin/dotnet; \
+    (groupadd -g "${DOCKER_GID}" docker || groupmod -g "${DOCKER_GID}" docker); \
+    usermod -aG docker root; \
+    dotnet --info >/dev/null; \
+    dotnet --version; \
+    docker --version; \
+    command -v sg
+
+# Deliberately NOT setting DOTNET_ROOT or prepending /usr/share/dotnet to PATH.
+# Runner.Listener is itself a .NET app bundled with its own runtime; pointing
+# those at the SDK made it resolve the wrong runtime and every registration
+# attempt failed with 404 from api.github.com/actions/runner-registration.
+# The /usr/local/bin/dotnet symlink above is enough for jobs to call dotnet.
+ENV DOTNET_NOLOGO=true \
+    DOTNET_CLI_TELEMETRY_OPTOUT=true \
+    DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true

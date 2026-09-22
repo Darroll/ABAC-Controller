@@ -3,6 +3,11 @@ name: CI
 # Runs entirely on a self-hosted runner inside the LAN.
 # Source lives on GitHub; every build artifact, image, scan result and
 # deployment stays on 192.168.2.x and never leaves the network.
+#
+# The runner image (ci/Dockerfile.runner) has the .NET SDK, docker CLI and
+# ssh client baked in, so steps run tooling directly rather than nesting
+# into another container. See that file for why nesting broke the
+# integration fixtures.
 
 on:
   push:
@@ -14,12 +19,10 @@ on:
 env:
   DOTNET_NOLOGO: "true"
   DOTNET_CLI_TELEMETRY_OPTOUT: "true"
-  SDK_IMAGE: mcr.microsoft.com/dotnet/sdk:10.0
   REGISTRY: 192.168.2.3:5000
   IMAGE_NAME: abac-controller
-  # SDK plus docker CLI and a matching docker group, needed because the
-  # integration fixtures shell out via `sg docker -c "docker ..."`.
-  CI_SDK_IMAGE: 192.168.2.3:5000/ci/dotnet-sdk-docker:10.0
+  VOLTRON: root@192.168.2.3
+  DEPLOY_KEY: /deploy/id_ed25519
 
 jobs:
   build-and-test:
@@ -30,20 +33,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Restore, build, unit test
-        run: |
-          docker run --rm \
-            -v "$PWD":/src -w /src \
-            -v abac-nuget:/root/.nuget/packages \
-            -e DOTNET_NOLOGO -e DOTNET_CLI_TELEMETRY_OPTOUT \
-            "$SDK_IMAGE" sh -euxc '
-              dotnet restore AbacController.slnx
-              dotnet build AbacController.slnx --no-restore -c Release -warnaserror
-              dotnet test tests/AbacController.Tests.Unit/AbacController.Tests.Unit.csproj \
-                --no-build -c Release \
-                --logger "trx;LogFileName=unit-results.trx" \
-                --results-directory ./TestResults
-            '
+      - name: Restore
+        run: dotnet restore AbacController.slnx
+
+      - name: Build
+        run: dotnet build AbacController.slnx --no-restore -c Release -warnaserror
+
+      - name: Unit tests
+        run: >-
+          dotnet test tests/AbacController.Tests.Unit/AbacController.Tests.Unit.csproj
+          --no-build -c Release
+          --logger "trx;LogFileName=unit-results.trx"
+          --results-directory ./TestResults
 
       - name: Upload unit test results
         if: always()
@@ -66,25 +67,19 @@ jobs:
         run: docker build -t "${IMAGE_NAME}:test" .
 
       - name: Integration tests
+        env:
+          ABAC_DOCKER_IMAGE: ${{ env.IMAGE_NAME }}:test
         run: |
-          # --network host: the fixtures start sibling containers through the
-          # host docker socket, so their published ports land on the host. Host
-          # networking makes the 127.0.0.1:<port> the fixtures poll resolve.
-          docker run --rm \
-            --network host \
-            -v "$PWD":/src -w /src \
-            -v abac-nuget:/root/.nuget/packages \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -e ABAC_DOCKER_IMAGE="${IMAGE_NAME}:test" \
-            -e DOTNET_NOLOGO -e DOTNET_CLI_TELEMETRY_OPTOUT \
-            "$CI_SDK_IMAGE" sh -euxc '
-              dotnet restore AbacController.slnx
-              dotnet build AbacController.slnx --no-restore -c Release
-              dotnet test tests/AbacController.Tests.Integration/AbacController.Tests.Integration.csproj \
-                --no-build -c Release \
-                --logger "trx;LogFileName=integration-results.trx" \
-                --results-directory ./TestResults
-            '
+          dotnet restore AbacController.slnx
+          dotnet build AbacController.slnx --no-restore -c Release
+          dotnet test tests/AbacController.Tests.Integration/AbacController.Tests.Integration.csproj \
+            --no-build -c Release \
+            --logger "trx;LogFileName=integration-results.trx" \
+            --results-directory ./TestResults
+
+      - name: Collect stray test containers
+        if: always()
+        run: docker ps -aq --filter "name=abac-it-" | xargs -r docker rm -f
 
       - name: Upload integration test results
         if: always()
@@ -103,44 +98,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Semgrep OSS. Findings stay on this box as an artifact - nothing is
+      # Semgrep OSS. Findings stay on this box as an artifact; nothing is
       # uploaded to any hosted service.
       - name: Semgrep (SAST)
         run: |
           mkdir -p reports
-          docker run --rm \
-            -v "$PWD":/src -w /src \
+          docker run --rm -v "$PWD":/src -w /src \
             semgrep/semgrep semgrep scan \
               --config p/csharp --config p/security-audit --config p/secrets \
               --sarif --output reports/semgrep.sarif \
-              --metrics=off --error || true
-          echo "findings: $(grep -o '"ruleId"' reports/semgrep.sarif | wc -l)"
+              --metrics=off || true
+          echo "semgrep findings: $(grep -o '"ruleId"' reports/semgrep.sarif 2>/dev/null | wc -l)"
 
       - name: CycloneDX SBOM
         run: |
           mkdir -p reports
-          docker run --rm \
-            -v "$PWD":/src -w /src \
-            -v abac-nuget:/root/.nuget/packages \
-            -e DOTNET_NOLOGO -e DOTNET_CLI_TELEMETRY_OPTOUT \
-            "$SDK_IMAGE" sh -euxc '
-              dotnet tool install --global CycloneDX >/dev/null 2>&1 || true
-              export PATH="$PATH:/root/.dotnet/tools"
-              dotnet CycloneDX AbacController.slnx -o reports --filename sbom.json --json
-            '
+          dotnet tool install --global CycloneDX >/dev/null 2>&1 || true
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet CycloneDX AbacController.slnx -o reports --filename sbom.json --json
 
       - name: Vulnerable package audit
         run: |
-          docker run --rm \
-            -v "$PWD":/src -w /src \
-            -v abac-nuget:/root/.nuget/packages \
-            -e DOTNET_NOLOGO -e DOTNET_CLI_TELEMETRY_OPTOUT \
-            "$SDK_IMAGE" sh -euxc '
-              dotnet restore AbacController.slnx
-              dotnet list AbacController.slnx package --vulnerable --include-transitive \
-                > /src/reports/vulnerable-packages.txt 2>&1 || true
-              cat /src/reports/vulnerable-packages.txt
-            '
+          mkdir -p reports
+          dotnet restore AbacController.slnx
+          dotnet list AbacController.slnx package --vulnerable --include-transitive \
+            | tee reports/vulnerable-packages.txt
+          if grep -qiE '(Critical|High)' reports/vulnerable-packages.txt; then
+            echo "::error::High or critical severity vulnerable packages found"
+            exit 1
+          fi
 
       - name: Upload security reports
         if: always()
@@ -162,15 +148,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Compute tags
+      - name: Compute tag
         id: meta
         run: |
           TAG="$(date -u +%Y%m%d)-${GITHUB_SHA::7}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Image tag: $TAG"
 
-      # The runner already holds a docker login for the private registry and
-      # trusts its CA, so no registry credentials are stored in GitHub.
+      # The runner already trusts the registry CA and holds a docker login,
+      # so no registry credentials are stored in GitHub.
       - name: Build and push
         run: |
           TAG="${{ steps.meta.outputs.tag }}"
@@ -188,15 +174,16 @@ jobs:
             -v "$PWD/reports":/reports \
             aquasec/trivy:latest image \
               --scanners vuln --severity HIGH,CRITICAL \
-              --format json --output /reports/trivy.json \
+              --format table --output /reports/trivy.txt \
               "${REGISTRY}/${IMAGE_NAME}:${{ steps.meta.outputs.tag }}" || true
+          cat reports/trivy.txt || true
 
       - name: Upload image scan
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: image-scan
-          path: reports/trivy.json
+          path: reports/trivy.txt
           if-no-files-found: warn
 
   deploy:
@@ -205,7 +192,6 @@ jobs:
     needs: publish
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     timeout-minutes: 15
-    environment: production
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -215,11 +201,13 @@ jobs:
       - name: Deploy compose stack
         run: |
           TAG="${{ needs.publish.outputs.tag }}"
-          SSH="ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -i /deploy/id_ed25519"
-          $SSH root@192.168.2.3 "mkdir -p /mnt/user/appdata/abac-controller"
-          scp -o BatchMode=yes -o StrictHostKeyChecking=accept-new -i /deploy/id_ed25519 \
-            deploy/docker-compose.yml root@192.168.2.3:/mnt/user/appdata/abac-controller/docker-compose.yml
-          $SSH root@192.168.2.3 "cd /mnt/user/appdata/abac-controller \
+          SSH="ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -i ${DEPLOY_KEY}"
+          REMOTE=/mnt/user/appdata/abac-controller
+
+          $SSH "$VOLTRON" "mkdir -p ${REMOTE}/data"
+          scp -o BatchMode=yes -o StrictHostKeyChecking=accept-new -i "${DEPLOY_KEY}" \
+            deploy/docker-compose.yml "${VOLTRON}:${REMOTE}/docker-compose.yml"
+          $SSH "$VOLTRON" "cd ${REMOTE} \
             && echo 'ABAC_IMAGE_TAG=${TAG}' > .env \
             && docker compose pull \
             && docker compose up -d \
@@ -228,10 +216,14 @@ jobs:
       - name: Health check
         run: |
           for i in $(seq 1 30); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://192.168.2.3:8080/health/ready || true)
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
+              http://192.168.2.3:8080/health/ready || true)
             echo "attempt $i -> $code"
-            [ "$code" = "200" ] && exit 0
+            if [ "$code" = "200" ]; then
+              echo "ABAC Controller is live on Voltron at tag ${{ needs.publish.outputs.tag }}"
+              exit 0
+            fi
             sleep 5
           done
-          echo "service did not become ready"
+          echo "::error::service did not become ready"
           exit 1
