@@ -10,9 +10,16 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
-    <!-- Pinned above the version EF Core pulls transitively: 2.1.11 carries
-         GHSA-2m69-gcr7-jv3q (high). Remove once EF Core ships >= 2.1.13. -->
+    <!-- Pinned above the versions EF Core pulls transitively: lib.e_sqlite3
+         2.1.11 carries GHSA-2m69-gcr7-jv3q (high). All four SQLitePCLRaw
+         packages are pinned to the same version on purpose - mixing core
+         2.1.12 with bundle 2.1.13 makes SQLitePCL.raw.SetProvider fail to
+         bind sqlite3_libversion_number at runtime. Remove once EF Core
+         ships >= 2.1.13 itself. -->
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.13" />
+    <PackageReference Include="SQLitePCLRaw.core" Version="2.1.13" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.13" />
+    <PackageReference Include="SQLitePCLRaw.provider.e_sqlite3" Version="2.1.13" />
   </ItemGroup>
 
   <PropertyGroup>

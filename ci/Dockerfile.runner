@@ -13,7 +13,11 @@
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS sdk
 
-FROM myoung34/github-runner:latest
+# Pinned to a noble (24.04) base on purpose. The default :latest tag is Ubuntu
+# 20.04 / glibc 2.31, which is too old for the SQLitePCLRaw e_sqlite3 native
+# library: SQLitePCL.raw.SetProvider failed to bind sqlite3_libversion_number
+# and 144 unit tests errored before reaching an assertion.
+FROM myoung34/github-runner:ubuntu-noble
 
 # Must match the docker group id on the runner host so the mounted socket is
 # writable, and so the fixtures' `sg docker -c "docker ..."` resolves.
