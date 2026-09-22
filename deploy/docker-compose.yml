@@ -16,6 +16,14 @@ services:
       - "8091:8081"   # gRPC
     volumes:
       - /mnt/user/appdata/abac-controller/data:/data
+    # Unraid only treats a container as its own if it carries these labels.
+    # Without them the Docker tab shows the stack as third-party and greys out
+    # the update controls. They live here rather than being applied by hand so
+    # that `docker compose up -d` on each deploy keeps them.
+    labels:
+      net.unraid.docker.managed: dockerman
+      net.unraid.docker.webui: "http://[IP]:[PORT:8080]/"
+      net.unraid.docker.icon: "https://raw.githubusercontent.com/docker/docker.github.io/master/images/docker-icon.png"
     environment:
       TZ: America/New_York
       ASPNETCORE_ENVIRONMENT: Production
