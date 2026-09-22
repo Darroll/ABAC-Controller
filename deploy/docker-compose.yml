@@ -20,6 +20,16 @@ services:
       TZ: America/New_York
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: "http://+:8080"
+      ABAC_Database__ConnectionString: "Data Source=/data/abac-controller.db"
+      # The app refuses to start unless some authentication is configured.
+      # Machine-to-machine API key auth; the value lives only in the .env file
+      # the deploy job writes on Voltron, never in this repo.
+      ABAC_Auth__ApiKeys__0__Key: "${ABAC_API_KEY:?ABAC_API_KEY must be set}"
+      ABAC_Auth__ApiKeys__0__ClientId: "ci-deploy"
+      ABAC_Auth__ApiKeys__0__Description: "Provisioned by CI on first deploy"
+      ABAC_Auth__ApiKeys__0__Scopes__0: "abac:evaluate"
+      ABAC_Auth__ApiKeys__0__Scopes__1: "abac:sys:read"
+      ABAC_Auth__ApiKeys__0__Scopes__2: "abac:policy:read"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health/live"]
       interval: 30s

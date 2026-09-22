@@ -207,8 +207,16 @@ jobs:
           $SSH "$VOLTRON" "mkdir -p ${REMOTE}/data"
           scp -o BatchMode=yes -o StrictHostKeyChecking=accept-new -i "${DEPLOY_KEY}" \
             deploy/docker-compose.yml "${VOLTRON}:${REMOTE}/docker-compose.yml"
+
+          # The API key is generated once on Voltron and reused on later
+          # deploys, so it never passes through GitHub or this repo.
           $SSH "$VOLTRON" "cd ${REMOTE} \
-            && echo 'ABAC_IMAGE_TAG=${TAG}' > .env \
+            && if [ ! -s api-key.txt ]; then \
+                 openssl rand -hex 32 > api-key.txt && chmod 600 api-key.txt; \
+                 echo 'generated a new ABAC API key'; \
+               fi \
+            && { echo 'ABAC_IMAGE_TAG=${TAG}'; echo \"ABAC_API_KEY=\$(cat api-key.txt)\"; } > .env \
+            && chmod 600 .env \
             && docker compose pull \
             && docker compose up -d \
             && docker compose ps"
