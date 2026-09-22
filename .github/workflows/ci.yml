@@ -204,7 +204,9 @@ jobs:
           SSH="ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -i ${DEPLOY_KEY}"
           REMOTE=/mnt/user/appdata/abac-controller
 
-          $SSH "$VOLTRON" "mkdir -p ${REMOTE}/data"
+          # The image runs as uid/gid 1655 (abac); the appdata dir is created
+           # root-owned, which made SQLite fail with 'unable to open database file'.
+          $SSH "$VOLTRON" "mkdir -p ${REMOTE}/data && chown -R 1655:1655 ${REMOTE}/data"
           scp -o BatchMode=yes -o StrictHostKeyChecking=accept-new -i "${DEPLOY_KEY}" \
             deploy/docker-compose.yml "${VOLTRON}:${REMOTE}/docker-compose.yml"
 
