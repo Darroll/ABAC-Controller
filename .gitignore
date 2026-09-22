@@ -31,7 +31,6 @@ packages/
 ## Secrets
 appsettings.*.local.json
 .env
-.github/workflows/
 
 ## Test output
 **/TestResults/
