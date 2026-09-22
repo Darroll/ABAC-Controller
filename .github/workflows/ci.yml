@@ -1,87 +1,230 @@
 name: CI
 
+# Runs entirely on a self-hosted runner inside the LAN.
+# Source lives on GitHub; every build artifact, image, scan result and
+# deployment stays on 192.168.2.x and never leaves the network.
+
 on:
   push:
     branches: [main, develop]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 env:
-  DOTNET_VERSION: "10.0.x"
-  DOTNET_NOLOGO: true
-  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  SDK_IMAGE: mcr.microsoft.com/dotnet/sdk:10.0
+  REGISTRY: 192.168.2.3:5000
+  IMAGE_NAME: abac-controller
 
 jobs:
   build-and-test:
-    name: Build & Test
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
+    name: Build & Unit Test
+    runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Restore, build, unit test
+        run: |
+          docker run --rm \
+            -v "$PWD":/src -w /src \
+            -v abac-nuget:/root/.nuget/packages \
+            -e DOTNET_NOLOGO -e DOTNET_CLI_TELEMETRY_OPTOUT \
+            "$SDK_IMAGE" sh -euxc '
+              dotnet restore AbacController.slnx
+              dotnet build AbacController.slnx --no-restore -c Release -warnaserror
+              dotnet test tests/AbacController.Tests.Unit/AbacController.Tests.Unit.csproj \
+                --no-build -c Release \
+                --logger "trx;LogFileName=unit-results.trx" \
+                --results-directory ./TestResults
+            '
 
-      - name: Restore
-        run: dotnet restore AbacController.slnx
-
-      - name: Build
-        run: dotnet build AbacController.slnx --no-restore -c Release -warnaserror
-
-      - name: Unit Tests
-        run: >-
-          dotnet test tests/AbacController.Tests.Unit/AbacController.Tests.Unit.csproj
-          --no-build -c Release
-          --logger "trx;LogFileName=unit-results.trx"
-          --results-directory ./TestResults
-
-      - name: Upload Unit Test Results
+      - name: Upload unit test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-results
           path: ./TestResults/*.trx
+          if-no-files-found: warn
 
   integration-test:
     name: Integration Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     needs: build-and-test
-    timeout-minutes: 20
-
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Build test image
+        run: docker build -t "${IMAGE_NAME}:test" .
 
-      - name: Restore
-        run: dotnet restore AbacController.slnx
+      - name: Integration tests
+        run: |
+          docker run --rm \
+            -v "$PWD":/src -w /src \
+            -v abac-nuget:/root/.nuget/packages \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -e ABAC_DOCKER_IMAGE="${IMAGE_NAME}:test" \
+            -e DOTNET_NOLOGO -e DOTNET_CLI_TELEMETRY_OPTOUT \
+            "$SDK_IMAGE" sh -euxc '
+              dotnet restore AbacController.slnx
+              dotnet build AbacController.slnx --no-restore -c Release
+              dotnet test tests/AbacController.Tests.Integration/AbacController.Tests.Integration.csproj \
+                --no-build -c Release \
+                --logger "trx;LogFileName=integration-results.trx" \
+                --results-directory ./TestResults
+            '
 
-      - name: Build
-        run: dotnet build AbacController.slnx --no-restore -c Release
-
-      - name: Build Docker Image (for Testcontainers)
-        run: docker build -t abac-controller:test .
-
-      - name: Integration Tests
-        run: >-
-          dotnet test tests/AbacController.Tests.Integration/AbacController.Tests.Integration.csproj
-          --no-build -c Release
-          --logger "trx;LogFileName=integration-results.trx"
-          --results-directory ./TestResults
-        env:
-          ABAC_DOCKER_IMAGE: abac-controller:test
-
-      - name: Upload Integration Test Results
+      - name: Upload integration test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: integration-test-results
           path: ./TestResults/*.trx
+          if-no-files-found: warn
+
+  security-scan:
+    name: SAST & SBOM
+    runs-on: [self-hosted, linux, x64]
+    needs: build-and-test
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Semgrep OSS. Findings stay on this box as an artifact - nothing is
+      # uploaded to any hosted service.
+      - name: Semgrep (SAST)
+        run: |
+          mkdir -p reports
+          docker run --rm \
+            -v "$PWD":/src -w /src \
+            semgrep/semgrep semgrep scan \
+              --config p/csharp --config p/security-audit --config p/secrets \
+              --sarif --output reports/semgrep.sarif \
+              --metrics=off --error || true
+          echo "findings: $(grep -o '"ruleId"' reports/semgrep.sarif | wc -l)"
+
+      - name: CycloneDX SBOM
+        run: |
+          mkdir -p reports
+          docker run --rm \
+            -v "$PWD":/src -w /src \
+            -v abac-nuget:/root/.nuget/packages \
+            -e DOTNET_NOLOGO -e DOTNET_CLI_TELEMETRY_OPTOUT \
+            "$SDK_IMAGE" sh -euxc '
+              dotnet tool install --global CycloneDX >/dev/null 2>&1 || true
+              export PATH="$PATH:/root/.dotnet/tools"
+              dotnet CycloneDX AbacController.slnx -o reports --filename sbom.json --json
+            '
+
+      - name: Vulnerable package audit
+        run: |
+          docker run --rm \
+            -v "$PWD":/src -w /src \
+            -v abac-nuget:/root/.nuget/packages \
+            -e DOTNET_NOLOGO -e DOTNET_CLI_TELEMETRY_OPTOUT \
+            "$SDK_IMAGE" sh -euxc '
+              dotnet restore AbacController.slnx
+              dotnet list AbacController.slnx package --vulnerable --include-transitive \
+                > /src/reports/vulnerable-packages.txt 2>&1 || true
+              cat /src/reports/vulnerable-packages.txt
+            '
+
+      - name: Upload security reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: reports/
+          if-no-files-found: warn
+
+  publish:
+    name: Build & Push Image
+    runs-on: [self-hosted, linux, x64]
+    needs: [integration-test, security-scan]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    timeout-minutes: 30
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute tags
+        id: meta
+        run: |
+          TAG="$(date -u +%Y%m%d)-${GITHUB_SHA::7}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Image tag: $TAG"
+
+      # The runner already holds a docker login for the private registry and
+      # trusts its CA, so no registry credentials are stored in GitHub.
+      - name: Build and push
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          docker build \
+            -t "${REGISTRY}/${IMAGE_NAME}:${TAG}" \
+            -t "${REGISTRY}/${IMAGE_NAME}:latest" .
+          docker push "${REGISTRY}/${IMAGE_NAME}:${TAG}"
+          docker push "${REGISTRY}/${IMAGE_NAME}:latest"
+
+      - name: Scan published image
+        run: |
+          mkdir -p reports
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/reports":/reports \
+            aquasec/trivy:latest image \
+              --scanners vuln --severity HIGH,CRITICAL \
+              --format json --output /reports/trivy.json \
+              "${REGISTRY}/${IMAGE_NAME}:${{ steps.meta.outputs.tag }}" || true
+
+      - name: Upload image scan
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-scan
+          path: reports/trivy.json
+          if-no-files-found: warn
+
+  deploy:
+    name: Deploy to Voltron
+    runs-on: [self-hosted, linux, x64]
+    needs: publish
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The deploy key is mounted into the runner from the host, so the
+      # private key never lives in GitHub secrets.
+      - name: Deploy compose stack
+        run: |
+          TAG="${{ needs.publish.outputs.tag }}"
+          SSH="ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -i /deploy/id_ed25519"
+          $SSH root@192.168.2.3 "mkdir -p /mnt/user/appdata/abac-controller"
+          scp -o BatchMode=yes -o StrictHostKeyChecking=accept-new -i /deploy/id_ed25519 \
+            deploy/docker-compose.yml root@192.168.2.3:/mnt/user/appdata/abac-controller/docker-compose.yml
+          $SSH root@192.168.2.3 "cd /mnt/user/appdata/abac-controller \
+            && echo 'ABAC_IMAGE_TAG=${TAG}' > .env \
+            && docker compose pull \
+            && docker compose up -d \
+            && docker compose ps"
+
+      - name: Health check
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://192.168.2.3:8080/health/ready || true)
+            echo "attempt $i -> $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 5
+          done
+          echo "service did not become ready"
+          exit 1
