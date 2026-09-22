@@ -67,7 +67,11 @@ jobs:
 
       - name: Integration tests
         run: |
+          # --network host: the fixtures start sibling containers through the
+          # host docker socket, so their published ports land on the host. Host
+          # networking makes the 127.0.0.1:<port> the fixtures poll resolve.
           docker run --rm \
+            --network host \
             -v "$PWD":/src -w /src \
             -v abac-nuget:/root/.nuget/packages \
             -v /var/run/docker.sock:/var/run/docker.sock \
